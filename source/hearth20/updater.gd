@@ -3,9 +3,10 @@ class_name Hearth20Updater
 signal changed
 const REPOSITORY="WonderingMage/Hearth20"
 const RELEASES_PAGE="https://github.com/"+REPOSITORY+"/releases"
-const API="https://api.github.com/repos/"+REPOSITORY+"/releases?per_page=30"
+const API="https://api.github.com/repos/"+REPOSITORY+"/releases?per_page=100"
 const ASSET="Hearth20_Beta_Portable.exe"
 const MANIFEST="Hearth20-Beta-Manifest.json"
+const TEST_MANIFEST="Hearth20-Steam-Test-Manifest.json"
 const LIMIT=1500*1024*1024
 var app: Hearth20App
 var request: HTTPRequest
@@ -19,6 +20,7 @@ var message="Check when you are ready. Updates are downloaded only when you ask.
 var staged_path=""
 var hashing: Thread
 var tick=0.
+var channel=Hearth20Preferences.values.get("update_channel",Hearth20Identity.UPDATE_CHANNEL_DEFAULT)
 func _ready() -> void:
 	request=HTTPRequest.new();request.use_threads=true;request.timeout=30.;add_child(request);request.request_completed.connect(_received)
 	var previous=JSON.parse_string(FileAccess.get_file_as_string(Hearth20Identity.UPDATE_ROOT+"/install-plan.json.result")) if FileAccess.file_exists(Hearth20Identity.UPDATE_ROOT+"/install-plan.json.result") else null
@@ -47,30 +49,37 @@ static func newer(candidate: String,current: String) -> bool:
 static func valid_asset(asset: Dictionary,tag: String,name_value: String) -> bool:
 	var digest=str(asset.get("digest",""));var size_value=asset.get("size",0)
 	return asset.get("name","")==name_value and asset.get("state","")=="uploaded" and Hearth20Contracts._integer_number(size_value) and size_value>0 and size_value<=LIMIT and digest.begins_with("sha256:") and digest.length()==71 and digest.substr(7).is_valid_hex_number(false) and asset.get("browser_download_url","")=="https://github.com/"+REPOSITORY+"/releases/download/"+tag+"/"+name_value
-static func select_release(records: Variant,current: String) -> Dictionary:
+static func select_release(records: Variant,current: String,update_channel="beta") -> Dictionary:
 	if not records is Array:return {}
 	var best={}
 	for item in records:
 		if not item is Dictionary or item.get("draft",true):continue
-		var tag=str(item.get("tag_name",""));var version=tag.trim_prefix("hearth20-beta-v")
-		if not tag.begins_with("hearth20-beta-v") or not newer(version,current):continue
+		var tag=str(item.get("tag_name",""));var prefix="hearth20-steam-test-v" if tag.begins_with("hearth20-steam-test-v") else "hearth20-beta-v"
+		var test_channel=prefix=="hearth20-steam-test-v"
+		if not tag.begins_with(prefix) or (test_channel and update_channel!="steam-test"):continue
+		var version=tag.trim_prefix(prefix)
+		if not newer(version,current):continue
 		var executable={};var metadata={}
 		if not item.get("assets",[]) is Array:continue
 		for asset in item.get("assets",[]):
 			if not asset is Dictionary:continue
 			if valid_asset(asset,tag,ASSET):executable=asset
-			if valid_asset(asset,tag,MANIFEST) and int(asset.size)<=65536:metadata=asset
+			if valid_asset(asset,tag,TEST_MANIFEST if test_channel else MANIFEST) and int(asset.size)<=65536:metadata=asset
 		if executable.is_empty() or metadata.is_empty():continue
-		if best.is_empty() or newer(version,best.version):best={"tag":tag,"version":version,"exe":executable.duplicate(true),"metadata":metadata.duplicate(true)}
+		if best.is_empty() or newer(version,best.version):best={"tag":tag,"version":version,"channel":"steam-test" if test_channel else "beta","exe":executable.duplicate(true),"metadata":metadata.duplicate(true)}
 	return best
 static func valid_manifest(value: Variant,selected: Dictionary) -> bool:
+	if selected.get("channel","beta")=="steam-test" and (not value is Dictionary or value.get("channel","")!="steam-test"):return false
 	return value is Dictionary and value.get("edition","")==Hearth20Identity.EDITION and value.get("product","")==Hearth20Identity.PRODUCT_ID and value.get("version","")==selected.get("version","") and value.get("tag","")==selected.get("tag","") and value.get("asset","")==ASSET and value.get("bytes",0)==selected.get("exe",{}).get("size",-1) and value.get("sha256","")==str(selected.get("exe",{}).get("digest","")).trim_prefix("sha256:") and value.get("schema",-1)==Hearth20Identity.SCHEMA_VERSION and value.get("protocol",-1)==Hearth20Identity.NETWORK_PROTOCOL
+func set_channel(value: String) -> void:
+	if busy or value not in ["beta","steam-test"]:return
+	channel=value;release={};manifest={};verified=false;stage="idle";_notify("Update channel changed. Check for updates to see its releases.")
 func _notify(text: String) -> void:message=text;changed.emit()
 func _fail(text: String) -> void:
 	busy=false;stage="idle";request.download_file="";_notify(text)
 func check() -> void:
 	if busy:return
-	busy=true;verified=false;release={};manifest={};stage="check";request.download_file="";request.body_size_limit=2*1024*1024;request.timeout=30.;_notify("Looking for a Hearth20 Beta release on GitHub…")
+	busy=true;verified=false;release={};manifest={};stage="check";request.download_file="";request.body_size_limit=4*1024*1024;request.timeout=30.;_notify("Checking GitHub · "+("Beta + Steam test builds…" if channel=="steam-test" else "Beta releases…"))
 	if request.request(API,["Accept: application/vnd.github+json","User-Agent: Hearth20-Beta"])!=OK:_fail("GitHub could not be reached. Try again when you are online.")
 func download() -> void:
 	if busy or release.is_empty():return
@@ -80,8 +89,14 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
 	if result!=HTTPRequest.RESULT_SUCCESS or code!=200:
 		_fail("No Hearth20 Beta release is published yet." if stage=="check" and code==404 else "The update could not be fetched (HTTP %d). Your game is unchanged."%code);return
 	if stage=="check":
-		release=select_release(JSON.parse_string(body.get_string_from_utf8()),Hearth20Identity.VERSION);busy=false;stage="idle"
-		_notify("You have the latest published Hearth20 Beta." if release.is_empty() else "Hearth20 Beta "+str(release.version)+" is available. Download size: %.0f MB."%(float(release.exe.size)/1048576.));return
+		var records=JSON.parse_string(body.get_string_from_utf8())
+		if not records is Array:_fail("GitHub returned unreadable release information. Try checking again.");return
+		release=select_release(records,Hearth20Identity.VERSION,channel);busy=false;stage="idle"
+		if release.is_empty():
+			var other=select_release(records,Hearth20Identity.VERSION,"steam-test") if channel=="beta" else {}
+			_notify("No newer Beta release. Steam test "+str(other.version)+" is available; select Beta + Steam test builds to download it." if not other.is_empty() else "No newer "+("Beta or Steam test" if channel=="steam-test" else "Beta")+" release. You are running "+Hearth20Identity.VERSION+".")
+		else:_notify("Hearth20 "+str(release.version)+(" · Steam test" if release.channel=="steam-test" else " · Beta")+" is available. Download size: %.0f MB."%(float(release.exe.size)/1048576.))
+		return
 	if stage=="metadata":
 		if Hearth20Contracts.sha256(body)!=str(release.metadata.digest).trim_prefix("sha256:"):_fail("Release information failed its GitHub checksum. Nothing was installed.");return
 		var parsed=JSON.parse_string(body.get_string_from_utf8())
@@ -118,6 +133,8 @@ func install() -> void:
 	if not verified:return
 	if OS.has_feature("editor"):_notify("Restart updates are available in the portable edition.");return
 	if app!=null and not (app.session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer):_notify("Leave the multiplayer session before restarting for an update.");return
+	if app!=null and is_instance_valid(app.beyond_sheet):
+		if not await app.beyond_sheet.release_for_shutdown():_notify("Return your browser to its own window before restarting to update.");return
 	if app!=null and app.session.local_role=="dm":
 		var backup=Hearth20Identity.save_campaign(app.campaign,Hearth20Identity.SAVE_ROOT+"/before-update-"+str(int(Time.get_unix_time_from_system()))+"-"+Crypto.new().generate_random_bytes(3).hex_encode()+"."+Hearth20Identity.SAVE_EXTENSION)
 		if not backup.ok:_notify("A campaign backup could not be written. The update was not started.");return

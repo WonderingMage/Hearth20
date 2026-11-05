@@ -6,7 +6,8 @@ class_name Hearth20Identity
 const PRODUCT_ID := "com.wonderingmage.hearth20.seated"
 const PRODUCT_NAME := "Hearth20 Beta"
 const EDITION := "hearth20-seated"
-const VERSION := "0.2.4-beta"
+const VERSION := "0.3.5-beta"
+const UPDATE_CHANNEL_DEFAULT := "steam-test"
 const SCHEMA_ID := "hearth20.seated.campaign.v1"
 const SCHEMA_VERSION := 1
 const NETWORK_MAGIC := "HEARTH20-SEATED"
@@ -94,12 +95,17 @@ static func save_campaign(value: Dictionary, file_path: String) -> Dictionary:
 	var checked := Hearth20Contracts.validate_campaign(value)
 	if not checked.ok:
 		return checked
+	return _save_campaign_checked(value,file_path)
+
+static func _save_campaign_checked(value: Dictionary,file_path: String,progress: Callable=Callable()) -> Dictionary:
+	# The asynchronous saver validates its detached snapshot on the main thread first.
 	if not file_path.ends_with("." + SAVE_EXTENSION):
 		return {"ok": false, "errors": ["Hearth20 campaigns must use .%s." % SAVE_EXTENSION]}
 	if not file_path.begins_with(SAVE_ROOT + "/") or file_path.contains("..") or file_path.contains("\\"):
 		return {"ok": false, "errors": ["Campaign saves must stay under Hearth20's separate user-data root."]}
-	var json := JSON.stringify(_encode_variant(value))
-	if json.to_utf8_buffer().size() > MAX_SAVE_BYTES:
+	if progress.is_valid():progress.call(.25,"Preparing map and token data…")
+	var bytes := JSON.stringify(_encode_variant(value)).to_utf8_buffer()
+	if bytes.size() > MAX_SAVE_BYTES:
 		return {"ok": false, "errors": ["Campaign exceeds the save size limit."]}
 	var parent := file_path.get_base_dir()
 	var dir_error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(parent))
@@ -109,7 +115,9 @@ static func save_campaign(value: Dictionary, file_path: String) -> Dictionary:
 	var file := FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null:
 		return {"ok": false, "errors": ["Could not write Hearth20 campaign."]}
-	file.store_string(json)
+	for offset in range(0,bytes.size(),1048576):
+		file.store_buffer(bytes.slice(offset,mini(bytes.size(),offset+1048576)))
+		if progress.is_valid():progress.call(.35+.5*float(mini(bytes.size(),offset+1048576))/float(bytes.size()),"Writing your table…")
 	file.flush()
 	var error := file.get_error()
 	file.close()
@@ -118,6 +126,7 @@ static func save_campaign(value: Dictionary, file_path: String) -> Dictionary:
 		return {"ok": false, "errors": ["Could not flush Hearth20 campaign."]}
 	var absolute_temp := ProjectSettings.globalize_path(temporary)
 	var absolute_destination := ProjectSettings.globalize_path(file_path)
+	if progress.is_valid():progress.call(.9,"Preserving the previous save…")
 	if FileAccess.file_exists(file_path):
 		var backup := file_path + ".previous"
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(backup))
@@ -127,6 +136,8 @@ static func save_campaign(value: Dictionary, file_path: String) -> Dictionary:
 			return {"ok": false, "errors": ["Could not preserve the prior campaign save."]}
 	var rename_error := DirAccess.rename_absolute(absolute_temp, absolute_destination)
 	if rename_error != OK:
+		var previous=ProjectSettings.globalize_path(file_path+".previous")
+		if FileAccess.file_exists(previous) and not FileAccess.file_exists(absolute_destination):DirAccess.rename_absolute(previous,absolute_destination)
 		return {"ok": false, "errors": ["Could not finish Hearth20 campaign save."]}
 	return {"ok": true, "errors": [], "path": file_path}
 

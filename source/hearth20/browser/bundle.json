@@ -1,11 +1,11 @@
 {
-  "version": "webview2-1.0.4314.35-5a2cc0ced298",
   "files": {
-    "SDK-LICENSE.txt": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55",
+    "BeyondBrowserHost.exe": "ba033569f9761f70515fb07513d00f3734609c1e05f24d282794e72ba2f56595",
     "Microsoft.Web.WebView2.WinForms.dll": "c66437f80886aecf074804b61af4cc10ad90a95310c8e0a717f31ea377c26b03",
-    "BeyondBrowserHost.exe": "5a2cc0ced298904e15d9d396c63b6837738d3a49f8d6a669a88cecb8a7d5b4af",
-    "SDK-NOTICE.txt": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90",
+    "Microsoft.Web.WebView2.Core.dll": "acdd517b951829f763d1255f32df1e6a936cb8623a7ebff6b8b24172dede6bd6",
+    "SDK-LICENSE.txt": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55",
     "WebView2Loader.dll": "d3fce90bdeecb08596e377dea6a316354dd8949e32ff09b89d51be00c14e21b6",
-    "Microsoft.Web.WebView2.Core.dll": "acdd517b951829f763d1255f32df1e6a936cb8623a7ebff6b8b24172dede6bd6"
-  }
+    "SDK-NOTICE.txt": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90"
+  },
+  "version": "webview2-1.0.4314.35-ba033569f976"
 }
