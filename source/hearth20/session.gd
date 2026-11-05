@@ -8,6 +8,7 @@ signal snapshot_received(snapshot: Dictionary)
 signal fx_received(event: Dictionary)
 signal timeline_changed(entries: Array)
 signal dice_rolled(entry: Dictionary)
+signal table_request_finished(command: Dictionary, result: Dictionary)
 signal ping_received(event: Dictionary)
 signal tool_preview_received(event: Dictionary)
 signal character_submission_result(result: Dictionary)
@@ -42,6 +43,12 @@ var sight_cache: Dictionary = {}
 var pending_proofs: Dictionary = {}
 var token_drag_scope=""
 var refreshment_tick=0.
+var transport="direct"
+var steam_link: Node
+var steam_chunks=Hearth20SteamChunks.new()
+var steam_outgoing={}
+var steam_transfer_tick=0.
+var pending_table_commands: Array = []
 
 func _ready() -> void:
 	dice_rng.randomize()
@@ -49,10 +56,12 @@ func _ready() -> void:
 	multiplayer.server_disconnected.connect(func():
 		_clear_client_view()
 		status_changed.emit("The Hearth20 host disconnected. Private table data cleared.")
+		if transport=="steam" and is_instance_valid(steam_link):steam_link.connection_lost.call_deferred()
 	)
 	multiplayer.connection_failed.connect(func():
 		_clear_client_view()
 		status_changed.emit("Could not connect to the Hearth20 host. Private table data cleared.")
+		if transport=="steam" and is_instance_valid(steam_link):steam_link.connection_lost.call_deferred()
 	)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
@@ -72,6 +81,7 @@ func configure(campaign_data: Dictionary) -> void:
 	_load_refreshment_ledger()
 
 func start_host(port: int) -> Dictionary:
+	if is_instance_valid(steam_link) and steam_link.busy():return {"ok":false,"error":"Cancel the Steam connection before hosting by Direct IP."}
 	if port < 1024 or port > MAX_PORT:
 		return {"ok": false, "error": "Choose a port from 1024 to 65535."}
 	var api:=multiplayer as SceneMultiplayer
@@ -81,6 +91,7 @@ func start_host(port: int) -> Dictionary:
 	if error != OK:
 		return {"ok": false, "error": "Could not host the Hearth20 table (error %d)." % error}
 	multiplayer.multiplayer_peer = peer
+	transport="direct"
 	listening_port=port
 	invite_secret = _new_invite_secret()
 	remote_players.clear()
@@ -90,6 +101,7 @@ func start_host(port: int) -> Dictionary:
 	return {"ok": true, "invite_secret": invite_secret}
 
 func join_host(address: String, port: int, secret: String, nickname: String) -> Dictionary:
+	if is_instance_valid(steam_link) and steam_link.busy():return {"ok":false,"error":"Cancel the Steam connection before joining by Direct IP."}
 	var clean_address := address.strip_edges()
 	var clean_name := nickname.strip_edges().left(40)
 	if clean_address.is_empty() or clean_name.is_empty() or port < 1024 or port > MAX_PORT or secret.is_empty() or secret.length() > MAX_SECRET_LENGTH:
@@ -103,13 +115,34 @@ func join_host(address: String, port: int, secret: String, nickname: String) -> 
 	if error != OK:
 		return {"ok": false, "error": "Could not connect to the Hearth20 host (error %d)." % error}
 	multiplayer.multiplayer_peer = peer
+	transport="direct"
 	local_role = "player"
 	local_player_id = ""
 	invite_secret = secret
 	pending_nickname = clean_name
 	return {"ok": true}
 
+func adopt_steam_peer(peer: MultiplayerPeer,hosting: bool,secret: String,nickname: String) -> Dictionary:
+	if not multiplayer.multiplayer_peer is OfflineMultiplayerPeer:return {"ok":false,"error":"Leave the active table before connecting through Steam."}
+	if not is_instance_valid(steam_link) or not steam_link.initialized:return {"ok":false,"error":"Connect to Steam first."}
+	if secret.length()!=32 or not secret.is_valid_hex_number(false):return {"ok":false,"error":"The Steam invitation is invalid."}
+	if not hosting and (nickname.strip_edges().is_empty() or Hearth20PlayerProfile.key()==null):return {"ok":false,"error":"Choose a display name and make sure your local player profile can be saved."}
+	var api=multiplayer as SceneMultiplayer
+	if api!=null:api.server_relay=false
+	transport="steam";listening_port=0;invite_secret=secret;local_role="dm" if hosting else "player"
+	remote_players.clear();peer_to_player.clear();peer_asset_state.clear();pending_proofs.clear();steam_chunks.clear();steam_outgoing.clear()
+	if hosting:local_player_id="dm-local"
+	else:
+		_clear_client_view();pending_nickname=nickname.strip_edges().left(40)
+		var remembered=Hearth20PlayerProfile.preferences();Hearth20PlayerProfile.remember(pending_nickname,remembered.address,remembered.port)
+	multiplayer.multiplayer_peer=peer
+	status_changed.emit("Steam table ready. Invite friends to your private lobby." if hosting else "Connecting to the DM through Steam…")
+	return {"ok":true}
+
 func stop_session() -> void:
+	var was_steam=transport=="steam"
+	if multiplayer.multiplayer_peer!=null:multiplayer.multiplayer_peer.close()
+	transport="direct";steam_chunks.clear();steam_outgoing.clear()
 	listening_port=0
 	_clear_client_view()
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
@@ -122,8 +155,11 @@ func stop_session() -> void:
 	peer_asset_state.clear()
 	pending_proofs.clear()
 	status_changed.emit("Table disconnected.")
+	if was_steam and is_instance_valid(steam_link) and not steam_link.closing:steam_link.disconnect_table()
 
 func _clear_client_view() -> void:
+	var interrupted=pending_table_commands.duplicate();pending_table_commands.clear()
+	for command in interrupted:table_request_finished.emit(command,{"ok":false,"error":"The table disconnected before confirming this request."})
 	client_snapshot.clear()
 	local_player_id = "" if local_role == "player" else "dm-local"
 	if local_role != "player":
@@ -138,6 +174,8 @@ func send_handshake(identity: Dictionary, secret: String, nickname: String, publ
 	if not multiplayer.is_server():
 		return
 	var peer_id := multiplayer.get_remote_sender_id()
+	if transport=="steam" and (not is_instance_valid(steam_link) or not steam_link.allows_peer(peer_id) or peer_to_player.size()>=MAX_CLIENTS and not peer_to_player.has(peer_id)):
+		_reject_peer(peer_id);return
 	if not Hearth20Identity.validate_network_identity(identity) or secret != invite_secret or nickname.strip_edges().is_empty() or nickname.length() > 40 or not Hearth20PlayerProfile.valid_public(public_pem):
 		_reject_peer(peer_id)
 		return
@@ -158,6 +196,8 @@ func player_challenge(nonce: PackedByteArray) -> void:
 func prove_player(signature: PackedByteArray) -> void:
 	if local_role!="dm" or not multiplayer.is_server(): return
 	var peer_id:=multiplayer.get_remote_sender_id()
+	if transport=="steam" and (not is_instance_valid(steam_link) or not steam_link.allows_peer(peer_id) or peer_to_player.size()>=MAX_CLIENTS):
+		_reject_peer(peer_id);return
 	var pending: Dictionary=pending_proofs.get(peer_id,{})
 	pending_proofs.erase(peer_id)
 	if pending.is_empty() or Time.get_ticks_msec()>int(pending.expires) or not Hearth20PlayerProfile.verify(pending.nonce,pending.public_key,signature):
@@ -215,6 +255,14 @@ func request_move(actor_id: String, from: Vector2, to: Vector2, expected_revisio
 func receive_snapshot(snapshot: Dictionary) -> void:
 	if multiplayer.is_server():
 		return
+	if snapshot.has("_h20_transfer"):
+		if transport!="steam" or multiplayer.get_remote_sender_id()!=1 or not Hearth20Identity.validate_network_identity(snapshot) or not steam_link.allows_peer(1):return
+		var received=steam_chunks.accept(1,snapshot,"snapshot")
+		if not received.ok:_steam_transfer_failed(1,received.error);return
+		steam_link.transfer_update(float(received.get("progress",0.)),"Receiving the battlemap and campaign…")
+		if not received.complete:return
+		if not received.value is Dictionary:_steam_transfer_failed(1,"The table transfer was invalid.");return
+		snapshot=received.value
 	if multiplayer.get_remote_sender_id() != 1 or not Hearth20Identity.validate_network_identity(snapshot) or not snapshot.get("revision", null) is int or int(snapshot.revision) < 0 or not snapshot.get("scene") is Dictionary or not snapshot.get("actors") is Array or not snapshot.get("assets") is Dictionary:
 		return
 	if bool(snapshot.get("map_unchanged", false)):
@@ -375,6 +423,11 @@ func _send_peer_snapshot(peer_id: int, player_id: String,map_override: Variant=n
 		if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
 			var remote: ENetPacketPeer=multiplayer.multiplayer_peer.get_peer(peer_id)
 			if remote==null or remote.get_state()!=ENetPacketPeer.STATE_CONNECTED or remote.get_channels()==0: return
+		if transport=="steam":
+			if not steam_outgoing.has(peer_id):steam_outgoing[peer_id]={"active":{},"pending":{},"cache":{},"kind":"snapshot"}
+			# Keep only the latest waiting state. The in-flight state always finishes first.
+			steam_outgoing[peer_id].pending=snapshot
+			return
 		var assets_hash := Hearth20Contracts.sha256(var_to_bytes(snapshot.assets))
 		var previous: Dictionary = peer_asset_state.get(peer_id, {})
 		var map_hash := str(snapshot.get("map_sha256", ""))
@@ -438,6 +491,7 @@ func _project_for(player_id: String,map_override: Variant=null) -> Dictionary:
 	return projected
 
 func _on_peer_disconnected(peer_id: int) -> void:
+	steam_chunks.clear_peer(peer_id);steam_outgoing.erase(peer_id)
 	pending_proofs.erase(peer_id)
 	if local_role != "dm":
 		return
@@ -521,8 +575,14 @@ func _submit_table_request(command: Dictionary) -> Dictionary:
 		return _apply_table_request(command, "dm-local")
 	if local_player_id.is_empty() or multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return {"ok": false, "error": "Join a table before sending a roll or message."}
-	request_table_action.rpc_id(1, command)
-	return {"ok": true, "pending": true}
+	if pending_table_commands.size()>=32:return {"ok":false,"error":"Wait for the GM to confirm your pending requests."}
+	# Reliable requests and their existing acknowledgements arrive in the same order.
+	# Keep correlation local so older compatible hosts need no new RPC format.
+	pending_table_commands.append(command.duplicate(true))
+	var sent=rpc_id(1,"request_table_action",command)
+	if sent!=OK:
+		pending_table_commands.pop_back();return {"ok":false,"error":"The request could not be sent to the GM."}
+	return {"ok": true, "pending": true,"request_id":str(command.request_id)}
 
 @rpc("any_peer", "call_remote", "reliable")
 func request_table_action(command: Dictionary) -> void:
@@ -538,6 +598,9 @@ func request_table_action(command: Dictionary) -> void:
 @rpc("authority", "call_remote", "reliable")
 func table_action_result(ok: bool, message: String) -> void:
 	if not multiplayer.is_server() and multiplayer.get_remote_sender_id() == 1:
+		if not pending_table_commands.is_empty():
+			var command: Dictionary=pending_table_commands.pop_front()
+			table_request_finished.emit(command,{"ok":ok,"message":message,"error":"" if ok else message})
 		status_changed.emit(message if not ok else "Recorded at the table.")
 
 func _apply_table_request(command: Dictionary, player_id: String) -> Dictionary:
@@ -1126,6 +1189,12 @@ func request_view_actor(actor_id: String) -> void:
 func submit_join_character(sheet: Dictionary, png: PackedByteArray) -> Dictionary:
 	if local_role!="player" or local_player_id.is_empty() or multiplayer.multiplayer_peer.get_connection_status()!=MultiplayerPeer.CONNECTION_CONNECTED:return {"ok":false,"error":"Connect to the DM first."}
 	if png.size()>Hearth20Assets.TOKEN_MAX_BYTES or var_to_bytes(sheet).size()>Hearth20CharacterImport.MAX_BYTES:return {"ok":false,"error":"The character or PNG is too large."}
+	if transport=="steam":
+		if steam_outgoing.has(1):return {"ok":false,"error":"Your character image is still uploading."}
+		var job=Hearth20SteamChunks.make_job([sheet,png],"character",Hearth20Assets.TOKEN_MAX_BYTES+Hearth20CharacterImport.MAX_BYTES+4096)
+		if job.is_empty():return {"ok":false,"error":"The character image could not be prepared."}
+		steam_outgoing[1]={"active":job,"pending":{},"cache":{},"kind":"character"}
+		return {"ok":true,"pending":true}
 	request_join_character.rpc_id(1,sheet,png)
 	return {"ok":true,"pending":true}
 @rpc("any_peer","call_remote","reliable")
@@ -1133,6 +1202,13 @@ func request_join_character(sheet: Dictionary, png: PackedByteArray) -> void:
 	if local_role!="dm" or not multiplayer.is_server():return
 	var peer = multiplayer.get_remote_sender_id();var player = str(peer_to_player.get(peer,""))
 	if player.is_empty():return
+	if sheet.has("_h20_transfer"):
+		if transport!="steam" or not steam_link.allows_peer(peer):return
+		var received=steam_chunks.accept(peer,{"_h20_transfer":sheet._h20_transfer,"bytes":png},"character",Hearth20Assets.TOKEN_MAX_BYTES+Hearth20CharacterImport.MAX_BYTES+4096)
+		if not received.ok:_steam_transfer_failed(peer,received.error);return
+		if not received.complete:return
+		if not received.value is Array or received.value.size()!=2 or not received.value[0] is Dictionary or not received.value[1] is PackedByteArray:_steam_transfer_failed(peer,"The character transfer was invalid.");return
+		sheet=received.value[0];png=received.value[1]
 	var rate_key = "join-character:"+player;var now = Time.get_ticks_msec()
 	if now-int(request_rates.get(rate_key,-10000))<1500:return
 	request_rates[rate_key]=now
@@ -1223,12 +1299,55 @@ func receive_refreshment_event(event: Dictionary) -> void:
 func receive_refreshment_result(result: Dictionary) -> void:
 	if local_role=="player" and multiplayer.get_remote_sender_id()==1:refreshment_action_result.emit(result)
 func _process(delta: float) -> void:
+	if transport=="steam":
+		steam_transfer_tick+=delta
+		if steam_transfer_tick>=1./30.:steam_transfer_tick=0.;_pump_steam_transfers()
 	if local_role!="dm" or campaign.is_empty():return
 	refreshment_tick+=delta
 	if refreshment_tick<.25:return
 	refreshment_tick=0.
 	if Hearth20Refreshments.advance(campaign,Time.get_unix_time_from_system()):
 		_save_refreshment_ledger();campaign.revision=int(campaign.get("revision",0))+1;_broadcast_snapshots()
+func _make_steam_snapshot_job(peer: int,snapshot: Dictionary) -> Dictionary:
+	var packet=snapshot.duplicate(true)
+	var state={"map":str(packet.get("map_sha256","")),"assets":Hearth20Contracts.sha256(var_to_bytes(packet.assets)),"light":Hearth20Contracts.sha256(var_to_bytes(packet.scene.get("light_field",{}))),"scene":str(packet.scene.get("id",""))}
+	var previous: Dictionary=peer_asset_state.get(peer,{})
+	if previous.get("map","")==state.map:packet.map_png=PackedByteArray();packet.map_unchanged=true
+	if previous.get("assets","")==state.assets:packet.assets={};packet.assets_unchanged=true
+	if previous.get("light","")==state.light and previous.get("scene","")==state.scene:packet.scene.light_field={};packet.light_unchanged=true
+	return {"job":Hearth20SteamChunks.make_job(packet,"snapshot"),"cache":state}
+func _pump_steam_transfers() -> void:
+	if not is_instance_valid(steam_link) or not steam_link.initialized:return
+	for peer in steam_chunks.expire():_steam_transfer_failed(peer,"The Steam transfer stalled. Join the table again.")
+	for peer in steam_outgoing.keys():
+		if peer not in multiplayer.get_peers():steam_outgoing.erase(peer);continue
+		var slot: Dictionary=steam_outgoing[peer]
+		if slot.active.is_empty():
+			if slot.pending.is_empty():steam_outgoing.erase(peer);continue
+			var prepared=_make_steam_snapshot_job(peer,slot.pending);slot.pending={};slot.active=prepared.job;slot.cache=prepared.cache
+			if slot.active.is_empty():_steam_transfer_failed(peer,"This campaign exceeds the Steam transfer limit.");continue
+		var job: Dictionary=slot.active
+		if Time.get_ticks_msec()-int(job.get("last_sent",job.started))>45000:_steam_transfer_failed(peer,"The Steam transfer stalled. Join the table again.");continue
+		# Native send queues are finite. Leave space for moves, rolls and control RPCs.
+		for _chunk in 2:
+			if not steam_link.can_send(peer):break
+			var frame=Hearth20SteamChunks.frame(job);var result=OK
+			if slot.kind=="snapshot":
+				frame.merge(Hearth20Identity.network_identity());result=rpc_id(peer,"receive_snapshot",frame)
+			else:result=rpc_id(peer,"request_join_character",{"_h20_transfer":frame._h20_transfer},frame.bytes)
+			if result!=OK:_steam_transfer_failed(peer,"The Steam connection interrupted a transfer.");break
+			job.next+=1;job.last_sent=Time.get_ticks_msec()
+			if slot.kind=="character":steam_link.transfer_update(float(job.next)/float(job.count),"Sending your character image…")
+			if job.next>=job.count:
+				if slot.kind=="snapshot":peer_asset_state[peer]=slot.cache
+				slot.active={}
+				if slot.pending.is_empty():steam_outgoing.erase(peer)
+				break
+func _steam_transfer_failed(peer: int,note: String) -> void:
+	steam_chunks.clear_peer(peer);steam_outgoing.erase(peer);peer_asset_state.erase(peer)
+	status_changed.emit(note)
+	if local_role=="dm":_reject_peer(peer)
+	elif is_instance_valid(steam_link):steam_link.connection_lost.call_deferred()
 func _refreshment_ledger_path() -> String:
 	return "user://hearth20/refreshments/"+str(campaign.get("refreshment_scope","invalid"))+".json"
 func _load_refreshment_ledger() -> void:

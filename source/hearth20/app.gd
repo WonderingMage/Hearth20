@@ -115,6 +115,8 @@ var character_card: Hearth20CharacterCard
 var inventory_window: Hearth20TokenInventoryWindow
 var multiplayer_lab: Hearth20MultiplayerLab
 var dice_stage: Hearth20DiceStage
+var connection_window: Window
+var connection_signature=""
 
 func open_token_inventory() -> Hearth20TokenInventoryWindow:
 	if session.local_role!="dm": return null
@@ -141,6 +143,9 @@ func _ready() -> void:
 	session.name = "Hearth20Session"
 	add_child(session)
 	session.configure(campaign)
+	var steam=get_node_or_null("/root/SteamLink")
+	if steam!=null:
+		steam.attach(session);steam.invite_received.connect(_on_steam_invite);steam.changed.connect(_steam_connection_changed)
 	session.status_changed.connect(_on_status)
 	session.snapshot_received.connect(_on_snapshot)
 	session.state_changed.connect(_on_host_state)
@@ -1257,6 +1262,8 @@ func _apply_token_position() -> void:
 		session._broadcast_snapshots()
 
 func _build_network_section(parent: VBoxContainer) -> void:
+	var party=_add_button(parent,"✦ Gather party · Steam & Direct IP",func():open_connections())
+	party.custom_minimum_size.y=44
 	_add_header(parent, "HOSTED TABLE")
 	network_controls = VBoxContainer.new()
 	network_controls.add_theme_constant_override("separation", 8)
@@ -1763,7 +1770,7 @@ func _on_snapshot(value: Dictionary) -> void:
 	board.set_player_snapshot(value)
 	if session.local_role=="player" and not value.get("connection_closed",false):
 		if value.get("character_required",false) and not is_instance_valid(join_character_window) and not (multiplayer_lab!=null and multiplayer_lab.auto_character()):
-			join_character_window=Hearth20JoinPawnWindow.new();add_child(join_character_window);join_character_window.setup(self)
+			open_join_character()
 		elif not value.get("character_required",false) and is_instance_valid(join_character_window):
 			join_character_window.cancelled=true;join_character_window._close()
 	if bool(value.get("connection_closed", false)):
@@ -1899,3 +1906,24 @@ func open_fx_studio() -> Hearth20FxStudioWindow:
 
 func open_casino() -> void:
 	if session.local_role=="dm" and casino_portal!=null:casino_portal.open()
+
+func open_connections(action="") -> Window:
+	return Hearth20ConnectionWindow.open(self,action)
+func open_join_character() -> Hearth20JoinPawnWindow:
+	if is_instance_valid(join_character_window):return join_character_window
+	join_character_window=Hearth20JoinPawnWindow.new()
+	# The map is a texture-backed nested viewport. Modal input belongs to the player's screen.
+	(seated_shell if seated_shell!=null else self).add_child(join_character_window)
+	join_character_window.setup(self)
+	return join_character_window
+func _on_steam_invite() -> void:
+	var window=open_connections("join");var link=get_node("/root/SteamLink")
+	window.intent="join";window.invite_field.text=str(link.pending_invite)
+	if window.nickname.text.strip_edges().is_empty():window.nickname.text=link.display_name
+	if session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer and not link.busy() and not window.nickname.text.strip_edges().is_empty():link.join(str(link.pending_invite),window.nickname.text)
+func _steam_connection_changed() -> void:
+	if not is_instance_valid(host_button):return
+	var link=get_node("/root/SteamLink")
+	var signature=str(session.local_role)+"|"+str(session.transport)+"|"+str(session.multiplayer.multiplayer_peer.get_connection_status())+"|"+str(link.busy())
+	if signature==connection_signature:return
+	connection_signature=signature;board.set_role(session.local_role);_update_session_ui()

@@ -8,7 +8,7 @@ var preview: TextureRect
 var png=PackedByteArray()
 var send_button: Button
 func setup(owner_app: Hearth20App) -> void:
-	app=owner_app;title="Hearth20 Beyond · Bring your character";size=Vector2i(600,560);min_size=size;theme=Hearth20Design.theme();transient=true;exclusive=true;close_requested.connect(_close)
+	app=owner_app;title="Hearth20 · Bring your character";size=Vector2i(600,560);min_size=size;theme=Hearth20Design.theme();transient=true;exclusive=true;close_requested.connect(_close)
 	var panel=PanelContainer.new();panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#18120c"),3,28,Color("#ba9247")));add_child(panel)
 	var box=VBoxContainer.new();box.add_theme_constant_override("separation",16);panel.add_child(box)
 	var heading=Label.new();heading.text="YOUR PLACE AT THE TABLE";heading.add_theme_font_size_override("font_size",26);box.add_child(heading)
