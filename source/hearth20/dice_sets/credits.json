@@ -1,0 +1,17 @@
+{
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "player": {
+    "title": "RPG Dice Set",
+    "author": "ghosted",
+    "author_url": "https://sketchfab.com/dianaavlis2002",
+    "source": "https://sketchfab.com/3d-models/rpg-dice-set-2498c370c56842f89fa3d7096c72ed56"
+  },
+  "dm": {
+    "title": "Dungeons and Dragons Dice Set",
+    "author": "JayDesigns3D",
+    "author_url": "https://sketchfab.com/JayDesigns",
+    "source": "https://sketchfab.com/3d-models/dungeons-and-dragons-dice-set-163950cff9694fe1a686d22fe7737236"
+  },
+  "changes": "Converted from user-supplied glTF archives; normalized solids; bundled original materials; calibrated printed values and corner d4 outcomes. Ordinary DM d10 replaces sculpted tens with amber ones numerals; original tens retained for percentile rolls. Collection names and thumbnails added."
+}

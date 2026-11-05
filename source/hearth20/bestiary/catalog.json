@@ -1,0 +1,367 @@
+{
+  "version": 1,
+  "edition": "2014 fifth edition",
+  "artwork": "Twenty original Hearth20 colored 3D sculptures. Creature subjects are from the fifth-edition Monster Manual; these are original depictions, not extracted official art or third-party models.",
+  "creatures": [
+    {
+      "id": "adult-red-dragon",
+      "name": "Adult Red Dragon",
+      "type": "Huge dragon",
+      "tagline": "A crown of horn and flame",
+      "tips": [
+        "Red dragons are chromatic dragons, feared for fire and territorial pride.",
+        "A dragon encounter can unfold above the party as well as around it.",
+        "Spread the party before a cone of dragon breath catches everyone together.",
+        "The oldest treasure in a hoard may matter more than its gold value.",
+        "Drag the model to inspect its wings, horns and armored belly.",
+        "Right-drag up or down to lift the model slightly in the viewer.",
+        "Choose Fire in FX for turbulent flame; changing its tint keeps the fire material.",
+        "Breath is a cast effect: drag from the dragon toward its target.",
+        "Use a 60-degree measuring cone to plan a dragon's threat area.",
+        "Cosmetic fire never spends resources or applies damage; the DM resolves the outcome."
+      ]
+    },
+    {
+      "id": "beholder",
+      "name": "Beholder",
+      "type": "Large aberration",
+      "tagline": "Every eye is watching",
+      "tips": [
+        "A beholder's central eye and smaller eyestalks serve different purposes.",
+        "Its central gaze is associated with antimagic, while the stalks project magical rays.",
+        "A floating enemy makes cover and room height worth describing aloud.",
+        "Suspicion is a useful theme for a lair built by a many-eyed tyrant.",
+        "Rotate this model to see the separate stalks instead of a flat creature image.",
+        "Magic material draws arcane knotwork; Holy material forms crisp glints and facets.",
+        "A beam has a trajectory, so drag its source and release at the target.",
+        "The DM can hide a creature token until the party discovers it.",
+        "Opening a player-view preview shows the host-filtered view for that player.",
+        "Use the model and tip controls freely; a fast load does not force a waiting period."
+      ]
+    },
+    {
+      "id": "mind-flayer",
+      "name": "Mind Flayer",
+      "type": "Medium aberration",
+      "tagline": "A thought beneath the silence",
+      "tips": [
+        "The mind flayer combines an alien, tentacled appearance with formidable psychic power.",
+        "Telepathy can make an encounter unsettling without a single spoken word.",
+        "A psychic threat may demand a different plan from an armored brute.",
+        "Prisoners, thralls and strange machinery can tell a lair's story before combat starts.",
+        "Drag horizontally to examine the model's four facial tentacles and high collar.",
+        "Magic FX use moving glyph rings rather than a recolored fireball.",
+        "Use an instant burst for a psychic impact at the cursor, without a cast line.",
+        "Choose Only me when a roll should stay out of the public table history.",
+        "A player's display name is separate from their saved signing identity.",
+        "Someone using the same display name does not inherit another player's token grants."
+      ]
+    },
+    {
+      "id": "owlbear",
+      "name": "Owlbear",
+      "type": "Large monstrosity",
+      "tagline": "Feathers, fury and hooked claws",
+      "tips": [
+        "An owlbear combines a bear's heavy frame with an owl-like head and beak.",
+        "Its silhouette is a warning even before anyone recognizes the creature.",
+        "Tracks, torn trees and an abandoned nest can introduce the danger gradually.",
+        "A protective parent can create a tense encounter without an evil villain.",
+        "The viewer's scroll wheel moves the camera closer or farther away.",
+        "Tokens are controlled by the DM until the DM explicitly grants a player access.",
+        "The Tokens side button places a new creature where you click and release.",
+        "New creature tokens begin concealed; reveal them when the party can discover them.",
+        "Use Blood for wet splashes and mist instead of red sparks.",
+        "Adjust grid opacity on a busy forest map so movement remains easy to read."
+      ]
+    },
+    {
+      "id": "mimic",
+      "name": "Mimic",
+      "type": "Medium monstrosity",
+      "tagline": "The treasure has teeth",
+      "tips": [
+        "A mimic's disguise turns an ordinary object into an unexpected creature.",
+        "Its adhesive nature makes careless touching particularly dangerous.",
+        "A chest is a familiar disguise, but furniture can be suspicious too.",
+        "Leave clues that reward a cautious player before springing an ambush.",
+        "This model has an opening lid-jaw, individual teeth and a sculpted tongue.",
+        "Give the token an innocent name until you choose to reveal its identity.",
+        "The DM layer can hold a secret token before it enters the public token layer.",
+        "An impact appears where the left mouse button is released; it needs no trajectory.",
+        "The Slime material stretches into sticky strands and bubbling surfaces.",
+        "Save the campaign after changing control grants so they survive the next session."
+      ]
+    },
+    {
+      "id": "gelatinous-cube",
+      "name": "Gelatinous Cube",
+      "type": "Large ooze",
+      "tagline": "A corridor, swept clean",
+      "tips": [
+        "A gelatinous cube is a nearly transparent ooze shaped by the passages it travels.",
+        "Objects suspended inside an ooze can be a clue rather than free treasure.",
+        "An unnaturally clean dungeon corridor deserves a closer look.",
+        "Describe what the characters notice before demanding a tactical decision.",
+        "Rotate the colored translucent model to find the bones and coins inside.",
+        "Water and Slime are separate FX materials with different movement and surfaces.",
+        "Pooling and bubbling effects stay at the release point on the board.",
+        "Grid thickness is measured in screen pixels so lines stay readable as you zoom.",
+        "A player sees authorized map pixels, not the DM's complete original image.",
+        "Blackout clears the player's board while preserving their own sheet."
+      ]
+    },
+    {
+      "id": "goblin",
+      "name": "Goblin",
+      "type": "Small humanoid",
+      "tagline": "Small feet, quick plans",
+      "tips": [
+        "Goblins favor mobility, opportunistic attacks and a quick escape.",
+        "A small creature can turn narrow passages into a tactical advantage.",
+        "Scouting, alarms and retreat routes make a goblin camp feel organized.",
+        "A frightened lookout can matter as much as the strongest warrior.",
+        "The loading viewer supports arrow keys as well as mouse dragging.",
+        "Use K to open Tokens and control grants while preparing an encounter.",
+        "A saved player can be assigned a token even while they are offline.",
+        "Granting one token does not grant control of every creature on the board.",
+        "Use beacons to show the party a destination without revealing hidden artwork.",
+        "A player's remembered display name makes the returning group easier to identify."
+      ]
+    },
+    {
+      "id": "orc",
+      "name": "Orc",
+      "type": "Medium humanoid",
+      "tagline": "Iron, tusk and determination",
+      "tips": [
+        "The 2014 orc stat block emphasizes closing the distance with an enemy.",
+        "An orc warband can have scouts, rivalries and goals beyond its next fight.",
+        "Terrain can turn a straightforward advance into a difficult decision.",
+        "Not every encounter with an armed group needs to end in combat.",
+        "The model's armor and skin have separate colored materials.",
+        "Use Tokens to rename, resize, reveal and assign a selected creature.",
+        "Exploration movement can be allowed without giving the player DM editing tools.",
+        "The DM can revoke control by setting Controlled by to DM only.",
+        "Choose a thicker, brighter grid over dark dungeon floor textures.",
+        "The measuring beam offers widths of five, ten and fifteen feet."
+      ]
+    },
+    {
+      "id": "kobold",
+      "name": "Kobold",
+      "type": "Small humanoid",
+      "tagline": "A small foe with a larger scheme",
+      "tips": [
+        "Kobolds are small reptilian humanoids with a strong association with dragons.",
+        "Coordinated opponents can be more dangerous than their individual strength suggests.",
+        "Traps, tight tunnels and warning systems suit a carefully planned kobold lair.",
+        "A retreat can lure pursuers toward terrain the defenders know well.",
+        "Inspect the model's horns, tail and spear by rotating it around the vertical axis.",
+        "Grid squares and token size are separate: a small token still moves on the same grid.",
+        "Use the ruler's waypoints to measure a route around obstacles.",
+        "Closed doors stop sight and light until the DM opens them.",
+        "Rotate board north to change the direction of natural light through windows.",
+        "Use Escape to cancel token placement before you release it onto the map."
+      ]
+    },
+    {
+      "id": "troll",
+      "name": "Troll",
+      "type": "Large giant",
+      "tagline": "A wound that will not stay open",
+      "tips": [
+        "A troll is famous for regeneration and a relentless appetite.",
+        "Fire and acid are important considerations when facing a regenerating troll.",
+        "Show a wound knitting together so players can discover the danger in play.",
+        "A bridge, cavern or flooded passage can make a troll encounter memorable.",
+        "The sculpture's long arms and hooked nose distinguish it from the stockier ogre.",
+        "Acid FX bubble, spray and vaporize; Fire uses turbulent flame and smoke.",
+        "Changing an FX color preserves the chosen material's appearance and motion.",
+        "A cosmetic acid splash does not automatically disable regeneration.",
+        "The DM remains responsible for recording conditions, damage and other outcomes.",
+        "Preview an effect locally before showing it to the rest of the table."
+      ]
+    },
+    {
+      "id": "ogre",
+      "name": "Ogre",
+      "type": "Large giant",
+      "tagline": "Heavy steps in a narrow hall",
+      "tips": [
+        "An ogre's great size and strength make it a dangerous close-range threat.",
+        "A brute with a simple goal can still change the shape of an encounter.",
+        "Broken doors and oversized footprints can reveal an ogre before it appears.",
+        "A narrow route may force a large creature to approach differently.",
+        "This sculpture uses a broad belly, heavy club and distinct giant proportions.",
+        "Set a Large token to two grid squares when that suits the encounter's scale.",
+        "Token placement starts at the cursor; the DM can move the piece freely afterward.",
+        "A token's controller is explicit, even when the piece represents an ally.",
+        "Players cannot reveal a concealed enemy by guessing its token identifier.",
+        "Use Fit to restore a useful camera view after zooming into a creature."
+      ]
+    },
+    {
+      "id": "skeleton",
+      "name": "Skeleton",
+      "type": "Medium undead",
+      "tagline": "The dead remember how to march",
+      "tips": [
+        "A skeleton is an animated undead creature rather than a living humanoid.",
+        "Its exposed bones give the encounter a different character from a shambling zombie.",
+        "Clattering steps and abandoned equipment can introduce an undead patrol.",
+        "An ancient command may explain why a skeleton still guards an empty room.",
+        "This Skeleton showcase loops with sound. Pause, replay, mute or adjust its volume using the controls below.",
+        "Holy material uses hard glints and light facets rather than yellow flame.",
+        "A Holy nova is an instant effect centered on the cursor's release position.",
+        "Fog can conceal only part of a room while leaving the entrance visible.",
+        "Darkvision shows unlit map detail in grayscale and creates no light source.",
+        "Save a reusable visual effect as a named table preset."
+      ]
+    },
+    {
+      "id": "zombie",
+      "name": "Zombie",
+      "type": "Medium undead",
+      "tagline": "One more step through the dark",
+      "tips": [
+        "A zombie is a reanimated corpse whose persistence can surprise an attacker.",
+        "Its shambling appearance makes a useful contrast with quicker undead.",
+        "A familiar uniform or possession can tell the story of who the creature once was.",
+        "A slow threat can still become urgent when the party is trapped.",
+        "The model has colored decaying skin, wounds and torn clothing.",
+        "Death FX form moving wisps and dark vapor instead of purple fire.",
+        "Blood FX produce fluid sheets, falling droplets and suspended mist.",
+        "Apply appearance in Tokens to update the selected piece's name and size together.",
+        "The DM decides whether a creature is visible; owning another token does not bypass fog.",
+        "Right-drag the loading model vertically to bring a detail into a better viewing position."
+      ]
+    },
+    {
+      "id": "wraith",
+      "name": "Wraith",
+      "type": "Medium undead",
+      "tagline": "A shadow with a memory",
+      "tips": [
+        "A wraith is an incorporeal undead threat, unlike a creature built from bone or flesh.",
+        "Its presence can make darkness feel like an active part of the encounter.",
+        "A spectral foe invites descriptions of cold, silence and distorted light.",
+        "The history of a haunting can offer another path besides a fight.",
+        "This floating sculpture has a colored hood, spectral hands and trailing cloth.",
+        "Smoke material rolls into layered billows with changing silhouettes.",
+        "Reduce motion on your device when a calmer effect display is more comfortable.",
+        "Moonlight strength and sunlight strength can be adjusted independently.",
+        "A blackout is a deliberate DM action and does not erase the player's sheet.",
+        "A remembered player identity restores only the grants that exist in the saved campaign."
+      ]
+    },
+    {
+      "id": "giant-spider",
+      "name": "Giant Spider",
+      "type": "Large beast",
+      "tagline": "Eight legs above your torchlight",
+      "tips": [
+        "A giant spider's climbing and webs let it threaten more than the floor.",
+        "Threads across a doorway can be an early warning of a webbed lair.",
+        "An ambush becomes clearer when players can identify cover and escape routes.",
+        "Describe ceiling height when a creature can attack from above.",
+        "The colored model has eight jointed legs, several eyes and paired fangs.",
+        "Use the foreground layer for objects that sit visually above tokens.",
+        "Foreground scenery fades when it overlaps a token so the piece stays readable.",
+        "A persistent measuring shape can show a hazardous webbed area.",
+        "Water FX create splash droplets and ripples, with motion distinct from sticky Slime.",
+        "Turn up grid opacity when roots, webs or stones make square boundaries hard to see."
+      ]
+    },
+    {
+      "id": "basilisk",
+      "name": "Basilisk",
+      "type": "Medium monstrosity",
+      "tagline": "Do not meet its golden eyes",
+      "tips": [
+        "The basilisk is an eight-legged reptilian monstrosity associated with petrification.",
+        "A field of strangely lifelike statues can be a warning before the creature is seen.",
+        "A gaze threat makes the decision to look away meaningful.",
+        "Give players clear descriptions of what their characters can and cannot see.",
+        "Rotate the sculpture to count its legs and examine the ridge of spines.",
+        "Frost FX form sharp shards and branching crystal shapes instead of blue flames.",
+        "Instant effects need no source: aim the cursor and release the left mouse button.",
+        "A visual flash is a cue for the table, not automatic application of a condition.",
+        "The compass sets board north; it does not rotate the map's artwork or grid.",
+        "Use the model viewer's reset control to return to its original angle and height."
+      ]
+    },
+    {
+      "id": "rust-monster",
+      "name": "Rust Monster",
+      "type": "Medium monstrosity",
+      "tagline": "The antennae find your armor",
+      "tips": [
+        "A rust monster is known for its appetite for metal and its sensitive antennae.",
+        "The threat to equipment can matter more than raw damage.",
+        "Corroded tools and missing metal fittings can foreshadow its presence.",
+        "An encounter goal might be recovering supplies rather than defeating every creature.",
+        "This model includes an armored back, long antennae and a fan-shaped tail.",
+        "Create a creature token first, then explicitly choose its controller if a player needs it.",
+        "Setting Controlled by to DM only removes the player's movement access.",
+        "The grid's color, opacity and thickness are saved separately for each scene.",
+        "Saved FX presets retain their material as well as their tint.",
+        "Keep your local player identity when returning to a campaign so your grants can be restored."
+      ]
+    },
+    {
+      "id": "carrion-crawler",
+      "name": "Carrion Crawler",
+      "type": "Large monstrosity",
+      "tagline": "Feelers in the refuse",
+      "tips": [
+        "A carrion crawler is a scavenging monstrosity with a mass of dangerous tentacles.",
+        "Its many legs and feelers suit cramped, filthy underground passages.",
+        "A trail through abandoned refuse can warn explorers that something feeds nearby.",
+        "An encounter can turn on helping an ally escape a creature's reach.",
+        "Rotate the segmented colored model to inspect its tentacles and many feet.",
+        "Use a circle template to discuss reach or the extent of a hazard.",
+        "The ruler can add waypoints while preserving one continuous measurement.",
+        "An FX pool stays under the release point even if you began the click elsewhere.",
+        "Only the DM can change a token's layer, concealment or control assignment.",
+        "A player who reconnects proves their saved identity rather than relying on a display name."
+      ]
+    },
+    {
+      "id": "purple-worm",
+      "name": "Purple Worm",
+      "type": "Gargantuan monstrosity",
+      "tagline": "The tunnel is moving",
+      "tips": [
+        "A purple worm is an enormous burrowing monstrosity with a terrible maw.",
+        "Its size can turn a cave system into the creature's own passageway.",
+        "Rumbling stone and sudden tremors can build tension before the first sighting.",
+        "A chase, collapsing tunnel or escape route can give a giant-monster encounter variety.",
+        "Inspect the colored sculpture's segmented plates, ringed mouth and tail stinger.",
+        "Zoom out in the model viewer to take in a creature with a broad silhouette.",
+        "Scale FX to fit a dramatic moment while keeping the grid readable.",
+        "Non-cast explosions do not draw a trajectory across the board.",
+        "The DM can add a sample scene without replacing the campaign's existing maps.",
+        "Bring the party to another scene only when the gallery's party option is selected."
+      ]
+    },
+    {
+      "id": "gibbering-mouther",
+      "name": "Gibbering Mouther",
+      "type": "Medium aberration",
+      "tagline": "Too many voices, too many eyes",
+      "tips": [
+        "A gibbering mouther is an amorphous aberration covered in eyes and mouths.",
+        "Its unsettling sounds make the encounter more than a visual threat.",
+        "Distorted ground and confused movement can help describe an alien presence.",
+        "A creature's strange behavior can be a clue that ordinary tactics may fail.",
+        "This sculpture has individually modeled eyes, mouths and fleshy tendrils.",
+        "Charm FX flutter as hearts and petals; Magic FX trace moving arcane patterns.",
+        "Materials remain distinct even when you choose the same custom color for both.",
+        "The live FX preview is local until you deliberately place the effect on the board.",
+        "Your display name can change without giving up the identity that holds your token grants.",
+        "The creature codex offers twenty models and ten tailored tips for each, even after loading finishes."
+      ]
+    }
+  ]
+}

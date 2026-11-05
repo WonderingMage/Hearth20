@@ -1,0 +1,7 @@
+.godot/
+**/.godot/
+Builds/
+Reports/
+models/
+*.h20scampaign
+source/export_presets.cfg

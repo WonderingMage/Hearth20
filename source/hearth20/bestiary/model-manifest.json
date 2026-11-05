@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "models": {
+    "beholder": {
+      "source_file": "animated_beholder_dungeons__dragons.zip",
+      "source_sha256": "37ef5a71d444002a67d5c9bbda31bb09b97141dbb07e9a932da3aaf1cdfa69c0",
+      "scene_sha256": "66b87b27c94822166d5963dd98f7460daa00e021d96b02cf6b1c3fe146db3f49",
+      "attribution": "Model Information:\n* title:\tAnimated Beholder (Dungeons & Dragons)\n* source:\thttps://sketchfab.com/3d-models/animated-beholder-dungeons-dragons-b0fa0199cd74478fa1c46abc1ecc7adb\n* author:\tAnthony Yanez (https://sketchfab.com/paulyanez)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Animated Beholder (Dungeons & Dragons)\" (https://sketchfab.com/3d-models/animated-beholder-dungeons-dragons-b0fa0199cd74478fa1c46abc1ecc7adb) by Anthony Yanez (https://sketchfab.com/paulyanez) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 46,
+      "triangles": 25174,
+      "texture_pixels": 9076736,
+      "imported_utc": "2026-11-03T00:35:43.9464544Z"
+    },
+    "kobold": {
+      "source_file": "animated_kobold.zip",
+      "source_sha256": "41e3e5c22158aca27ffb751de97e631649d8e1cd1d324695ba4179c6b8497cbb",
+      "scene_sha256": "64d1915944a67b0b9bef52f6c70990de467a669428978667a72b0549cbfca9f1",
+      "attribution": "Model Information:\n* title:\tAnimated Kobold\n* source:\thttps://sketchfab.com/3d-models/animated-kobold-0da9989223424d4d80137c0bbf4979fa\n* author:\tgreeneyed3DArtist (https://sketchfab.com/greeneyes3DArtist)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Animated Kobold\" (https://sketchfab.com/3d-models/animated-kobold-0da9989223424d4d80137c0bbf4979fa) by greeneyed3DArtist (https://sketchfab.com/greeneyes3DArtist) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 2,
+      "triangles": 12746,
+      "texture_pixels": 15728640,
+      "imported_utc": "2026-11-03T00:35:50.4171901Z"
+    },
+    "carrion-crawler": {
+      "source_file": "carrion_crawler.zip",
+      "source_sha256": "5ec79cae8164c2158cf1b2ed323ea5642c3997aee1a3c63642bf230bccf53b53",
+      "scene_sha256": "dced86a8ff1a53867c27c873b048d4c754a28dac9e544004a3e989cbadfb9438",
+      "attribution": "Model Information:\n* title:\tCarrion Crawler\n* source:\thttps://sketchfab.com/3d-models/carrion-crawler-dfd3fd62a0114ad3a7649c679e48314c\n* author:\ttwedo565 (https://sketchfab.com/twedo565)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Carrion Crawler\" (https://sketchfab.com/3d-models/carrion-crawler-dfd3fd62a0114ad3a7649c679e48314c) by twedo565 (https://sketchfab.com/twedo565) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 16,
+      "triangles": 1596327,
+      "texture_pixels": 12582912,
+      "imported_utc": "2026-11-03T00:35:59.1274890Z"
+    },
+    "basilisk": {
+      "source_file": "coiled_basilisk_snake_meshy.zip",
+      "source_sha256": "0e1b0990121251cfb46c48a0a0ab53c8007b2549b3026a80597e65f8895a2f48",
+      "scene_sha256": "81c3fcdeecf0ef347d1735bb6a0010604df94160a74d8123cc143e7d8b8b0822",
+      "attribution": "Model Information:\n* title:\tCoiled Basilisk Snake [MESHY]\n* source:\thttps://sketchfab.com/3d-models/coiled-basilisk-snake-meshy-5192ced444d64546af7428ccbb366f39\n* author:\tEthanFromEngland (https://sketchfab.com/EthanfromEngland)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Coiled Basilisk Snake [MESHY]\" (https://sketchfab.com/3d-models/coiled-basilisk-snake-meshy-5192ced444d64546af7428ccbb366f39) by EthanFromEngland (https://sketchfab.com/EthanfromEngland) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 1,
+      "triangles": 67560,
+      "texture_pixels": 4194304,
+      "imported_utc": "2026-11-03T00:36:05.0284877Z"
+    },
+    "wraith": {
+      "source_file": "death_star_asuirila_shadow_wraith.zip",
+      "source_sha256": "f55e567c4901ccede1b2810f0fc918d514d8dc93ec1743d02920e7960b1aadc1",
+      "scene_sha256": "10246898dba261397809ac0de0d2a731adfcb462d19bc49459a810840e8419a1",
+      "attribution": "Model Information:\n* title:\tDeath Star Asuirila Shadow Wraith\n* source:\thttps://sketchfab.com/3d-models/death-star-asuirila-shadow-wraith-622cf16de38f4bc3afbf5c83870f96df\n* author:\tpatromes (https://sketchfab.com/patromes)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Death Star Asuirila Shadow Wraith\" (https://sketchfab.com/3d-models/death-star-asuirila-shadow-wraith-622cf16de38f4bc3afbf5c83870f96df) by patromes (https://sketchfab.com/patromes) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 1,
+      "triangles": 10000,
+      "texture_pixels": 4194304,
+      "imported_utc": "2026-11-03T00:36:10.3866975Z"
+    },
+    "mimic": {
+      "source_file": "dnd_mimic.zip",
+      "source_sha256": "55cbef933bd4a7ab8a57898adef3af095ca98a4aef5ef0f7fb669fbc6abf013d",
+      "scene_sha256": "27b4dd9dea4584fa16e0f325a496190495b7f919f1cd75f60769713c5e5206b8",
+      "attribution": "Model Information:\n* title:\tDnD_mimic\n* source:\thttps://sketchfab.com/3d-models/dnd-mimic-be3e8759772a48d0bc3d5433edbfb7c7\n* author:\tEclipsekn (https://sketchfab.com/Eclipsekn)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"DnD_mimic\" (https://sketchfab.com/3d-models/dnd-mimic-be3e8759772a48d0bc3d5433edbfb7c7) by Eclipsekn (https://sketchfab.com/Eclipsekn) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 5,
+      "triangles": 498286,
+      "texture_pixels": 12582912,
+      "imported_utc": "2026-11-03T00:36:16.9303822Z"
+    },
+    "giant-spider": {
+      "source_file": "elemental_spider.zip",
+      "source_sha256": "edc4bba0a670984a32133cd4984a14120d973fa24a409997fef26badd997a969",
+      "scene_sha256": "80304b8e4eea8a1866a76c23f1efbe06dad0d7e66f874eb7775c9d130823a7e1",
+      "attribution": "Model Information:\n* title:\tElemental Spider\n* source:\thttps://sketchfab.com/3d-models/elemental-spider-3f5ea19aff254877b9eb5a89f2db7951\n* author:\tArachnoBoy (https://sketchfab.com/vang807)\n\nModel License:\n* license type:\tCC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)\n* requirements:\tAuthor must be credited. No commercial use. Modified versions must have the same license.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Elemental Spider\" (https://sketchfab.com/3d-models/elemental-spider-3f5ea19aff254877b9eb5a89f2db7951) by ArachnoBoy (https://sketchfab.com/vang807) licensed under CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)",
+      "meshes": 1,
+      "triangles": 7478,
+      "texture_pixels": 6291456,
+      "imported_utc": "2026-11-03T00:36:22.6133915Z"
+    },
+    "goblin": {
+      "source_file": "goblin.zip",
+      "source_sha256": "c51a2c7ce9235d8c12fef53033bfe21191daa40d1d7a0447e824a98e7da0a9dc",
+      "scene_sha256": "9deb7cb0ebe860cb8fb0b62aa003c2af116ccf13deb92237532d085cfee1bb2b",
+      "attribution": "Model Information:\n* title:\tgoblin\n* source:\thttps://sketchfab.com/3d-models/goblin-1dbcfa5a93ec4584b4368babef51b443\n* author:\tkonkulie (https://sketchfab.com/konkylie)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"goblin\" (https://sketchfab.com/3d-models/goblin-1dbcfa5a93ec4584b4368babef51b443) by konkulie (https://sketchfab.com/konkylie) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 1,
+      "triangles": 33604,
+      "texture_pixels": 12582912,
+      "imported_utc": "2026-11-03T00:36:29.2254039Z"
+    },
+    "mind-flayer": {
+      "source_file": "mind_flayer__illithid.zip",
+      "source_sha256": "86be0f49cd36798cdc858246a69df1b0f401ea8daf3d6feea3f22c70292af8f6",
+      "scene_sha256": "7564d00af5f6ba24c54c00c0487303ec69cc4b11c439b56e31c16b94c5fdf31d",
+      "attribution": "Model Information:\n* title:\tMind flayer / Illithid\n* source:\thttps://sketchfab.com/3d-models/mind-flayer-illithid-50c6cc33366449be873b785c3b1efab6\n* author:\tfilobus (https://sketchfab.com/filobus)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Mind flayer / Illithid\" (https://sketchfab.com/3d-models/mind-flayer-illithid-50c6cc33366449be873b785c3b1efab6) by filobus (https://sketchfab.com/filobus) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 1,
+      "triangles": 93946,
+      "texture_pixels": 16777216,
+      "imported_utc": "2026-11-03T00:36:35.7666371Z"
+    },
+    "orc": {
+      "source_file": "orc_shaman.zip",
+      "source_sha256": "5ba4267581efe7cba327357d12cc84a81aeedf728e45d4b91532787e439c790f",
+      "scene_sha256": "ed9a5c879d2cf14f33da67d8302cd9dfaafe7e44f15e9a189bdfc4be6961a59f",
+      "attribution": "Model Information:\n* title:\tOrc shaman\n* source:\thttps://sketchfab.com/3d-models/orc-shaman-e1c7d1da70854278a728742f7bb98c9b\n* author:\tvalkiriaixda (https://sketchfab.com/valkiriaixda)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Orc shaman\" (https://sketchfab.com/3d-models/orc-shaman-e1c7d1da70854278a728742f7bb98c9b) by valkiriaixda (https://sketchfab.com/valkiriaixda) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 8,
+      "triangles": 16430,
+      "texture_pixels": 47841280,
+      "imported_utc": "2026-11-03T00:36:43.5053934Z"
+    },
+    "owlbear": {
+      "source_file": "owlbear.zip",
+      "source_sha256": "f1daca428293a127c1901bad4ede01d139f8fd7464788d6ad462d2480c046239",
+      "scene_sha256": "3fcc32112a86327eb974c49eef9e63ddf43b8012a1e863abaa8f1dca91ce6d64",
+      "attribution": "Model Information:\n* title:\tOwlbear\n* source:\thttps://sketchfab.com/3d-models/owlbear-b073d2499a7a40528d3000bebcd65783\n* author:\tSpinnee (https://sketchfab.com/Spinnee)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Owlbear\" (https://sketchfab.com/3d-models/owlbear-b073d2499a7a40528d3000bebcd65783) by Spinnee (https://sketchfab.com/Spinnee) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 4,
+      "triangles": 3138,
+      "texture_pixels": 3145728,
+      "imported_utc": "2026-11-03T00:36:49.3615803Z"
+    },
+    "purple-worm": {
+      "source_file": "purple_worm.zip",
+      "source_sha256": "72fe1c0861f07316a860683f1d9691de54f6c2053ba1c91ac9bb6f85c9e74f9e",
+      "scene_sha256": "2b246a6ede2c23d87578a48800882688578546056544607273777b3872bc4e1a",
+      "attribution": "Model Information:\n* title:\tpurple worm\n* source:\thttps://sketchfab.com/3d-models/purple-worm-4b7d6c4fdd0548a8ba208e64be7c0d29\n* author:\thugobart (https://sketchfab.com/hugobart)\n\nModel License:\n* license type:\tCC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)\n* requirements:\tAuthor must be credited. No commercial use. Modified versions must have the same license.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"purple worm\" (https://sketchfab.com/3d-models/purple-worm-4b7d6c4fdd0548a8ba208e64be7c0d29) by hugobart (https://sketchfab.com/hugobart) licensed under CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)",
+      "meshes": 1,
+      "triangles": 47998,
+      "texture_pixels": 4194304,
+      "imported_utc": "2026-11-03T00:36:54.8707714Z"
+    },
+    "adult-red-dragon": {
+      "source_file": "red_dragon_-_dungeons_and_dragons.zip",
+      "source_sha256": "1e0563b379c3b48ad75c831bf29ac93ea0bc216cf4264e0215d9a4086438eb4c",
+      "scene_sha256": "e8ab26a10a73cca690758c568592853dbe44645ad8c3a5a30771db20a87992d5",
+      "attribution": "Model Information:\n* title:\tRed Dragon - Dungeons and Dragons\n* source:\thttps://sketchfab.com/3d-models/red-dragon-dungeons-and-dragons-bdfabc5038044ea0b15e9b27a2d5b998\n* author:\tBrian Trepanier (https://sketchfab.com/CMBC)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Red Dragon - Dungeons and Dragons\" (https://sketchfab.com/3d-models/red-dragon-dungeons-and-dragons-bdfabc5038044ea0b15e9b27a2d5b998) by Brian Trepanier (https://sketchfab.com/CMBC) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 13,
+      "triangles": 1357512,
+      "texture_pixels": 4194304,
+      "imported_utc": "2026-11-03T00:37:01.3423367Z"
+    },
+    "rust-monster": {
+      "source_file": "rust_monster.zip",
+      "source_sha256": "60792ea74e7e776fc302476f1aaea194cfa8ae3a0c2147c121dccfda7aa614f4",
+      "scene_sha256": "3c717351286feed2240ceab35a46bc9223d1be0a9b26ee3ff4597f271d505c3d",
+      "attribution": "Model Information:\n* title:\tRust Monster\n* source:\thttps://sketchfab.com/3d-models/rust-monster-a5645f1bf8274a30aa5f099c9868ca2d\n* author:\tMiniature Collectors Club (https://sketchfab.com/Alberto.Zanini)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Rust Monster\" (https://sketchfab.com/3d-models/rust-monster-a5645f1bf8274a30aa5f099c9868ca2d) by Miniature Collectors Club (https://sketchfab.com/Alberto.Zanini) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 6,
+      "triangles": 557292,
+      "texture_pixels": 12582912,
+      "imported_utc": "2026-11-03T00:37:08.2965847Z"
+    },
+    "troll": {
+      "source_file": "troll.zip",
+      "source_sha256": "697f2c14d5c16392603f7457aafffe0d6bc56abc2ccd7d72a72f43e53724d7a3",
+      "scene_sha256": "20cb7d1d31e4276fc1c0d04be7f6048f74d46a4587849fa35190e1bd092e558c",
+      "attribution": "Model Information:\n* title:\tTroll\n* source:\thttps://sketchfab.com/3d-models/troll-94b4a00a72bb4450b82b7a9c6bd4b177\n* author:\tkenchoo (https://sketchfab.com/kenchoo)\n\nModel License:\n* license type:\tCC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)\n* requirements:\tAuthor must be credited. No commercial use. Modified versions must have the same license.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Troll\" (https://sketchfab.com/3d-models/troll-94b4a00a72bb4450b82b7a9c6bd4b177) by kenchoo (https://sketchfab.com/kenchoo) licensed under CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)",
+      "meshes": 3,
+      "triangles": 17824,
+      "texture_pixels": 7340032,
+      "imported_utc": "2026-11-03T00:37:19.5277447Z"
+    },
+    "zombie": {
+      "source_file": "zombie_scream.zip",
+      "source_sha256": "153104032b91194546ecf6099164dd4d82ff80c7ff752b75a22604d88518b647",
+      "scene_sha256": "997fceacf4d93d11791710f31cec049d5d1cfeeeb5a2443ad58f7190225c6a77",
+      "attribution": "Model Information:\n* title:\tZombie Scream\n* source:\thttps://sketchfab.com/3d-models/zombie-scream-e1233ae435184964ba0579bf22d97545\n* author:\tJuangamer (https://sketchfab.com/Juangamer)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Zombie Scream\" (https://sketchfab.com/3d-models/zombie-scream-e1233ae435184964ba0579bf22d97545) by Juangamer (https://sketchfab.com/Juangamer) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 1,
+      "triangles": 14934,
+      "texture_pixels": 12582912,
+      "imported_utc": "2026-11-03T00:37:27.4786332Z"
+    },
+    "ogre": {
+      "source_file": "the_elder_scrolls_blades_ogre.zip",
+      "source_sha256": "0183469adc9415db8d7f1207253d5808846c9771b8579aedc8d52343a4a0bb28",
+      "scene_sha256": "0bf4722504f257a4c5a1e7ed0d4979578c1f07885d6d75238861c5b1cf79b967",
+      "attribution": "Model Information:\n* title:\tThe Elder Scrolls Blades Ogre\n* source:\thttps://sketchfab.com/3d-models/the-elder-scrolls-blades-ogre-f52616363be045209b6d1564634d5ebc\n* author:\tOrangeSauceu (https://sketchfab.com/orangesauceu)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"The Elder Scrolls Blades Ogre\" (https://sketchfab.com/3d-models/the-elder-scrolls-blades-ogre-f52616363be045209b6d1564634d5ebc) by OrangeSauceu (https://sketchfab.com/orangesauceu) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "meshes": 7,
+      "triangles": 36640,
+      "texture_pixels": 2097152,
+      "imported_utc": "2026-11-03T00:38:44.1942028Z"
+    },
+    "skeleton": {
+      "kind": "video",
+      "source_file": "videoplayback.mp4",
+      "source_sha256": "5259ffef59b0b6ec2b7ac38fa14e0a6ec3b5c4fb11d62e78654deaec6ccc365a",
+      "media_sha256": "120f28bd2f60fb9ba5a3b9997c109407e011bd10f7460bdfb3bbd0b04dbbbf60",
+      "attribution": "Skeleton video supplied by the campaign owner. Converted from MP4 to Ogg Theora/Vorbis for native looping playback, with the original audio retained.",
+      "duration_seconds": 5.9,
+      "width": 640,
+      "height": 360
+    },
+    "gibbering-mouther": {
+      "source_file": "gibbering_2.zip",
+      "source_sha256": "9735d348ce84a7e7ac1a7ed6d58576b991bf8787889f6988c371ab3dab4bebe2",
+      "scene_sha256": "ed81364f29c84664913bdb8dc0e606b051abe6d615eee9f1178bb82588d51ae0",
+      "attribution": "Model Information:\n* title:\tGIBBERING 2\n* source:\thttps://sketchfab.com/3d-models/gibbering-2-25e48f2a698d4d39ad50104b5d35aace\n* author:\tjulionavarro98 (https://sketchfab.com/julionavarro98)\n\nModel License:\n* license type:\tCC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\n* requirements:\tAuthor must be credited. Commercial use is allowed.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"GIBBERING 2\" (https://sketchfab.com/3d-models/gibbering-2-25e48f2a698d4d39ad50104b5d35aace) by julionavarro98 (https://sketchfab.com/julionavarro98) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\nHearth20 modification: procedural mottled flesh, fine veins, pores and a wet clearcoat material.",
+      "meshes": 11,
+      "triangles": 1077810,
+      "texture_pixels": 0,
+      "imported_utc": "2026-11-03T00:42:51.8395830Z",
+      "color_profile": "gibbering-flesh"
+    },
+    "gelatinous-cube": {
+      "source_file": "gelatinous_cube.zip",
+      "source_sha256": "5c8b840bcb540a5886b974a233e462460039784c564b1090e5e679d5668fe940",
+      "scene_sha256": "3f15ac2bfb9ad4468e8512d0d938e72eea7a4226a864b6923e864ba9ba9ec215",
+      "attribution": "Model Information:\n* title:\tGelatinous Cube\n* source:\thttps://sketchfab.com/3d-models/gelatinous-cube-e08385238f4d4b59b012233a9fbdca21\n* author:\tglenatron (https://sketchfab.com/glenatron)\n\nModel License:\n* license type:\tCC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)\n* requirements:\tAuthor must be credited. No commercial use.\n\nIf you use this 3D model in your project be sure to copy paste this credit wherever you share it:\nThis work is based on \"Gelatinous Cube\" (https://sketchfab.com/3d-models/gelatinous-cube-e08385238f4d4b59b012233a9fbdca21) by glenatron (https://sketchfab.com/glenatron) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)",
+      "meshes": 19,
+      "triangles": 92767,
+      "texture_pixels": 94699520,
+      "imported_utc": "2026-11-03T01:00:57.3176879Z"
+    }
+  },
+  "note": "Each creature can override its provisional sculpture with imported/<creature-id>.scn. Use tools/import_loading_model.ps1 for glTF ZIP or GLB conversion. The viewer and ten tips stay bound to the creature ID."
+}

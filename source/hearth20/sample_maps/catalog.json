@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "license": "Original Hearth20 sample cartography. Common encounter archetypes; no third-party map artwork is included.",
+  "maps": [
+    {
+      "id": "lantern-larch-inn",
+      "title": "Lantern & Larch Inn",
+      "category": "Interiors",
+      "description": "A furnished roadside inn with a hearth, kitchen and storeroom. Warm firelight meets afternoon window light.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 5,
+      "source_types": [
+        "brazier",
+        "window"
+      ]
+    },
+    {
+      "id": "briarwood-crossroads",
+      "title": "Briarwood Crossroads",
+      "category": "Wilderness",
+      "description": "Forest paths, a stalled cart and a sheltered camp. Moonlight threads through the canopy.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 3,
+      "source_types": [
+        "brazier",
+        "moonlight"
+      ]
+    },
+    {
+      "id": "moonwater-bridge",
+      "title": "Moonwater Bridge",
+      "category": "Wilderness",
+      "description": "A narrow crossing above a moonlit river, with broken ruins and clear ambush approaches.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 3,
+      "source_types": [
+        "torch",
+        "moonlight"
+      ]
+    },
+    {
+      "id": "mossfall-chapel",
+      "title": "Mossfall Chapel",
+      "category": "Ruins",
+      "description": "A fallen chapel with surviving columns, broken walls and an open eastern approach.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 3,
+      "source_types": [
+        "sunlight",
+        "window",
+        "crystal"
+      ]
+    },
+    {
+      "id": "echoing-caverns",
+      "title": "Echoing Caverns",
+      "category": "Underground",
+      "description": "A broad limestone chamber with a deep pool, mineral outcrops and open tactical space.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 4,
+      "source_types": [
+        "crystal",
+        "sunlight"
+      ]
+    },
+    {
+      "id": "ironbarrow-crypt",
+      "title": "Ironbarrow Crypt",
+      "category": "Underground",
+      "description": "A burial hall, side tombs and an altar chamber. Wall braziers cast long shadows across the pillars.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 5,
+      "source_types": [
+        "brazier",
+        "crystal"
+      ]
+    },
+    {
+      "id": "oldwatch-keep",
+      "title": "Oldwatch Keep",
+      "category": "Strongholds",
+      "description": "A fortified courtyard, gatehouse and barracks ready for a siege or a tense arrival.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 5,
+      "source_types": [
+        "brazier",
+        "sunlight",
+        "torch"
+      ]
+    },
+    {
+      "id": "saltwind-docks",
+      "title": "Saltwind Docks",
+      "category": "Settlements",
+      "description": "Warehouse doors, cargo stacks and long piers beside a cold harbour.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 5,
+      "source_types": [
+        "window",
+        "torch",
+        "moonlight"
+      ]
+    },
+    {
+      "id": "emberforge-mine",
+      "title": "Emberforge Mine",
+      "category": "Underground",
+      "description": "A working mine with a forge, rail cart and branching tunnels. Furnace light mixes with cool ore crystals.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 4,
+      "source_types": [
+        "brazier",
+        "crystal"
+      ]
+    },
+    {
+      "id": "ashen-cellblock",
+      "title": "Ashen Cellblock",
+      "category": "Strongholds",
+      "description": "Six prison cells, a guard room and barred windows. A strong showcase for door occlusion and 60-foot darkvision.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 5,
+      "source_types": [
+        "window",
+        "torch"
+      ]
+    },
+    {
+      "id": "willowfen-ruins",
+      "title": "Willowfen Ruins",
+      "category": "Ruins",
+      "description": "Boardwalks cross dark marsh water toward a broken shrine and standing stones.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 3,
+      "source_types": [
+        "crystal",
+        "torch",
+        "moonlight"
+      ]
+    },
+    {
+      "id": "sunspire-sanctum",
+      "title": "Sunspire Sanctum",
+      "category": "Interiors",
+      "description": "A broad temple nave with a central aisle and three high windows. Strong, warm shafts break around the columns.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 4,
+      "source_types": [
+        "window",
+        "brazier"
+      ]
+    },
+    {
+      "id": "frostpass-ambush",
+      "title": "Frostpass Ambush",
+      "category": "Wilderness",
+      "description": "A winding snowy pass, broken wagon and exposed campsite beneath an icy moon.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 2,
+      "source_types": [
+        "brazier",
+        "moonlight"
+      ]
+    },
+    {
+      "id": "market-of-lanterns",
+      "title": "Market of Lanterns",
+      "category": "Settlements",
+      "description": "An evening market with striped stalls, a fountain and many approach routes.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 7,
+      "source_types": [
+        "torch",
+        "moonlight"
+      ]
+    },
+    {
+      "id": "red-sail-sloop",
+      "title": "Red Sail Sloop",
+      "category": "Coastal",
+      "description": "A compact ship deck with a captain’s cabin, mast, cargo and a lantern-lit boarding approach.",
+      "width_cells": 32,
+      "height_cells": 24,
+      "feet_per_cell": 5,
+      "light_count": 5,
+      "source_types": [
+        "window",
+        "torch",
+        "moonlight"
+      ]
+    }
+  ]
+}

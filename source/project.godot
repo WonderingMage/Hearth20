@@ -1,0 +1,23 @@
+; Isolated D&D Beyond experiment. Never uses the original Hearth20 profile.
+config_version=5
+[application]
+config/name="Hearth20 Beta"
+config/edition="hearth20-seated"
+config/hearth20_debug=false
+config/hearth20_debug.hearth20_debug=true
+config/icon="res://hearth20/hearth20-beta-icon.png"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="Hearth20-Seated-Debug"
+run/main_scene="res://hearth20_boot.tscn"
+run/max_fps=60
+boot_splash/image="res://hearth20/boot-splash.png"
+boot_splash/bg_color=Color(0.063,0.055,0.043,1)
+config/features=PackedStringArray("4.5", "GL Compatibility")
+[autoload]
+Preferences="*res://hearth20/preferences.gd"
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=800
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

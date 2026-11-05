@@ -1,0 +1,25 @@
+[gd_scene format=3]
+[node name="Hearth20DevelopmentGate" type="Control"]
+layout_mode=3
+anchors_preset=15
+anchor_right=1.0
+anchor_bottom=1.0
+[node name="Message" type="Label" parent="."]
+layout_mode=0
+offset_left=50.0
+offset_top=80.0
+offset_right=950.0
+offset_bottom=550.0
+text="HEARTH20 DEVELOPMENT CHECKPOINT
+
+An isolated Hearth20 top-down source candidate is available in this checkout.
+The default project still stops here while native rendered acceptance and the
+full Lite sheet, import, homebrew, and DM outcome flows remain incomplete.
+
+This gate starts no inherited Lite autoloads, campaign, network session, or
+updater. Open hearth20_main.tscn explicitly only with disposable Hearth20 user
+data. Do not replace this gate for a portable build until native acceptance
+and the owner-reviewed baseline checkpoint are complete.
+
+Return to Develop Hearth20.cmd to continue."
+autowrap_mode=2

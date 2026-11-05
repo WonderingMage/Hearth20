@@ -1,0 +1,56 @@
+[
+  {
+    "id": "bag",
+    "source_id": "1431",
+    "url": "https://bigsoundbank.com/UPLOAD/mp3/1431.mp3?v=d",
+    "license": "CC0",
+    "source": "BigSoundBank (see source pages for recording authors)",
+    "bytes": 200868,
+    "sha256": "f63f0ce59a4ff1967e8291cda8394c23c9351a1a084137f2fb74ee6070ab78f5"
+  },
+  {
+    "id": "crunch",
+    "source_id": "1430",
+    "url": "https://bigsoundbank.com/UPLOAD/mp3/1430.mp3?v=d",
+    "license": "CC0",
+    "source": "BigSoundBank (see source pages for recording authors)",
+    "bytes": 1822308,
+    "sha256": "2770dbe4659b9616be4fa03a7befc2ea1b201399f9bbcfefb6acd571a916914b"
+  },
+  {
+    "id": "soft",
+    "source_id": "0352",
+    "url": "https://bigsoundbank.com/UPLOAD/mp3/0352.mp3?v=d",
+    "license": "CC0",
+    "source": "BigSoundBank (see source pages for recording authors)",
+    "bytes": 196548,
+    "sha256": "cdb86a3e026b4fc3516cc57c5ad0fdb1b2c08f54f3c4d045f447a8a6f8802efa"
+  },
+  {
+    "id": "crisp",
+    "source_id": "0407",
+    "url": "https://bigsoundbank.com/UPLOAD/mp3/0407.mp3?v=d",
+    "license": "CC0",
+    "source": "BigSoundBank (see source pages for recording authors)",
+    "bytes": 543474,
+    "sha256": "830a80781ba1c2534472ac769ec07677e5279934f9dc5d48863b9eff5d2ba5a7"
+  },
+  {
+    "id": "drink",
+    "source_id": "3247",
+    "url": "https://bigsoundbank.com/UPLOAD/mp3/3247.mp3?v=d",
+    "license": "CC0",
+    "source": "BigSoundBank (see source pages for recording authors)",
+    "bytes": 454413,
+    "sha256": "76aec7135d5d75510a2bb4bfde271860fcc1869ae70c563c747c53f156f9d760"
+  },
+  {
+    "id": "lick",
+    "source_id": "0239",
+    "url": "https://bigsoundbank.com/UPLOAD/mp3/0239.mp3?v=d",
+    "license": "CC0",
+    "source": "BigSoundBank (see source pages for recording authors)",
+    "bytes": 50179,
+    "sha256": "fcd34655505e7a071f8d9aef397b432bf75eefdf63dca98b3b6458a890d5a4cf"
+  }
+]

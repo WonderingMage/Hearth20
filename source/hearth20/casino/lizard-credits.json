@@ -1,0 +1,8 @@
+{
+  "title": "Lizard",
+  "author": "Froggreen (https://sketchfab.com/Froggreen)",
+  "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+  "source": "https://sketchfab.com/3d-models/lizard-2405fa5c4338474ebb646a21aaf81f2d",
+  "archive_sha256": "8accb2b9951ed9d46bdc5a0783bcc1640d3ebc5eac950cd9897c26d4bc969718",
+  "changes": "Converted from the supplied glTF to a self-contained Godot scene. Original colors and rig/idle/walk animations retained. Scaled and positioned as racing miniatures in-game; no attack animation is used."
+}
