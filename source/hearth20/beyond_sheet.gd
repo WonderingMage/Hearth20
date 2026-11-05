@@ -21,20 +21,34 @@ var last_message=""
 var command_number=0
 var native_commands: Array=[]
 var reparenting=false
+var host_mode="native"
+var stopping=false
+var backend: OptionButton
+var quitting=false
 func setup(owner_app: Hearth20App) -> void:
 	app=owner_app;name="BeyondSheetBrowser";add_theme_constant_override("separation",8);size_flags_vertical=Control.SIZE_EXPAND_FILL
-	var heading=Label.new();heading.text="D&D BEYOND · YOUR SHEET";heading.add_theme_font_override("font",Hearth20Design.font(true));heading.add_theme_font_size_override("font_size",18);add_child(heading)
-	var row=HBoxContainer.new();row.add_theme_constant_override("separation",6);add_child(row)
-	_button(row,"‹",func():action="back");_button(row,"›",func():action="forward");_button(row,"↻",func():action="reload")
-	expanded_button=_button(row,"Expand sheet",toggle_expanded)
-	address=LineEdit.new();address.placeholder_text="D&D Beyond character URL or search…";address.size_flags_horizontal=Control.SIZE_EXPAND_FILL;address.text_submitted.connect(_go);add_child(address)
-	var go=HBoxContainer.new();add_child(go);_button(go,"My characters",func():navigate(HOME));_button(go,"Go / Search",func():_go(address.text));_button(go,"Browser ↗",func():OS.shell_open(requested))
-	status=Label.new();status.text="Sign in on D&D Beyond. Your sheet stays on that website; map controls and casino coins stay in Hearth20.";status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;status.add_theme_font_size_override("font_size",12);add_child(status)
-	surface=Panel.new();surface.name="NativeWebsiteSurface";surface.custom_minimum_size=Vector2(280,440);surface.size_flags_vertical=Control.SIZE_EXPAND_FILL;surface.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#18120c"),2,10,Color("#9b783d")));add_child(surface)
 	var profile=ConfigFile.new()
 	if profile.load("user://beyond-sheet.cfg")==OK:
 		var saved=str(profile.get_value("sheet","url",HOME))
-		if valid_url(saved):requested=saved;address.text=saved
+		if valid_url(saved):requested=saved
+		var saved_mode=str(profile.get_value("sheet","browser","native"))
+		if saved_mode in ["native","embedded"]:host_mode=saved_mode
+	var heading=Label.new();heading.text="D&D BEYOND · YOUR SHEET";heading.add_theme_font_override("font",Hearth20Design.font(true));heading.add_theme_font_size_override("font_size",18);add_child(heading)
+	var row=HBoxContainer.new();row.add_theme_constant_override("separation",6);add_child(row)
+	backend=OptionButton.new();backend.add_item("My Windows browser");backend.add_item("Built-in browser");backend.select(0 if host_mode=="native" else 1);backend.item_selected.connect(func(index):_change_backend("native" if index==0 else "embedded"));row.add_child(backend)
+	_button(row,"‹",func():action="back");_button(row,"›",func():action="forward");_button(row,"↻",func():action="reload")
+	expanded_button=_button(row,"Expand sheet",toggle_expanded)
+	address=LineEdit.new();address.placeholder_text="D&D Beyond character URL or search…";address.size_flags_horizontal=Control.SIZE_EXPAND_FILL;address.text_submitted.connect(_go);add_child(address)
+	var go=HFlowContainer.new();add_child(go);_button(go,"My characters",func():navigate(HOME));_button(go,"Go / Search",func():_go(address.text));_button(go,"Browser ↗",func():OS.shell_open(requested));_button(go,"Choose browser window",func():action="choose_browser");_button(go,"Return browser to desktop",func():action="release_browser")
+	status=Label.new();status.text="Sign in on D&D Beyond. Your sheet stays on that website; map controls and casino coins stay in Hearth20.";status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;status.add_theme_font_size_override("font_size",12);add_child(status)
+	surface=Panel.new();surface.name="NativeWebsiteSurface";surface.custom_minimum_size=Vector2(280,440);surface.size_flags_vertical=Control.SIZE_EXPAND_FILL;surface.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#18120c"),2,10,Color("#9b783d")));add_child(surface)
+	address.text=requested
+func _change_backend(value: String) -> void:
+	if value==host_mode or stopping:return
+	if not await release_for_shutdown():backend.select(0 if host_mode=="native" else 1);return
+	host_mode=value;browser_ready=false;native_commands.clear();channel="";_save_profile()
+func _save_profile() -> void:
+	var profile=ConfigFile.new();profile.set_value("sheet","url",requested);profile.set_value("sheet","browser",host_mode);profile.save("user://beyond-sheet.cfg")
 static func valid_url(value: String) -> bool:
 	if value.length()>2048 or "@" in value or "\n" in value or "\r" in value or "\\" in value:return false
 	return value.begins_with("https://www.dndbeyond.com/") or value.begins_with("https://dndbeyond.com/")
@@ -49,7 +63,7 @@ func _go(text: String) -> void:
 func navigate(url: String) -> void:
 	if not valid_url(url):return
 	requested=url;action="navigate";address.text=url
-	var profile=ConfigFile.new();profile.set_value("sheet","url",url);profile.save("user://beyond-sheet.cfg")
+	_save_profile()
 func toggle_expanded() -> void:
 	if app.seated_shell!=null and not app.seated_shell.changing_focus:
 		if app.seated_shell.focus_state=="sheet":app.seated_shell.leave_focus()
@@ -63,7 +77,7 @@ func _move_surface(parent: Node) -> void:
 	# Reparenting emits exit_tree too; it is a layout change, not browser shutdown.
 	reparenting=true;reparent(parent);reparenting=false
 func _process(delta: float) -> void:
-	if app==null:return
+	if app==null or stopping:return
 	elapsed+=delta
 	if elapsed<.12:return
 	elapsed=0
@@ -104,9 +118,33 @@ func _start() -> void:
 	nonce=Crypto.new().generate_random_bytes(24).hex_encode();channel=ProjectSettings.globalize_path("user://beyond-browser/session-"+nonce);DirAccess.make_dir_recursive_absolute(channel)
 	_write({"visible":false,"x":0,"y":0,"width":1,"height":1})
 	var hwnd=DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE,get_window().get_window_id())
-	pid=OS.create_process(root.path_join("BeyondBrowserHost.exe"),PackedStringArray([str(hwnd),str(OS.get_process_id()),nonce,channel]))
+	var arguments=PackedStringArray([str(hwnd),str(OS.get_process_id()),nonce,channel])
+	if host_mode=="native":arguments.append("native")
+	_arm_quit_guard()
+	pid=_create_host(root.path_join("BeyondBrowserHost.exe"),arguments)
 	if pid<0:status.text="Embedded browser could not start. Use Open in browser.";set_process(false)
 	action="navigate"
+func _create_host(executable: String,arguments: PackedStringArray) -> int:
+	return OS.create_process(executable,arguments)
+func _arm_quit_guard() -> void:
+	get_tree().auto_accept_quit=false
+	var window=get_tree().root
+	if not window.close_requested.is_connected(_quit_with_browser):window.close_requested.connect(_quit_with_browser)
+func release_for_shutdown() -> bool:
+	if stopping:return false
+	if pid<0 or not OS.is_process_running(pid):pid=-1;return true
+	stopping=true;_write({"action":"exit","visible":false})
+	var deadline=Time.get_ticks_msec()+4000
+	while OS.is_process_running(pid) and Time.get_ticks_msec()<deadline:await get_tree().process_frame
+	stopping=false
+	if OS.is_process_running(pid):status.text="The browser is still attached. Choose another browser window or close the sheet browser before leaving Hearth20.";return false
+	pid=-1;browser_ready=false;channel="";native_commands.clear();return true
+func _quit_with_browser() -> void:
+	if quitting:return
+	quitting=true
+	if await release_for_shutdown():_finish_quit()
+	else:quitting=false
+func _finish_quit() -> void:get_tree().quit()
 func _write(command: Dictionary) -> void:
 	if channel.is_empty():return
 	if not str(command.get("action","")).is_empty() and command.action!="exit":

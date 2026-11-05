@@ -1,7 +1,7 @@
 extends Node
 class_name Hearth20Preferences
 const PATH="user://hearth20/settings.cfg"
-const DEFAULTS={"window_mode":0,"width":1280,"height":800,"monitor":0,"vsync":true,"fps":60,"background_fps":30,"quality":1,"master":.8,"effects":1.,"party":1.,"showcase":1.,"wake":1.,"mute_unfocused":false,"audio_device":"Default"}
+const DEFAULTS={"window_mode":0,"width":1280,"height":800,"monitor":0,"vsync":true,"fps":60,"background_fps":30,"quality":1,"master":.8,"effects":1.,"party":1.,"showcase":1.,"wake":1.,"mute_unfocused":false,"audio_device":"Default","update_channel":Hearth20Identity.UPDATE_CHANNEL_DEFAULT}
 const BUSES={"effects":"Table FX","party":"Tavern & Party","showcase":"Creature Showcase","wake":"Wake Voice"}
 static var values: Dictionary=DEFAULTS.duplicate()
 static var preview_values: Dictionary={}
@@ -25,6 +25,7 @@ static func sanitized(input: Dictionary) -> Dictionary:
 	for key in ["fps","background_fps"]:
 		if int(result[key]) not in [0,30,45,60,90,120,144,165,240]:result[key]=DEFAULTS[key]
 	for key in ["master","effects","party","showcase","wake"]:result[key]=clampf(float(result[key]),0.,1.)
+	if result.update_channel not in ["beta","steam-test"]:result.update_channel=DEFAULTS.update_channel
 	return result
 static func read() -> Dictionary:
 	var file=ConfigFile.new();var data={}

@@ -32,5 +32,22 @@ func run() -> void:
 	expect(Hearth20Updater.valid_manifest(manifest,selected),"matching edition manifest accepted")
 	for field in manifest:
 		var bad=manifest.duplicate(true);bad[field]=-1 if field in ["bytes","schema","protocol"] else "forged";expect(not Hearth20Updater.valid_manifest(bad,selected),"reject mismatched manifest "+field)
+	var test_tag="hearth20-steam-test-v0.3.6-beta";var test_assets=[]
+	for name_value in [Hearth20Updater.ASSET,Hearth20Updater.TEST_MANIFEST]:test_assets.append({"name":name_value,"state":"uploaded","size":4096,"digest":"sha256:"+"b".repeat(64),"browser_download_url":"https://github.com/"+Hearth20Updater.REPOSITORY+"/releases/download/"+test_tag+"/"+name_value})
+	var test_record={"tag_name":test_tag,"draft":false,"prerelease":true,"assets":test_assets}
+	expect(Hearth20Updater.select_release([test_record],"0.3.4-beta","beta").is_empty(),"Beta-only channel excludes Steam tests")
+	var test_selected=Hearth20Updater.select_release([record,test_record],"0.3.4-beta","steam-test")
+	expect(not test_selected.is_empty() and test_selected.version=="0.3.6-beta" and test_selected.channel=="steam-test","Steam channel discovers published prerelease test tags")
+	expect(Hearth20Updater.select_release([record],"0.2.3-beta","steam-test").version=="0.2.4-beta","Steam channel also accepts newer ordinary Beta releases")
+	var test_manifest=manifest.duplicate(true);test_manifest.version="0.3.6-beta";test_manifest.tag=test_tag;test_manifest.sha256="b".repeat(64);test_manifest.channel="steam-test"
+	expect(Hearth20Updater.valid_manifest(test_manifest,test_selected),"Steam manifest matches its verified test release")
+	test_manifest.channel="beta";expect(not Hearth20Updater.valid_manifest(test_manifest,test_selected),"manifest cannot change its release channel")
+	var wrong_manifest=test_record.duplicate(true);wrong_manifest.assets[1].name=Hearth20Updater.MANIFEST
+	expect(Hearth20Updater.select_release([wrong_manifest],"0.3.4-beta","steam-test").is_empty(),"Steam release must provide its own manifest asset")
+	var test_draft=test_record.duplicate(true);test_draft.draft=true;expect(Hearth20Updater.select_release([test_draft],"0.3.4-beta","steam-test").is_empty(),"Steam drafts remain excluded")
+	expect(Hearth20Updater.select_release([test_record],"0.3.6-beta","steam-test").is_empty(),"current Steam test is not offered again")
+	expect(Hearth20Preferences.sanitized({"update_channel":"forged"}).update_channel==Hearth20Identity.UPDATE_CHANNEL_DEFAULT,"unsupported update channel cannot alter routing")
+	var updater=Hearth20Updater.new();updater.release=test_selected;updater.verified=true;updater.set_channel("beta")
+	expect(updater.channel=="beta" and updater.release.is_empty() and not updater.verified,"changing channel clears stale release/install state");updater.free()
 	Hearth20Preferences.save(previous);Hearth20Preferences.apply_audio(previous)
 	print("Preferences and updates: %d checks, %d failures"%[checks,errors.size()]);quit(0 if errors.is_empty() else 1)
