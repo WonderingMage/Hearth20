@@ -19,7 +19,10 @@ internal sealed class BeyondBrowserHost : Form {
     [DllImport("user32.dll")] static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int w, int h, uint flags);
     [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
+    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll")] static extern bool AttachThreadInput(uint thread, uint target, bool attach);
     readonly IntPtr owner;
+    readonly uint ownerThread;
     readonly int ownerPid;
     readonly string nonce, folder;
     readonly JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength = 16384, RecursionLimit = 8 };
@@ -32,6 +35,7 @@ internal sealed class BeyondBrowserHost : Form {
     bool ready, suspended, frozen, working, requestedVisible;
     string suspendError = "";
     int failures;
+    bool inputAttached;
     static string Str(Dictionary<string, object> d, string key, string fallback = "") { return d.ContainsKey(key) ? Convert.ToString(d[key]) : fallback; }
     static int Number(Dictionary<string, object> d, string key) { return d.ContainsKey(key) ? Convert.ToInt32(d[key]) : 0; }
     static bool Https(string value) { Uri u; return value.Length <= 2048 && Uri.TryCreate(value, UriKind.Absolute, out u) && u.Scheme == "https" && String.IsNullOrEmpty(u.UserInfo); }
@@ -47,19 +51,26 @@ internal sealed class BeyondBrowserHost : Form {
         } catch { /* Reported through status when a host window could be created. */ }
     }
     BeyondBrowserHost(IntPtr parent, int pid, string secret, string path) {
-        uint actual; GetWindowThreadProcessId(parent, out actual);
+        uint actual; ownerThread = GetWindowThreadProcessId(parent, out actual);
         if (!IsWindow(parent) || actual != pid) throw new ArgumentException("Invalid owner");
         owner = parent; ownerPid = pid; nonce = secret; folder = path;
         Directory.CreateDirectory(folder);
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; BackColor = Color.FromArgb(24, 18, 12);
         StartPosition = FormStartPosition.Manual; Bounds = new Rectangle(-32000, -32000, 1, 1);
         Load += async delegate {
+            // A child in another process must share the owner's input queue for
+            // Windows to route focus to it. No keystrokes cross the JSON channel.
+            inputAttached = ownerThread != GetCurrentThreadId() && AttachThreadInput(GetCurrentThreadId(), ownerThread, true);
             SetParent(Handle, owner);
             SetWindowLong(Handle, -16, (GetWindowLong(Handle, -16) & ~unchecked((int)0x80000000)) | 0x40000000 | 0x04000000 | 0x02000000);
             Hide(); poll.Tick += async delegate { await TickHost(); }; poll.Start();
             await InitializeBrowser();
         };
-        FormClosed += delegate { poll.Stop(); if (controller != null) controller.Close(); };
+        FormClosing += delegate {
+            ready = false; poll.Stop();
+            if (inputAttached) { AttachThreadInput(GetCurrentThreadId(), ownerThread, false); inputAttached = false; }
+        };
+        FormClosed += delegate { if (controller != null) controller.Close(); };
     }
     async Task InitializeBrowser() {
         try {
@@ -79,6 +90,12 @@ internal sealed class BeyondBrowserHost : Form {
             ready = true; state = "Ready · choose My characters or search D&D Beyond";
         } catch { state = "Embedded browser unavailable. Open D&D Beyond in your browser, or install Microsoft Edge WebView2 Runtime."; }
         WriteStatus();
+    }
+    protected override void OnGotFocus(EventArgs e) {
+        base.OnGotFocus(e);
+        // Windows can focus the cross-process child Form itself on reactivation.
+        // Forward that one focus transition, never poll or steal toolbar focus.
+        if (ready && requestedVisible && controller != null) controller.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
     }
     async Task TickHost() {
         if (working) return;

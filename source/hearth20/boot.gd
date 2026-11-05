@@ -30,6 +30,7 @@ var loaded: Array[Resource]=[]
 var load_errors: Array[String]=[]
 var campaign_thread: Thread
 var campaign_result: Dictionary={}
+var campaign_path=""
 var advance_pending:=false
 var codex:=false
 var loading_drawn:=false
@@ -87,7 +88,7 @@ func _ready() -> void:
 	menu=GridContainer.new(); menu.columns=1; menu.add_theme_constant_override("v_separation",8); menu.add_theme_constant_override("h_separation",8); copy_column.add_child(menu)
 	_button(menu,"Start a new table",func(): begin_loading("new"))
 	if Hearth20MultiplayerLab.enabled():_button(menu,"Multiplayer Lab · DM + 2 Players",func(): Hearth20MultiplayerLab.start_on_table=true;begin_loading("lab"))
-	_button(menu,"Open saved campaign",func(): begin_loading("saved"))
+	_button(menu,"Open saved campaign",open_campaign_vault)
 	_button(menu,"Join a table",func(): begin_loading("join"))
 	_button(menu,"Creature codex",_show_codex)
 	_button(menu,"Model credits",_show_credits)
@@ -171,8 +172,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode==KEY_F6 and debug_enabled: _show_debug_lab(); get_viewport().set_input_as_handled()
 		elif event.keycode==KEY_ESCAPE and debug_preview: set_debug_preview(false); get_viewport().set_input_as_handled()
-func begin_loading(action: String) -> void:
+func open_campaign_vault() -> void:
+	Hearth20CampaignVault.open(self,null,"open",func(path):begin_loading("saved",path))
+func begin_loading(action: String,save_path="") -> void:
 	if loading: return
+	if action=="saved" and save_path.is_empty():open_campaign_vault();return
+	campaign_path=save_path
 	set_debug_preview(false)
 	if is_instance_valid(debug_dialog): debug_dialog.queue_free()
 	mode=action; loading=true; menu.hide(); progress.show(); progress.value=0; progress_note.text="Preparing your table…"
@@ -182,7 +187,7 @@ func begin_loading(action: String) -> void:
 		if ResourceLoader.load_threaded_request(path,"",false)!=OK: load_errors.append(path)
 	if action=="saved":
 		campaign_thread=Thread.new()
-		campaign_thread.start(func(): return Hearth20Identity.load_campaign(Hearth20Identity.SAVE_ROOT+"/table."+Hearth20Identity.SAVE_EXTENSION))
+		campaign_thread.start(func(): return Hearth20Identity.load_campaign(campaign_path))
 	RenderingServer.frame_post_draw.connect(_on_loading_drawn,CONNECT_ONE_SHOT)
 func _on_loading_drawn() -> void:
 	loading_drawn=true
@@ -226,7 +231,7 @@ func _enter_table() -> void:
 	get_parent().add_child(experience)
 	var app: Hearth20App=experience.app
 	if mode=="lab":app._load_sample_map("sunspire-sanctum",false)
-	if mode=="saved": app.install_loaded_campaign(campaign_result.campaign)
+	if mode=="saved": app.install_loaded_campaign(campaign_result.campaign,campaign_path)
 	elif mode=="join":experience.focus_join_when_ready()
 	get_tree().current_scene=experience
 	queue_free()
