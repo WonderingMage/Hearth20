@@ -26,6 +26,11 @@ func run() -> void:
 	var shell=Hearth20SeatedShell.new();root.add_child(shell)
 	while not shell.ready_to_show:await process_frame
 	shell.app._load_sample_map("sunspire-sanctum",false);await create_timer(.5).timeout
+	var orphan_count=Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)
+	for _opening in 4:
+		shell.app.toolbox.open("dice");await process_frame;await process_frame
+		shell.app.toolbox.open("select");await process_frame;await process_frame
+	expect(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)==orphan_count,"reopening dice controls leaves no orphaned text controls")
 	expect(not shell.table.casino_active,"map mode marks casino inactive")
 	expect(shell.table.card_viewport.render_target_update_mode==SubViewport.UPDATE_DISABLED and shell.table.soul_viewport.render_target_update_mode==SubViewport.UPDATE_DISABLED,"map mode does not render hidden card or soul layers")
 	shell.focus_map();await create_timer(.2).timeout

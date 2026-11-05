@@ -372,7 +372,7 @@ func _dice_ui() -> void:
 		box.add_child(value)
 	section("ROLL OPTIONS")
 	fields.sides=number("Sides · custom die",dice_sides,2,1000,func(v): dice_sides=int(v); _formula())
-	label("Include your D&D Beyond modifier in the manual bonus.",12)
+	_target().add_child(label("Include your D&D Beyond modifier in the manual bonus.",12))
 	options("Roll mode",["normal","advantage","disadvantage"],dice_mode,func(v): dice_mode=v)
 	formula_label=label("",24,Color("#f0c674"))
 	formula_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
