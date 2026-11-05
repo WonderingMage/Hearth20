@@ -1,0 +1,23 @@
+{
+  "version": "4.23.2",
+  "sdk": "1.65",
+  "asset": "https://godotengine.org/asset-library/asset/2445",
+  "commit": "f99b9f54ea64974b8f5288713adc778172e3c60a",
+  "files": {
+    "native-debug.bin": {
+      "sha256": "8eb26b667ad0e85c77fda8ff7aa020496ace6afd58bccc544365c782df8f773e",
+      "bytes": 4324352,
+      "output": "libgodotsteam.windows.template_debug.x86_64.dll"
+    },
+    "native-release.bin": {
+      "sha256": "6535af56d325af0fff52dbb5de3703d110bb430fdef4e3026d7ece617270e530",
+      "bytes": 3980800,
+      "output": "libgodotsteam.windows.template_release.x86_64.dll"
+    },
+    "steam-api.bin": {
+      "sha256": "8de54d32508e216c9135b8bf025749243d44e404c1c22a8e5fe35acecabe7a9c",
+      "bytes": 319128,
+      "output": "steam_api64.dll"
+    }
+  }
+}

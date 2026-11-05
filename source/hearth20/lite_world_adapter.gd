@@ -3,7 +3,14 @@ class_name Hearth20LiteWorldAdapter
 ## Minimal Hearth20-owned adapter for invoking Lite's unchanged rules module.
 
 var campaign: Dictionary
-var data: Dictionary
+var _data: Dictionary
+var data: Dictionary:
+	get:
+		_data.actors=campaign.get("actors",[])
+		return _data
+	set(value):
+		_data=value
+		_data.actors=campaign.get("actors",[])
 var client := false
 var preview := false
 
@@ -21,6 +28,7 @@ func actor(actor_id: String) -> Dictionary:
 	return {}
 
 func sync_to_campaign() -> void:
-	campaign.actors = data.get("actors", [])
-	campaign.lite_state = data.get("lite", {}).duplicate(true)
-	campaign.revision = int(campaign.get("revision", 0)) + 1
+	# Map imports and onboarding can replace the array after the adapter is created.
+	# The campaign owns that collection; saving must never restore an older one.
+	_data.actors=campaign.get("actors",[])
+	campaign.lite_state = _data.get("lite", {}).duplicate(true)
