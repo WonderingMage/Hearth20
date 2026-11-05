@@ -49,7 +49,8 @@ func _ready() -> void:
 	app=Hearth20App.new();app.name="TableApplication";app.seated_shell=self;app.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);map_viewport.add_child(app)
 	# Canvas notifications/rolls belong to this player's screen, not the map texture.
 	app.casino_portal.balance_notice.reparent(self)
-	app.dice_stage.reparent(self);app.dice_stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# The focused map is at 700; rolls must composite above it on the player's screen.
+	app.dice_stage.reparent(self);app.dice_stage.z_index=1000;app.dice_stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	if is_instance_valid(app.multiplayer_lab.overlay):app.multiplayer_lab.overlay.reparent(self)
 	focus_surface.hide();_build_hud();_loading();_prepare_table()
 func _prepare_table() -> void:

@@ -4,7 +4,9 @@
 
 A gilded virtual tabletop with a first-person tavern, private D&D Beyond sheets and four multiplayer fantasy casino games.
 
-**[Download Hearth20 Beta 0.2.3-beta](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.2.3-beta)** · Windows 64-bit portable. Open `Hearth20_Beta_Portable.exe`; no installer is needed. The player edition omits diagnostic menus and the local testing lab.
+**[Download Hearth20 Beta 0.2.4-beta](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.2.4-beta)** · Windows 64-bit portable. Open `Hearth20_Beta_Portable.exe`; no installer is needed. The player edition omits diagnostic menus and the local testing lab.
+
+Beta 0.2.4 fixes ordinary 3D dice rolls being covered by the focused battlemap. Public and private rolls now render above the map, including after returning from the casino. Existing 0.2.3 users can update from Settings → Updates.
 
 ## At your table
 
