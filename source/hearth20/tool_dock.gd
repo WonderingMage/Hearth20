@@ -28,6 +28,10 @@ var dm_controls: Array[Control] = []
 var section_body: VBoxContainer
 var active_tool_name: Label
 var die_buttons: Array[Button] = []
+var dice_mode_help: Label
+var dice_roll_button: Button
+var pending_dice_request=""
+var dice_status_text=""
 
 func setup(owner_app: Node, rail: VBoxContainer) -> void:
 	app = owner_app
@@ -78,6 +82,7 @@ func setup(owner_app: Node, rail: VBoxContainer) -> void:
 	board.object_selected.connect(_object_selected)
 	session.timeline_changed.connect(func(_entries):
 		if current == "dice": _refresh_rolls())
+	session.table_request_finished.connect(_dice_request_finished)
 	open("draw", false)
 	board.activate_tool("select")
 	rail_buttons.select.button_pressed=true
@@ -204,6 +209,7 @@ func choices(values: Array, selected_value: String, callback: Callable, columns:
 		result.button_pressed = key == selected_value
 		result.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if current=="dice" and key.is_valid_int():
+			result.set_meta("dice_sides",int(key))
 			result.icon=Hearth20Design.icon("die"+key,28)
 			result.add_theme_constant_override("icon_max_width",28)
 			result.expand_icon=true
@@ -370,17 +376,20 @@ func _dice_ui() -> void:
 			else: dice_bonus=int(v)
 			_formula())
 		box.add_child(value)
+		if is_count:fields.quantity=value
 	section("ROLL OPTIONS")
 	fields.sides=number("Sides · custom die",dice_sides,2,1000,func(v): dice_sides=int(v); _formula())
 	_target().add_child(label("Include your D&D Beyond modifier in the manual bonus.",12))
-	options("Roll mode",["normal","advantage","disadvantage"],dice_mode,func(v): dice_mode=v)
+	fields.dice_mode=options("Roll mode",["normal","advantage","disadvantage"],dice_mode,_set_dice_mode)
+	dice_mode_help=label("",12,Hearth20Design.MUTED);dice_mode_help.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;_target().add_child(dice_mode_help)
 	formula_label=label("",24,Color("#f0c674"))
 	formula_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	formula_label.add_theme_font_override("font",Hearth20Design.font(true))
 	action_area.add_child(formula_label)
 	_formula()
-	button("Roll dice",_roll,true,action_area)
-	roll_result=label("",16,Color("#76e0ca"))
+	dice_roll_button=button("Roll dice",_roll,true,action_area)
+	dice_roll_button.disabled=not pending_dice_request.is_empty()
+	roll_result=label(dice_status_text,16,Color("#76e0ca"))
 	roll_result.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	action_area.add_child(roll_result)
 	section("RECENT ROLLS")
@@ -388,17 +397,49 @@ func _dice_ui() -> void:
 	roll_history.add_theme_constant_override("separation",8)
 	_target().add_child(roll_history)
 	_refresh_rolls()
+	_sync_dice_mode()
+
+func _set_dice_mode(value: String) -> void:
+	dice_mode=value
+	if value!="normal":dice_count=1;dice_sides=20
+	_sync_dice_mode();_formula()
+
+func _sync_dice_mode() -> void:
+	var special=dice_mode!="normal"
+	if fields.has("quantity"):
+		fields.quantity.set_value_no_signal(2 if special else dice_count);fields.quantity.editable=not special
+	if fields.has("sides"):
+		fields.sides.set_value_no_signal(dice_sides);fields.sides.editable=not special
+	for die in die_buttons:
+		die.disabled=special and int(die.get_meta("dice_sides",0))!=20
+		die.set_pressed_no_signal(int(die.get_meta("dice_sides",0))==dice_sides)
+	if is_instance_valid(dice_mode_help):dice_mode_help.text="Roll two d20s; keep the higher result." if dice_mode=="advantage" else "Roll two d20s; keep the lower result." if dice_mode=="disadvantage" else "Normal rolls support any quantity and die. Advantage/disadvantage use two d20s."
 
 func _formula() -> void:
 	if not is_instance_valid(formula_label): return
 	formula_label.text="%dd%d" % [dice_count,dice_sides]+("%+d" % dice_bonus if dice_bonus else "")+(" + proficiency" if use_proficiency else "")
+	if dice_mode!="normal":formula_label.text="2d20 · keep "+("highest" if dice_mode=="advantage" else "lowest")+("%+d"%dice_bonus if dice_bonus else "")
 
 func _roll() -> void:
+	if not pending_dice_request.is_empty():return
+	if dice_mode!="normal" and (dice_count!=1 or dice_sides!=20):
+		dice_status_text="Advantage/disadvantage use two d20s. Choose d20 with quantity 1, or Normal for this die.";roll_result.text=dice_status_text;return
 	var actor: Dictionary=app._selected_sheet_actor()
 	var expression:="%dd%d" % [dice_count,dice_sides]+("%+d" % dice_bonus if dice_bonus else "")
 	var result: Dictionary=session.submit_dice(str(actor.get("id","")) if use_proficiency else "",expression,dice_visibility,use_proficiency,dice_mode)
-	roll_result.text=str(result.get("error","Sent to the GM. The result is visible only to the GM." if dice_visibility=="secret" else "Roll recorded."))
+	if not result.get("ok",false):dice_status_text=str(result.get("error","The roll could not be sent."))
+	elif result.get("pending",false):
+		pending_dice_request=str(result.get("request_id",""));dice_status_text="Waiting for the GM to confirm the roll…";dice_roll_button.disabled=true
+	else:dice_status_text="Roll confirmed. Only the GM sees the result." if dice_visibility=="secret" else "Roll confirmed."
+	roll_result.text=dice_status_text
 	_refresh_rolls()
+
+func _dice_request_finished(command: Dictionary,result: Dictionary) -> void:
+	if pending_dice_request.is_empty() or command.get("action","")!="roll" or command.get("request_id","")!=pending_dice_request:return
+	pending_dice_request=""
+	dice_status_text=("Roll confirmed. Only the GM sees the result." if command.get("visibility","")=="secret" else "Roll confirmed.") if result.get("ok",false) else str(result.get("error","The GM could not accept this roll."))
+	if current=="dice" and is_instance_valid(roll_result):roll_result.text=dice_status_text
+	if current=="dice" and is_instance_valid(dice_roll_button):dice_roll_button.disabled=false
 
 func _refresh_rolls() -> void:
 	if not is_instance_valid(roll_history): return

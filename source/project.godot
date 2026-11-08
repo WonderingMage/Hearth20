@@ -15,6 +15,8 @@ boot_splash/bg_color=Color(0.063,0.055,0.043,1)
 config/features=PackedStringArray("4.5", "GL Compatibility")
 [autoload]
 Preferences="*res://hearth20/preferences.gd"
+SteamLink="*res://hearth20/steam_link.gd"
+Updates="*res://hearth20/updater.gd"
 [display]
 window/size/viewport_width=1280
 window/size/viewport_height=800
