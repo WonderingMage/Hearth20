@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "title": "Overgrown forest camp",
+  "prompt": "An overgrown forest camp with four connected rooms, a campfire, tents, and a secret cache beside a clockwork lighthouse.",
+  "pattern": "forest_camp",
+  "grid": {
+    "width_cells": 27,
+    "height_cells": 18,
+    "feet_per_cell": 5,
+    "coordinate_unit": "grid_cells"
+  },
+  "rooms": [
+    {"id":"room-00","kind":"forest_camp","public_label":"Room 1","grid":{"x":1,"y":3,"width":5,"height":5},"initially_visible":true},
+    {"id":"room-01","kind":"forest_camp","public_label":"Room 2","grid":{"x":7,"y":3,"width":5,"height":5},"initially_visible":false},
+    {"id":"room-02","kind":"forest_camp","public_label":"Room 3","grid":{"x":13,"y":3,"width":5,"height":5},"initially_visible":false},
+    {"id":"room-03","kind":"forest_camp","public_label":"Room 4","grid":{"x":19,"y":3,"width":5,"height":5},"initially_visible":false}
+  ],
+  "corridors": [
+    {"id":"hall-01","room_ids":["room-00","room-01"],"grid":{"x":6,"y":5,"width":1,"height":1},"width_cells":1,"orientation":"east-west"},
+    {"id":"hall-02","room_ids":["room-01","room-02"],"grid":{"x":12,"y":5,"width":1,"height":1},"width_cells":1,"orientation":"east-west"},
+    {"id":"hall-03","room_ids":["room-02","room-03"],"grid":{"x":18,"y":5,"width":1,"height":1},"width_cells":1,"orientation":"east-west"}
+  ],
+  "props": [
+    {"id":"campfire-00","kind":"campfire","label":"Campfire","room_id":"room-00","position":{"x":3,"y":5},"visibility":"public"},
+    {"id":"tent-00","kind":"tent","label":"Tent","room_id":"room-00","position":{"x":2,"y":6},"visibility":"public"},
+    {"id":"cache-00","kind":"hidden_cache","label":"Hidden cache","room_id":"room-00","position":{"x":4,"y":6},"visibility":"gm","gm_details":"A cache beneath the roots."}
+  ],
+  "gm_only": {"secrets": []},
+  "unresolved_requests": ["clockwork", "lighthouse"],
+  "provenance": {"generator":"hearth20-offline-recipe","version":1,"seed":17}
+}

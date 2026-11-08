@@ -30,6 +30,7 @@ var loaded: Array[Resource]=[]
 var load_errors: Array[String]=[]
 var campaign_thread: Thread
 var campaign_result: Dictionary={}
+var campaign_path=""
 var advance_pending:=false
 var codex:=false
 var loading_drawn:=false
@@ -61,6 +62,7 @@ func _ready() -> void:
 	var top:=HBoxContainer.new(); top.add_theme_constant_override("separation",14); column.add_child(top)
 	heading=_label("H E A R T H 2 0",39,true); heading.size_flags_horizontal=Control.SIZE_EXPAND_FILL; top.add_child(heading)
 	var appearance:=Hearth20Regal.ThemeMedallion.new(); appearance.name="TitleAppearance"; top.add_child(appearance)
+	_button(top,"Host & join guide",func():Hearth20PartyGuide.open(self),36)
 	var strap:=_label("THE ADVENTURE AT YOUR TABLE",11); column.add_child(strap)
 	var line:=HSeparator.new(); column.add_child(line)
 	content=HBoxContainer.new(); content.size_flags_vertical=Control.SIZE_EXPAND_FILL; content.add_theme_constant_override("separation",44); column.add_child(content)
@@ -87,7 +89,7 @@ func _ready() -> void:
 	menu=GridContainer.new(); menu.columns=1; menu.add_theme_constant_override("v_separation",8); menu.add_theme_constant_override("h_separation",8); copy_column.add_child(menu)
 	_button(menu,"Start a new table",func(): begin_loading("new"))
 	if Hearth20MultiplayerLab.enabled():_button(menu,"Multiplayer Lab · DM + 2 Players",func(): Hearth20MultiplayerLab.start_on_table=true;begin_loading("lab"))
-	_button(menu,"Open saved campaign",func(): begin_loading("saved"))
+	_button(menu,"Open saved campaign",open_campaign_vault)
 	_button(menu,"Join a table",func(): begin_loading("join"))
 	_button(menu,"Creature codex",_show_codex)
 	_button(menu,"Model credits",_show_credits)
@@ -105,7 +107,9 @@ func _ready() -> void:
 func _on_first_title_draw() -> void:
 	menu_drawn_msec=Time.get_ticks_msec()
 	Hearth20Updater.confirm_startup()
+	get_node("/root/Updates").startup_check()
 	viewer.start_pending()
+	if get_node("/root/SteamLink").pending_invite>0:begin_loading("join")
 func _label(text_value: String, points: int, serif: bool=false) -> Label:
 	var label:=Label.new(); label.text=text_value; label.add_theme_font_size_override("font_size",points)
 	label.add_theme_color_override("font_color",Hearth20Regal.swatch(Hearth20Regal.INK if points>15 else Hearth20Regal.MUTED))
@@ -171,8 +175,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode==KEY_F6 and debug_enabled: _show_debug_lab(); get_viewport().set_input_as_handled()
 		elif event.keycode==KEY_ESCAPE and debug_preview: set_debug_preview(false); get_viewport().set_input_as_handled()
-func begin_loading(action: String) -> void:
+func open_campaign_vault() -> void:
+	Hearth20CampaignVault.open(self,null,"open",func(path):begin_loading("saved",path))
+func begin_loading(action: String,save_path="") -> void:
 	if loading: return
+	if action=="saved" and save_path.is_empty():open_campaign_vault();return
+	campaign_path=save_path
 	set_debug_preview(false)
 	if is_instance_valid(debug_dialog): debug_dialog.queue_free()
 	mode=action; loading=true; menu.hide(); progress.show(); progress.value=0; progress_note.text="Preparing your table…"
@@ -182,7 +190,7 @@ func begin_loading(action: String) -> void:
 		if ResourceLoader.load_threaded_request(path,"",false)!=OK: load_errors.append(path)
 	if action=="saved":
 		campaign_thread=Thread.new()
-		campaign_thread.start(func(): return Hearth20Identity.load_campaign(Hearth20Identity.SAVE_ROOT+"/table."+Hearth20Identity.SAVE_EXTENSION))
+		campaign_thread.start(func(): return Hearth20Identity.load_campaign(campaign_path))
 	RenderingServer.frame_post_draw.connect(_on_loading_drawn,CONNECT_ONE_SHOT)
 func _on_loading_drawn() -> void:
 	loading_drawn=true
@@ -226,7 +234,7 @@ func _enter_table() -> void:
 	get_parent().add_child(experience)
 	var app: Hearth20App=experience.app
 	if mode=="lab":app._load_sample_map("sunspire-sanctum",false)
-	if mode=="saved": app.install_loaded_campaign(campaign_result.campaign)
+	if mode=="saved": app.install_loaded_campaign(campaign_result.campaign,campaign_path)
 	elif mode=="join":experience.focus_join_when_ready()
 	get_tree().current_scene=experience
 	queue_free()

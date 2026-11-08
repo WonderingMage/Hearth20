@@ -202,11 +202,11 @@ func _process(delta: float) -> void:
 	if elapsed<.2:return
 	elapsed=0.
 	Engine.max_fps=60 if get_window().has_focus() else 20
-	if slot!="dm" and _status("dm").is_empty():get_tree().quit();return
+	if slot!="dm" and _status("dm").is_empty():_close_child();return
 	var cmd=read_record(root_path.path_join("cmd-"+slot+".json"))
 	if cmd.get("token","")==token and cmd.get("id","")!=last_command:
 		last_command=str(cmd.id)
-		if cmd.get("action","")=="close" and slot!="dm":app.session.stop_session();get_tree().quit();return
+		if cmd.get("action","")=="close" and slot!="dm":_close_child();return
 		if cmd.get("action","")=="focus":
 			last_focus_ack=last_command
 			if DisplayServer.get_name()!="headless":get_window().mode=Window.MODE_WINDOWED if get_window().mode==Window.MODE_MINIMIZED else get_window().mode;get_window().grab_focus()
@@ -215,6 +215,11 @@ func _process(delta: float) -> void:
 	if slot=="dm":_prepare_samples()
 	elif auto_character() and app.session.client_snapshot.get("character_required",false) and not app.session.local_player_id.is_empty() and Time.get_ticks_msec()-last_submit>2000:last_submit=Time.get_ticks_msec();app.session.submit_join_character(demo_sheet(int(slot.right(1))-1),demo_png(int(slot.right(1))-1))
 	_heartbeat();_update_labels()
+func _close_child() -> void:
+	if stopping:return
+	stopping=true
+	if is_instance_valid(app.beyond_sheet) and not await app.beyond_sheet.release_for_shutdown():stopping=false;return
+	app.session.stop_session();get_tree().quit()
 func _input(event: InputEvent) -> void:
 	if not enabled() or not event is InputEventKey or not event.pressed or event.echo:return
 	if event.keycode==KEY_F8:open_panel();get_viewport().set_input_as_handled()

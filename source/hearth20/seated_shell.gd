@@ -93,7 +93,7 @@ func _build_hud() -> void:
 	_button(row,"Refreshments",func():refreshments.glance())
 	_button(row,"⚙ Settings",func():app.open_preferences())
 	home_row=HBoxContainer.new();home_row.alignment=BoxContainer.ALIGNMENT_CENTER;home_row.anchor_left=.28;home_row.anchor_right=.72;home_row.anchor_top=.07;home_row.anchor_bottom=.13;hud.add_child(home_row)
-	_button(home_row,"Host a game",func():app._host_table();focus_map(app.session_page));_button(home_row,"Join a game",func():focus_map(app.session_page));_button(home_row,"Open campaign",func():focus_map();app._load_campaign())
+	_button(home_row,"Host a game",func():app.open_connections("host"));_button(home_row,"Join a game",func():app.open_connections("join"));_button(home_row,"Open campaign",func():focus_map();app._load_campaign())
 	back=Button.new();back.text="↙ Back to the table";back.anchor_top=1.;back.anchor_bottom=1.;back.offset_left=24;back.offset_right=214;back.offset_top=-54;back.offset_bottom=-12;back.z_index=1100;back.pressed.connect(leave_focus);add_child(back);back.hide()
 	look_button=Button.new();look_button.text="↑ Ceiling pulls";look_button.tooltip_text="Look up · the DM can drag a wooden pull downward to choose map or casino";look_button.anchor_left=.5;look_button.anchor_right=.5;look_button.offset_left=-85;look_button.offset_right=85;look_button.offset_top=20;look_button.offset_bottom=60;look_button.z_index=950;look_button.pressed.connect(toggle_pulls);add_child(look_button)
 func look_at_pulls() -> void:
@@ -112,7 +112,7 @@ func desired_mode() -> String:
 	return str(app.campaign.get("table_mode","map")) if app.session.local_role=="dm" else str(app.session.client_snapshot.get("table_mode","map"))
 func focus_join_when_ready() -> void:
 	while not ready_to_show:await get_tree().process_frame
-	focus_map(app.session_page);app.player_name.grab_focus()
+	app.open_connections("join")
 func use_casino_scene(parent: Node) -> Hearth20CasinoTable:
 	table.casino_active=true;table.reparent(parent,false);table.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);table.book.process_mode=Node.PROCESS_MODE_INHERIT;table.book.show();table.show();table.process_mode=Node.PROCESS_MODE_INHERIT;table.viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS;return table
 func release_casino_scene() -> void:
@@ -262,6 +262,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if has_modal():return
 	if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE and focus_state!="table":leave_focus();get_viewport().set_input_as_handled()
 func has_modal() -> bool:
-	for node in get_children()+app.get_children():
+	for node in get_children()+app.get_children()+get_tree().root.get_children():
 		if node is Window and node.visible:return true
 	return false
