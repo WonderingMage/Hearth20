@@ -58,7 +58,7 @@ func setup(owner_app: Hearth20App) -> void:
 	var detail_scroll:=ScrollContainer.new(); detail_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED; detail_scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL; inspector.add_child(detail_scroll)
 	editor=Hearth20TokenPanel.new(); editor.inventory_context=true; editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL; detail_scroll.add_child(editor); editor.setup(app)
 	status=_label("Stored tokens keep their image and player assignment. Save the campaign to retain the inventory.",12); status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; column.add_child(status)
-	selected_id=app.board.selected_actor_id; refresh(); popup_centered()
+	selected_id=app.board.selected_actor_id; refresh(); Hearth20Design.popup_window(self)
 func _label(caption: String, points: int) -> Label:
 	var label:=Label.new(); label.text=caption; label.add_theme_font_size_override("font_size",points); label.add_theme_color_override("font_color",Hearth20Regal.swatch(Hearth20Regal.INK)); return label
 func _button(parent: Node, caption: String, action: Callable) -> Button:

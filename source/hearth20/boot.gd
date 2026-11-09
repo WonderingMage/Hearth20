@@ -30,6 +30,7 @@ var loaded: Array[Resource]=[]
 var load_errors: Array[String]=[]
 var campaign_thread: Thread
 var campaign_result: Dictionary={}
+var campaign_path=""
 var advance_pending:=false
 var codex:=false
 var loading_drawn:=false
@@ -61,6 +62,7 @@ func _ready() -> void:
 	var top:=HBoxContainer.new(); top.add_theme_constant_override("separation",14); column.add_child(top)
 	heading=_label("H E A R T H 2 0",39,true); heading.size_flags_horizontal=Control.SIZE_EXPAND_FILL; top.add_child(heading)
 	var appearance:=Hearth20Regal.ThemeMedallion.new(); appearance.name="TitleAppearance"; top.add_child(appearance)
+	_button(top,"Host & join guide",func():Hearth20PartyGuide.open(self),36)
 	var strap:=_label("THE ADVENTURE AT YOUR TABLE",11); column.add_child(strap)
 	var line:=HSeparator.new(); column.add_child(line)
 	content=HBoxContainer.new(); content.size_flags_vertical=Control.SIZE_EXPAND_FILL; content.add_theme_constant_override("separation",44); column.add_child(content)
@@ -74,7 +76,8 @@ func _ready() -> void:
 	video_volume=HSlider.new(); video_volume.min_value=0; video_volume.max_value=1; video_volume.step=.01; video_volume.value=.8; video_volume.custom_minimum_size.x=65; video_volume.tooltip_text="Showcase audio volume"; video_volume.value_changed.connect(func(value): viewer.set_video_volume(value)); controls.add_child(video_volume)
 	_button(controls,"›",func(): choose_creature(creature_index+1),38)
 	showcase_help=_label("DRAG TO ROTATE  ·  RIGHT-DRAG TO LIFT  ·  WHEEL TO ZOOM",10); showcase_help.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; model_column.add_child(showcase_help)
-	copy_column=VBoxContainer.new(); copy_column.custom_minimum_size.x=340; copy_column.size_flags_horizontal=Control.SIZE_EXPAND_FILL; copy_column.add_theme_constant_override("separation",12); content.add_child(copy_column)
+	var copy_scroll=ScrollContainer.new();copy_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;copy_scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL;content.add_child(copy_scroll)
+	copy_column=VBoxContainer.new(); copy_column.custom_minimum_size.x=340; copy_column.size_flags_horizontal=Control.SIZE_EXPAND_FILL; copy_column.add_theme_constant_override("separation",12); copy_scroll.add_child(copy_column)
 	var spacer:=Control.new(); spacer.custom_minimum_size.y=12; copy_column.add_child(spacer)
 	creature_type=_label("",11); copy_column.add_child(creature_type)
 	creature_name=_label("",34,true); creature_name.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; copy_column.add_child(creature_name)
@@ -85,14 +88,13 @@ func _ready() -> void:
 	tip_counter=_label("",11); tip_counter.size_flags_horizontal=Control.SIZE_EXPAND_FILL; tip_row.add_child(tip_counter)
 	_button(tip_row,"Next tip  ›",next_tip,32)
 	menu=GridContainer.new(); menu.columns=1; menu.add_theme_constant_override("v_separation",8); menu.add_theme_constant_override("h_separation",8); copy_column.add_child(menu)
-	_button(menu,"Start a new table",func(): begin_loading("new"))
+	_button(menu,"Host a new game",func(): begin_loading("host"))
 	if Hearth20MultiplayerLab.enabled():_button(menu,"Multiplayer Lab · DM + 2 Players",func(): Hearth20MultiplayerLab.start_on_table=true;begin_loading("lab"))
-	_button(menu,"Open saved campaign",func(): begin_loading("saved"))
+	_button(menu,"Open saved campaign",open_campaign_vault)
 	_button(menu,"Join a table",func(): begin_loading("join"))
-	_button(menu,"Creature codex",_show_codex)
-	_button(menu,"Model credits",_show_credits)
-	_button(menu,"Settings",func():Hearth20SettingsWindow.open(self))
-	_button(menu,"Quit",func(): get_tree().quit())
+	var utilities=GridContainer.new();utilities.columns=2;utilities.add_theme_constant_override("h_separation",8);utilities.add_theme_constant_override("v_separation",8);menu.add_child(utilities)
+	for entry in [["Creature codex",_show_codex],["Model credits",_show_credits],["Settings",func():Hearth20SettingsWindow.open(self)],["Quit",func():get_tree().quit()]]:
+		var action=_button(utilities,entry[0],entry[1]);action.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	progress=ProgressBar.new(); progress.show_percentage=false; progress.max_value=100; progress.custom_minimum_size.y=5; progress.visible=false; column.add_child(progress)
 	progress_note=_label("Twenty creatures. Two hundred field notes. Your next story awaits.",12); column.add_child(progress_note)
 	if debug_enabled:
@@ -105,7 +107,9 @@ func _ready() -> void:
 func _on_first_title_draw() -> void:
 	menu_drawn_msec=Time.get_ticks_msec()
 	Hearth20Updater.confirm_startup()
+	get_node("/root/Updates").startup_check()
 	viewer.start_pending()
+	if get_node("/root/SteamLink").pending_invite>0:begin_loading("join")
 func _label(text_value: String, points: int, serif: bool=false) -> Label:
 	var label:=Label.new(); label.text=text_value; label.add_theme_font_size_override("font_size",points)
 	label.add_theme_color_override("font_color",Hearth20Regal.swatch(Hearth20Regal.INK if points>15 else Hearth20Regal.MUTED))
@@ -171,8 +175,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode==KEY_F6 and debug_enabled: _show_debug_lab(); get_viewport().set_input_as_handled()
 		elif event.keycode==KEY_ESCAPE and debug_preview: set_debug_preview(false); get_viewport().set_input_as_handled()
-func begin_loading(action: String) -> void:
+func open_campaign_vault() -> void:
+	Hearth20CampaignVault.open(self,null,"open",func(path):begin_loading("saved",path))
+func begin_loading(action: String,save_path="") -> void:
 	if loading: return
+	if action=="saved" and save_path.is_empty():open_campaign_vault();return
+	campaign_path=save_path
 	set_debug_preview(false)
 	if is_instance_valid(debug_dialog): debug_dialog.queue_free()
 	mode=action; loading=true; menu.hide(); progress.show(); progress.value=0; progress_note.text="Preparing your table…"
@@ -182,7 +190,7 @@ func begin_loading(action: String) -> void:
 		if ResourceLoader.load_threaded_request(path,"",false)!=OK: load_errors.append(path)
 	if action=="saved":
 		campaign_thread=Thread.new()
-		campaign_thread.start(func(): return Hearth20Identity.load_campaign(Hearth20Identity.SAVE_ROOT+"/table."+Hearth20Identity.SAVE_EXTENSION))
+		campaign_thread.start(func(): return Hearth20Identity.load_campaign(campaign_path))
 	RenderingServer.frame_post_draw.connect(_on_loading_drawn,CONNECT_ONE_SHOT)
 func _on_loading_drawn() -> void:
 	loading_drawn=true
@@ -226,8 +234,8 @@ func _enter_table() -> void:
 	get_parent().add_child(experience)
 	var app: Hearth20App=experience.app
 	if mode=="lab":app._load_sample_map("sunspire-sanctum",false)
-	if mode=="saved": app.install_loaded_campaign(campaign_result.campaign)
-	elif mode=="join":experience.focus_join_when_ready()
+	if mode=="saved": app.install_loaded_campaign(campaign_result.campaign,campaign_path)
+	elif mode in ["host","join"]:experience.focus_connections_when_ready(mode)
 	get_tree().current_scene=experience
 	queue_free()
 func _exit_tree() -> void:

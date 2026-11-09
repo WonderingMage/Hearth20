@@ -39,7 +39,7 @@ func setup(owner_app: Hearth20App) -> void:
 	column.add_child(_label("Preview your effects in3D. Rotate the scene, slow the action or inspect an impact. Previews stay on this device.",13))
 	var body:=HBoxContainer.new();body.size_flags_vertical=Control.SIZE_EXPAND_FILL;body.add_theme_constant_override("separation",18);column.add_child(body)
 	var rail:=VBoxContainer.new();rail.custom_minimum_size.x=235;body.add_child(rail);rail.add_child(_label("CURATED EFFECTS",12))
-	preset_list=ItemList.new();preset_list.size_flags_vertical=Control.SIZE_EXPAND_FILL;preset_list.custom_minimum_size.y=350
+	preset_list=ItemList.new();preset_list.size_flags_vertical=Control.SIZE_EXPAND_FILL;preset_list.custom_minimum_size.y=160
 	for preset in PRESETS:preset_list.add_item(preset[0])
 	preset_list.item_selected.connect(_preset);rail.add_child(preset_list)
 	rail.add_child(_label("Material",12));element=OptionButton.new()
@@ -51,7 +51,7 @@ func setup(owner_app: Hearth20App) -> void:
 	shape.item_selected.connect(func(_index):
 		if not syncing:_restart());rail.add_child(shape)
 	var preview:=VBoxContainer.new();preview.size_flags_horizontal=Control.SIZE_EXPAND_FILL;body.add_child(preview)
-	surface=SubViewportContainer.new();surface.stretch=true;surface.size_flags_horizontal=Control.SIZE_EXPAND_FILL;surface.size_flags_vertical=Control.SIZE_EXPAND_FILL;surface.custom_minimum_size=Vector2(660,430);surface.material=Hearth20FxPost.material();surface.gui_input.connect(_orbit);preview.add_child(surface)
+	surface=SubViewportContainer.new();surface.stretch=true;surface.size_flags_horizontal=Control.SIZE_EXPAND_FILL;surface.size_flags_vertical=Control.SIZE_EXPAND_FILL;surface.custom_minimum_size=Vector2(420,260);surface.material=Hearth20FxPost.material();surface.gui_input.connect(_orbit);preview.add_child(surface)
 	viewport=SubViewport.new();viewport.msaa_3d=Viewport.MSAA_4X;viewport.own_world_3d=true;surface.add_child(viewport);world=Node3D.new();viewport.add_child(world)
 	camera=Camera3D.new();camera.current=true;camera.fov=44;world.add_child(camera);_camera()
 	var env_node:=WorldEnvironment.new();var env:=Environment.new();env.background_mode=Environment.BG_COLOR;env.background_color=Color("#0e0d0c");env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;env.ambient_light_color=Color("#b1a28c");env.ambient_light_energy=.38;env.tonemap_mode=Environment.TONE_MAPPER_FILMIC;env_node.environment=env;world.add_child(env_node)
@@ -71,7 +71,7 @@ func setup(owner_app: Hearth20App) -> void:
 	timeline=HSlider.new();timeline.min_value=0;timeline.max_value=7;timeline.step=.01;timeline.size_flags_horizontal=Control.SIZE_EXPAND_FILL;timeline.value_changed.connect(func(value):
 		if not syncing:age=value);time_row.add_child(timeline)
 	time_label=_label("0.00 s",13);time_label.custom_minimum_size.x=72;time_row.add_child(time_label)
-	preset_list.select(0);_preset(0);popup_centered()
+	preset_list.select(0);_preset(0);Hearth20Design.popup_window(self)
 func _label(text: String, points: int) -> Label:
 	var label:=Label.new();label.text=text;label.add_theme_font_size_override("font_size",points);label.add_theme_color_override("font_color",Hearth20Regal.swatch(Hearth20Regal.INK));return label
 func _button(parent: Node, text: String, action: Callable) -> Button:

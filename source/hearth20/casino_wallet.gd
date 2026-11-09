@@ -2,6 +2,30 @@ extends RefCounted
 class_name Hearth20CasinoWallet
 ## Explicit table declarations, never a claim of synchronization with a website.
 const MAX_CP=100000000000
+static func parse_declaration(fields: Dictionary) -> Dictionary:
+	var result={"ok":true,"total_cp":0}
+	for pair in [["gp",100],["sp",10],["cp",1]]:
+		var raw=fields.get(pair[0],"")
+		if not raw is String or raw.length()>128:
+			return fail("Enter a whole number for each coin. That entry is too long.")
+		var text=raw.strip_edges()
+		if text.is_empty():text="0"
+		var digits=RegEx.new()
+		digits.compile("^(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)$")
+		if digits.search(text)==null:
+			return fail("Use whole gold, silver and copper amounts, such as 100 or 1,000.")
+		text=text.replace(",","").lstrip("0")
+		if text.is_empty():text="0"
+		if text.length()>12:
+			return fail("That balance exceeds the table limit.")
+		var amount=text.to_int()
+		if amount>MAX_CP:
+			return fail("That balance exceeds the table limit.")
+		result[pair[0]]=amount
+		result.total_cp+=amount*int(pair[1])
+		if result.total_cp>MAX_CP:
+			return fail("That balance exceeds the table limit.")
+	return result
 static func fail(message: String) -> Dictionary:return {"ok":false,"error":message}
 static func coins(cp: int) -> Dictionary:return {"gp":cp/100,"sp":(cp%100)/10,"cp":cp%10}
 static func label(cp: int) -> String:

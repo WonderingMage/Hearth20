@@ -16,6 +16,7 @@ var roster: VBoxContainer
 var peek_hint: Button
 var footer_panel: Control
 var left_panel: Control
+var right_panel: Control
 var book_nav: PanelContainer
 var catalog_panel: PanelContainer
 var change_game_button: Button
@@ -35,6 +36,8 @@ var game_loader: Control
 var bet_prefs={}
 var table_prefs={}
 var balance_notice: Hearth20CasinoBalanceNotice
+var balance_drafts={}
+var balance_game_id=""
 func setup(owner_app: Hearth20App) -> void:
 	app=owner_app;app.session.state_changed.connect(func(_s):sync());app.session.snapshot_received.connect(func(_s):sync());app.session.casino_action_result.connect(_result)
 	balance_notice=Hearth20CasinoBalanceNotice.new();add_child(balance_notice);balance_notice.setup(app)
@@ -138,16 +141,26 @@ func _process(_delta: float) -> void:
 			_build_hud();signature="";phase="ready";_refresh();progress.value=100;loader.queue_free();loader=null
 func _label(text: String, points: int=14) -> Label:
 	var label=Label.new();label.text=text;label.add_theme_font_size_override("font_size",points);label.add_theme_color_override("font_color",Color("#e1cfaa"));return label
-func _button(parent: Node, text: String, action: Callable) -> Button:
-	var button=Button.new();button.text=text;button.custom_minimum_size.y=36;button.pressed.connect(action);parent.add_child(button);return button
+func _button(parent: Node, text: String, action: Callable, numbers: Array=[]) -> Button:
+	var button=Button.new();button.text=text;button.clip_text=true;button.tooltip_text=text;button.custom_minimum_size.y=36
+	button.custom_minimum_size.x=minf(180.,Hearth20Design.font().get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,14).x+32.)
+	button.pressed.connect(func():
+		var committed=Hearth20Design.commit_numbers(numbers)
+		if not committed.ok:
+			if is_instance_valid(status):status.text=committed.error
+			return
+		action.call())
+	parent.add_child(button);return button
 func _panel(at: Rect2) -> VBoxContainer:
 	var panel=PanelContainer.new();panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT);panel.anchor_left=at.position.x;panel.anchor_top=at.position.y;panel.anchor_right=at.end.x;panel.anchor_bottom=at.end.y;panel.offset_left=16;panel.offset_top=16;panel.offset_right=-16;panel.offset_bottom=-16;panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Color(.055,.043,.026,1.),3,16,Color("#66502c")));hud.add_child(panel)
 	var scroll=ScrollContainer.new();scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;panel.add_child(scroll);var column=VBoxContainer.new();column.size_flags_horizontal=Control.SIZE_EXPAND_FILL;column.add_theme_constant_override("separation",9);scroll.add_child(column);return column
 func _build_hud() -> void:
 	hud=Control.new();hud.name="CasinoControls";hud.z_index=20;hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);layer.add_child(hud)
-	var left=_panel(Rect2(0,0,.205,.70));left_panel=left.get_parent().get_parent();left.add_child(_label("THE GILDED TABLE",18));summary=_label("",14);summary.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;left.add_child(summary);roster=VBoxContainer.new();roster.add_theme_constant_override("separation",12);left.add_child(roster)
-	var right=_panel(Rect2(.79,0,.21,.80));detail=VBoxContainer.new();detail.add_theme_constant_override("separation",10);right.add_child(detail);actions=VBoxContainer.new();actions.add_theme_constant_override("separation",8);right.add_child(actions)
+	var left=_panel(Rect2(0,0,.24,.80));left_panel=left.get_parent().get_parent();left.add_child(_label("THE GILDED TABLE",18));summary=_label("",14);summary.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;left.add_child(summary);roster=VBoxContainer.new();roster.add_theme_constant_override("separation",12);left.add_child(roster)
+	var right=_panel(Rect2(.76,0,.24,.80));right_panel=right.get_parent().get_parent();detail=VBoxContainer.new();detail.add_theme_constant_override("separation",10);right.add_child(detail);actions=VBoxContainer.new();actions.add_theme_constant_override("separation",8);right.add_child(actions)
 	var bottom=_panel(Rect2(.21,.87,.58,.13));var bottom_row=HBoxContainer.new();footer_panel=bottom.get_parent().get_parent();bottom_row.add_theme_constant_override("separation",12);bottom.add_child(bottom_row);status=_label("",13);status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;status.size_flags_horizontal=Control.SIZE_EXPAND_FILL;bottom_row.add_child(status)
+	footer_panel.anchor_top=1.;footer_panel.offset_top=-90;footer_panel.anchor_bottom=1.;footer_panel.offset_bottom=-12
+	status.max_lines_visible=2;status.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 	change_game_button=_button(bottom_row,"Change game",_change_game);_update_game_change()
 	_button(bottom_row,"Look at mode pulls" if app.seated_shell!=null else "Leave casino" if app.session.local_role=="dm" else "Leave session",func():
 		if app.seated_shell!=null:app.seated_shell.look_at_pulls();return
@@ -164,6 +177,7 @@ func _clear(node: Node) -> void:
 	for child in node.get_children():node.remove_child(child);child.queue_free()
 func _refresh() -> void:
 	game=current();var next=JSON.stringify(game)
+	if is_instance_valid(left_panel):left_panel.visible=not game.is_empty()
 	_update_game_change()
 	if signature==next:return
 	signature=next;selected="";_clear(roster);_clear(actions);_clear(detail)
@@ -225,20 +239,22 @@ func _catalog() -> void:
 	summary.text="The casino board\nChoose an evening's game.\nThe DM opens the chosen table for every connected player."
 	_text(detail,"Tavern games",23);_text(detail,"Players declare their coins before playing. The CM settles the table; players enter their new balance in D&D Beyond.",14)
 	Hearth20CasinoGamesUI.reserve(self,detail)
-	catalog_panel=PanelContainer.new();catalog_panel.anchor_left=.23;catalog_panel.anchor_top=.12;catalog_panel.anchor_right=.76;catalog_panel.anchor_bottom=.84;catalog_panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Color(.08,.06,.03,.94),3,24,Color("#a78442")));hud.add_child(catalog_panel)
+	catalog_panel=PanelContainer.new();catalog_panel.anchor_left=.025;catalog_panel.anchor_top=.11;catalog_panel.anchor_right=.745;catalog_panel.anchor_bottom=1.;catalog_panel.offset_bottom=-100;catalog_panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Color(.08,.06,.03,.94),3,16,Color("#a78442")));hud.add_child(catalog_panel)
 	var backdrop=TextureRect.new();backdrop.texture=assets.catalog;backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;backdrop.modulate=Color(.5,.43,.34,1);backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;catalog_panel.add_child(backdrop)
-	var column=VBoxContainer.new();column.add_theme_constant_override("separation",16);catalog_panel.add_child(column);column.add_child(_label("A NIGHT AT THE GILDED TABLE",24))
-	var grid=GridContainer.new();grid.columns=2;grid.size_flags_vertical=Control.SIZE_EXPAND_FILL;grid.add_theme_constant_override("h_separation",16);grid.add_theme_constant_override("v_separation",16);column.add_child(grid)
+	var scroll=ScrollContainer.new();scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;catalog_panel.add_child(scroll)
+	var column=VBoxContainer.new();column.size_flags_horizontal=Control.SIZE_EXPAND_FILL;column.add_theme_constant_override("separation",12);scroll.add_child(column);_text(column,"A NIGHT AT THE GILDED TABLE",22)
+	var grid=GridContainer.new();grid.columns=2;grid.size_flags_vertical=Control.SIZE_EXPAND_FILL;grid.add_theme_constant_override("h_separation",16);grid.add_theme_constant_override("v_separation",12);column.add_child(grid)
 	for spec in [["three_dragon_ante","Three-Dragon Ante","Traditional 80-card deck · 2–6 players"],["gambit_of_ord","Gambit of Ord","Soul-glass d8, d6, d4 · 2–6 players"],["run_of_luck","Run of Luck","Five living racers · three d4 stages"],["tymoras_spinner","Tymora's Spinner","Brass, velvet and fortune · D20 wheel"]]:
-		var tile=PanelContainer.new();tile.size_flags_horizontal=Control.SIZE_EXPAND_FILL;tile.size_flags_vertical=Control.SIZE_EXPAND_FILL;tile.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#1f180e"),3,16,Color("#806236")));grid.add_child(tile);var box=VBoxContainer.new();tile.add_child(box)
-		box.add_theme_constant_override("separation",8)
+		var tile=PanelContainer.new();tile.size_flags_horizontal=Control.SIZE_EXPAND_FILL;tile.size_flags_vertical=Control.SIZE_EXPAND_FILL;tile.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#1f180e"),3,14,Color("#806236")));grid.add_child(tile);var box=VBoxContainer.new();tile.add_child(box)
+		box.add_theme_constant_override("separation",6)
 		_text(box,spec[1],21);_text(box,spec[2],13);var type=str(spec[0]);var prefs=table_prefs.get(type,{"denomination":1 if type=="three_dragon_ante" else 2,"buyin":100,"minimum":5 if type=="gambit_of_ord" else 25});table_prefs[type]=prefs;var denomination=OptionButton.new()
 		for label in ["Copper · 0.01 gp","Silver · 0.10 gp","Gold · 1 gp","Platinum · 10 gp"]:denomination.add_item(label)
 		denomination.selected=int(prefs.denomination);denomination.item_selected.connect(func(index):prefs.denomination=index);box.add_child(denomination)
-		var row=HBoxContainer.new();box.add_child(row);var buyin=Hearth20CasinoGamesUI.number(row,1,1000000,int(prefs.buyin));buyin.prefix="Buy-in ";var minimum=Hearth20CasinoGamesUI.number(row,1,int(buyin.value),int(prefs.minimum));minimum.prefix="Min ";buyin.value_changed.connect(func(v):prefs.buyin=int(v);minimum.max_value=v);minimum.value_changed.connect(func(v):prefs.minimum=int(v))
+		var row=HFlowContainer.new();box.add_child(row);var buyin=Hearth20CasinoGamesUI.number(row,1,1000000,int(prefs.buyin));buyin.prefix="Buy-in ";buyin.custom_minimum_size.x=136;var minimum=Hearth20CasinoGamesUI.number(row,1,int(buyin.value),int(prefs.minimum));minimum.prefix="Min ";minimum.custom_minimum_size.x=136;buyin.value_changed.connect(func(v):prefs.buyin=int(v);minimum.max_value=v);minimum.value_changed.connect(func(v):prefs.minimum=int(v))
 		row.visible=type!="three_dragon_ante"
 		if type=="tymoras_spinner":_button(box,"Set wheel payouts",_wheel_terms)
-		_button(box,"Open for the party",func():_send("open",{"game":type,"chip_cp":[1,10,100,1000][denomination.selected],"buyin":int(buyin.value),"minimum":int(minimum.value),"payouts":wheel_payouts.duplicate(true)}))
+		_button(box,"Open for the party",func():_send("open",{"game":type,"chip_cp":[1,10,100,1000][denomination.selected],"buyin":int(buyin.value),"minimum":int(minimum.value),"payouts":wheel_payouts.duplicate(true)}),[buyin,minimum] if type!="three_dragon_ante" else [])
+	status.text="Choose a game · Scroll the board for more options."
 func _game_loading(active: bool) -> void:
 	if is_instance_valid(game_loader):game_loader.queue_free();game_loader=null
 	if not active:return
@@ -254,21 +270,57 @@ func _wallet(s: Dictionary) -> void:
 		_text(actions,str(s.name)+(" · coins declared" if s.get("balance_declared",false) else " · awaiting player coin declaration"),13);return
 	_text(actions,"Your declared coins · "+str(s.name),16)
 	_text(actions,"Enter the balance on your D&D Beyond sheet. Hearth20 tracks this table only; update the website after payout or refund.",12)
-	var value=Hearth20CasinoWallet.coins(int(s.get("declared_cp",0)));var fields={}
+	var value=Hearth20CasinoWallet.coins(int(s.get("declared_cp",0)))
+	var fields={}
+	if balance_game_id!=str(game.get("id","")):
+		balance_game_id=str(game.get("id",""))
+		balance_drafts.clear()
+	var draft_key=str(game.get("id",""))+"/"+str(s.actor_id)
+	var draft=balance_drafts.get(draft_key,{})
 	for key in ["gp","sp","cp"]:
 		var row=HBoxContainer.new();actions.add_child(row);_text(row,str(key).to_upper(),13)
-		fields[key]=Hearth20CasinoGamesUI.number(row,0,1000000000,int(value[key]))
+		var input=LineEdit.new()
+		input.name="Declared"+str(key).to_upper()
+		input.text=str(draft.get(key,value[key]))
+		input.placeholder_text="0"
+		input.custom_minimum_size.y=38
+		input.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		row.add_child(input)
+		fields[key]=input
 	var id=str(s.actor_id)
-	_button(actions,"Update declaration" if s.get("balance_declared",false) else "Declare my balance",func():_send("declare_balance",{"actor_id":id,"gp":int(fields.gp.value),"sp":int(fields.sp.value),"cp":int(fields.cp.value)}))
+	var preview=_label("",13)
+	preview.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	actions.add_child(preview)
+	var submit=_button(actions,"Update declaration" if s.get("balance_declared",false) else "Declare my balance",func():
+		var parsed=_read_balance(fields)
+		if not parsed.ok:
+			preview.text=parsed.error
+			return
+		_send("declare_balance",{"actor_id":id,"gp":parsed.gp,"sp":parsed.sp,"cp":parsed.cp}))
+	var changed=func(_text=""):
+		var raw={}
+		for key in fields:raw[key]=fields[key].text
+		balance_drafts[draft_key]=raw
+		var parsed=Hearth20CasinoWallet.parse_declaration(raw)
+		submit.disabled=not parsed.ok
+		preview.text="Declared total · "+Hearth20CasinoWallet.label(parsed.total_cp) if parsed.ok else parsed.error
+	for field in fields.values():field.text_changed.connect(changed)
+	changed.call()
+func _read_balance(fields: Dictionary) -> Dictionary:
+	var raw={}
+	for key in fields:raw[key]=fields[key].text
+	return Hearth20CasinoWallet.parse_declaration(raw)
 func _motion_finished() -> void:
 	if phase=="ready":signature="";_refresh()
 func _wager_pick(wager: Dictionary) -> void:
 	var state=current();var id=str(state.get("id",""));var prefs=bet_prefs.get(id,{});prefs.kind=wager.kind;prefs.number=wager.number;bet_prefs[id]=prefs;signature="";_refresh()
 func _wheel_terms() -> void:
 	_clear(detail);_text(detail,"Wheel payouts",24);_text(detail,"Profit per winning chip. The original stake returns too. Terms lock when the table opens.",14)
+	var numbers=[]
 	for kind in ["odd","even","red","black","ends","number"]:
 		var key=kind;var row=HBoxContainer.new();detail.add_child(row);row.add_child(_label(kind.capitalize(),14));var value=Hearth20CasinoGamesUI.number(row,1,100,int(wheel_payouts[kind]));value.suffix=" : 1";value.value_changed.connect(func(v):wheel_payouts[key]=int(v))
-	_button(detail,"Return to casino board",func():signature="";_refresh())
+		numbers.append(value)
+	_button(detail,"Return to casino board",func():signature="";_refresh(),numbers)
 func _ledger() -> void:
 	_clear(detail);_text(detail,"Gold ledger",23)
 	var entries=app.campaign.get("tavern_ledger",[])
@@ -312,7 +364,12 @@ func _book_ui(opened: bool) -> void:
 	book_nav=PanelContainer.new();book_nav.anchor_left=.05;book_nav.anchor_top=.02;book_nav.anchor_right=.95;book_nav.anchor_bottom=.10;book_nav.add_theme_stylebox_override("panel",Hearth20Design.panel(Color(.05,.035,.02,.92),2,10,Color("#8c6c37")));layer.add_child(book_nav)
 	var row=HBoxContainer.new();row.add_theme_constant_override("separation",8);book_nav.add_child(row)
 	_button(row,"Contents",func():scene.book.select_chapter(-1))
+	var chapters=OptionButton.new();chapters.fit_to_longest_item=false;chapters.size_flags_horizontal=Control.SIZE_EXPAND_FILL;row.add_child(chapters);chapters.add_item("Choose a chapter")
 	for i in Hearth20CasinoBook.TITLES.size():
-		var index=i;_button(row,Hearth20CasinoBook.TITLES[i],func():scene.book.select_chapter(index))
-	var space=Control.new();space.size_flags_horizontal=Control.SIZE_EXPAND_FILL;row.add_child(space);_button(row,"Close DA ROLLS",func():scene.book.close_book())
+		chapters.add_item(Hearth20CasinoBook.TITLES[i])
+	chapters.select(scene.book.chapter+1);chapters.item_selected.connect(func(index):scene.book.select_chapter(index-1))
+	var follow_chapter=func(index):chapters.select(index+1)
+	scene.book.chapter_changed.connect(follow_chapter)
+	chapters.tree_exiting.connect(func():scene.book.chapter_changed.disconnect(follow_chapter))
 	_button(row,"‹",func():scene.book.turn_spread(-1));_button(row,"›",func():scene.book.turn_spread(1))
+	_button(row,"Close DA ROLLS",func():scene.book.close_book())

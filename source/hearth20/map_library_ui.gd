@@ -74,11 +74,11 @@ func setup(owner_app: Node) -> void:
 	cards.add_theme_constant_override("v_separation",10)
 	cards.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	scroll.add_child(cards)
+	var detail_scroll:=ScrollContainer.new();detail_scroll.custom_minimum_size.x=360;detail_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;detail_scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL;split.add_child(detail_scroll)
 	var detail:=VBoxContainer.new()
-	detail.custom_minimum_size.x=360
 	detail.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	detail.add_theme_constant_override("separation",10)
-	split.add_child(detail)
+	detail_scroll.add_child(detail)
 	var frame:=PanelContainer.new()
 	frame.size_flags_vertical=Control.SIZE_EXPAND_FILL
 	frame.custom_minimum_size.y=230

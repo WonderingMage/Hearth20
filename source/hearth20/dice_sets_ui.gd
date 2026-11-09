@@ -42,7 +42,7 @@ func setup(owner_session: Hearth20Session) -> void:
 		status.text=Hearth20DiceSets.NAMES[chosen]+" is equipped. Everyone authorized to see your rolls sees these dice.")
 	detail.add_child(choose)
 	var credit:=RichTextLabel.new(); credit.bbcode_enabled=true; credit.fit_content=true; credit.custom_minimum_size.y=54; credit.add_theme_font_size_override("normal_font_size",11); credit.text="Supplied models: [url=https://sketchfab.com/3d-models/rpg-dice-set-2498c370c56842f89fa3d7096c72ed56]RPG Dice Set by ghosted[/url] · [url=https://sketchfab.com/3d-models/dungeons-and-dragons-dice-set-163950cff9694fe1a686d22fe7737236]Dungeons and Dragons Dice Set by JayDesigns3D[/url] · [url=https://creativecommons.org/licenses/by/4.0/]CC BY 4.0[/url]. Converted, normalized and calibrated; ordinary DM d10 numerals adapted."; credit.meta_clicked.connect(func(url): OS.shell_open(str(url))); column.add_child(credit)
-	select_set(chosen); popup_centered()
+	select_set(chosen); Hearth20Design.popup_window(self)
 func _label(text: String, points: int) -> Label:
 	var label:=Label.new(); label.text=text; label.add_theme_font_size_override("font_size",points); label.add_theme_color_override("font_color",Hearth20Regal.swatch(Hearth20Regal.INK)); return label
 func select_set(id: String) -> void:
