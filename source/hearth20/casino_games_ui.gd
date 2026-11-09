@@ -2,12 +2,13 @@ extends RefCounted
 class_name Hearth20CasinoGamesUI
 const RACERS=["Ember","Jade","Saffron","Indigo","Pearl"]
 static func number(parent: Node, minimum: int, maximum: int, value: int, step=1) -> SpinBox:
-	var input=SpinBox.new();input.min_value=minimum;input.max_value=maxi(minimum,maximum);input.step=step;input.value=clampi(value,minimum,maxi(minimum,maximum));input.custom_minimum_size.y=38;input.size_flags_horizontal=Control.SIZE_EXPAND_FILL;parent.add_child(input);return input
+	var input=SpinBox.new();input.min_value=minimum;input.max_value=maxi(minimum,maximum);input.step=step;input.value=clampi(value,minimum,maxi(minimum,maximum));input.custom_minimum_size.y=38;input.size_flags_horizontal=Control.SIZE_EXPAND_FILL;parent.add_child(input);Hearth20Design.track_number(input);return input
 static func view_seat(p: Hearth20CasinoPortal, i: int) -> void:p.selected_view_seat=i;p.signature="";p._refresh()
 static func reserve(p: Hearth20CasinoPortal, parent: Node) -> void:
 	var cp=int(p.app.campaign.get("casino_house_cp",0));p._text(parent,"Casino reserve · "+p._money(cp),15)
-	var amount=SpinBox.new();amount.min_value=0;amount.max_value=1000000000;amount.step=25;amount.value=maxf(cp/100.,1000.);amount.prefix="Total ";amount.suffix=" gp";amount.custom_minimum_size.y=38;parent.add_child(amount)
-	p._button(parent,"Set casino reserve",func():p._send("house_reserve",{"amount_cp":roundi(amount.value*100)}))
+	var amount=SpinBox.new();amount.min_value=0;amount.max_value=1000000000;amount.step=1;amount.value=maxf(cp/100.,1000.);amount.prefix="Total ";amount.suffix=" gp";amount.custom_minimum_size.y=38;parent.add_child(amount)
+	Hearth20Design.track_number(amount)
+	p._button(parent,"Set casino reserve",func():p._send("house_reserve",{"amount_cp":roundi(amount.value*100)}),[amount])
 static func build(p: Hearth20CasinoPortal, mine: int) -> void:
 	var g=p.game;var dm=p.app.session.local_role=="dm";var title=str(Hearth20CasinoGames.NAMES[g.game]);var ord_game=g.game=="gambit_of_ord"
 	p.summary.text=("CASINO MASTER · DEALER\n" if dm else "")+title+"\n"+str(g.phase).replace("_"," ").capitalize()+" · Round "+str(g.round)+"\nEach chip = "+p._money(int(g.chip_cp))+"\nStakes "+str(g.pot)+" chips"
@@ -55,7 +56,7 @@ static func _ord(p: Hearth20CasinoPortal, mine: int, dm: bool) -> void:
 			p._button(p.actions,"Check" if call==0 else "Call · "+str(mini(call,int(s.hoard)))+" chips",func():p._send("check" if call==0 else "call",{"actor_id":actor_id}))
 			var raise_min=int(g.street_bet)+int(g.min_raise);var maximum=int(s.street_paid)+int(s.hoard)
 			p._text(p.actions,"Raise this street's total to",13);var amount=number(p.actions,raise_min,maximum,raise_min)
-			var raise_button=p._button(p.actions,"Raise",func():p._send("raise",{"actor_id":actor_id,"total":int(amount.value)}));raise_button.disabled=maximum<raise_min
+			var raise_button=p._button(p.actions,"Raise",func():p._send("raise",{"actor_id":actor_id,"total":int(amount.value)}),[amount]);raise_button.disabled=maximum<raise_min
 			p._button(p.actions,"All in · "+str(s.hoard)+" chips",func():p._send("all_in",{"actor_id":actor_id}));p._button(p.actions,"Fold this gambit",func():p._send("fold",{"actor_id":actor_id}))
 	elif g.phase=="await_die":
 		p._text(p.detail,"Betting is matched",19)
@@ -82,7 +83,7 @@ static func _house(p: Hearth20CasinoPortal, mine: int, dm: bool) -> void:
 		var amount=number(p.actions,int(g.minimum),int(s.hoard),int(prefs.get("amount",g.minimum)));amount.name="WagerAmount"
 		var remember=func():p.bet_prefs[g.id]={"kind":"racer" if race else kinds[choice.selected],"number":choice.selected if race else int(exact.value),"amount":int(amount.value)}
 		choice.item_selected.connect(func(i):exact.visible=not race and kinds[i]=="number";remember.call());exact.value_changed.connect(func(_v):remember.call());amount.value_changed.connect(func(_v):remember.call())
-		var button=p._button(p.actions,"Place wager",func():p._send("wager",{"actor_id":actor_id,"amount":int(amount.value),"kind":"racer" if race else kinds[choice.selected],"number":choice.selected if race else int(exact.value) if kinds[choice.selected]=="number" else 0}));button.disabled=s.hoard<g.minimum or (race and not s.bets.is_empty())
+		var button=p._button(p.actions,"Place wager",func():p._send("wager",{"actor_id":actor_id,"amount":int(amount.value),"kind":"racer" if race else kinds[choice.selected],"number":choice.selected if race else int(exact.value) if kinds[choice.selected]=="number" else 0}),[amount,exact]);button.disabled=s.hoard<g.minimum or (race and not s.bets.is_empty())
 		for i in s.bets.size():
 			var slot=i;p._button(p.actions,"Remove · "+bet_label(s.bets[i],g.game),func():p._send("remove_wager",{"actor_id":actor_id,"bet_index":slot}))
 	if dm and g.phase=="betting":

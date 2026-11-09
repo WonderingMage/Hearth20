@@ -14,6 +14,35 @@ static var fonts: Dictionary = {}
 static var theme_cache: Theme
 static var theme_revision:=-1
 
+static func track_number(input: SpinBox) -> void:
+	input.get_line_edit().text_changed.connect(func(text):input.set_meta("number_draft",text))
+	input.gui_input.connect(func(event):
+		if event is InputEventMouseButton and event.pressed:input.remove_meta("number_draft"))
+
+static func commit_numbers(inputs: Array) -> Dictionary:
+	for input in inputs:
+		if not is_instance_valid(input) or not input is SpinBox or not input.editable or not input.visible:continue
+		if not input.has_meta("number_draft"):continue
+		var text=str(input.get_meta("number_draft")).strip_edges()
+		text=text.trim_prefix(input.prefix.strip_edges()).strip_edges()
+		text=text.trim_suffix(input.suffix.strip_edges()).strip_edges()
+		var expression=Expression.new()
+		var error="Enter a finite number between %s and %s." % [input.min_value,input.max_value]
+		if text.is_empty() or text.length()>128:return {"ok":false,"error":error}
+		for exponent in RegEx.create_from_string("[eE]([+-]?[0-9]+)").search_all(text):
+			if exponent.get_string(1).length()>4 or absi(exponent.get_string(1).to_int())>100:return {"ok":false,"error":error}
+		if expression.parse(TextServerManager.get_primary_interface().parse_number(text.replace(";",",")))!=OK:
+			return {"ok":false,"error":error}
+		var value=expression.execute([],null,false,true)
+		if expression.has_execute_failed() or typeof(value) not in [TYPE_INT,TYPE_FLOAT]:return {"ok":false,"error":error}
+		if not is_finite(float(value)) or value<input.min_value or value>input.max_value:return {"ok":false,"error":error}
+		if input.step>=1 and float(value)!=floor(float(value)):return {"ok":false,"error":"Enter a whole number."}
+		# Commit before the caller reads value. Native focus-loss commits are deferred.
+		input.get_line_edit().text=str(value)
+		input.apply()
+		input.remove_meta("number_draft")
+	return {"ok":true}
+
 static func font(heading: bool = false) -> Font:
 	var key := "heading" if heading else "body"
 	if not fonts.has(key):

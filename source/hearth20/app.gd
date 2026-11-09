@@ -80,6 +80,8 @@ var chat_privacy: OptionButton
 var sheet_actor_picker: OptionButton
 var selected_sheet_actor_id := ""
 var join_character_window: Hearth20JoinPawnWindow
+var current_save_path=""
+var campaign_progress: Hearth20CampaignProgress
 var beyond_sheet: Hearth20BeyondSheet
 var cover_map_button: Button
 var inventory_drop_button: Button
@@ -115,6 +117,8 @@ var character_card: Hearth20CharacterCard
 var inventory_window: Hearth20TokenInventoryWindow
 var multiplayer_lab: Hearth20MultiplayerLab
 var dice_stage: Hearth20DiceStage
+var connection_window: Window
+var connection_signature=""
 
 func open_token_inventory() -> Hearth20TokenInventoryWindow:
 	if session.local_role!="dm": return null
@@ -123,6 +127,8 @@ func open_token_inventory() -> Hearth20TokenInventoryWindow:
 
 func _ready() -> void:
 	Hearth20Regal.load_preference()
+	var updates=get_node_or_null("/root/Updates")
+	if updates!=null:updates.app=self;updates.startup_check.call_deferred()
 	add_to_group("hearth20_themed")
 	var project_name := str(ProjectSettings.get_setting("application/config/name", ""))
 	var edition := str(ProjectSettings.get_setting("application/config/edition", ""))
@@ -141,6 +147,9 @@ func _ready() -> void:
 	session.name = "Hearth20Session"
 	add_child(session)
 	session.configure(campaign)
+	var steam=get_node_or_null("/root/SteamLink")
+	if steam!=null:
+		steam.attach(session);steam.invite_received.connect(_on_steam_invite);steam.changed.connect(_steam_connection_changed)
 	session.status_changed.connect(_on_status)
 	session.snapshot_received.connect(_on_snapshot)
 	session.state_changed.connect(_on_host_state)
@@ -1257,6 +1266,8 @@ func _apply_token_position() -> void:
 		session._broadcast_snapshots()
 
 func _build_network_section(parent: VBoxContainer) -> void:
+	var party=_add_button(parent,"✦ Gather party · Steam & Direct IP",func():open_connections())
+	party.custom_minimum_size.y=44
 	_add_header(parent, "HOSTED TABLE")
 	network_controls = VBoxContainer.new()
 	network_controls.add_theme_constant_override("separation", 8)
@@ -1644,9 +1655,12 @@ func _save_campaign() -> void:
 	if board.role != "dm":
 		_on_status("Only the DM can save the campaign.")
 		return
-	lite_bridge.sync_to_campaign()
-	var result := Hearth20Identity.save_campaign(campaign, Hearth20Identity.SAVE_ROOT + "/table." + Hearth20Identity.SAVE_EXTENSION)
-	_on_status("Campaign saved under Hearth20 user data." if result.ok else "; ".join(result.errors))
+	Hearth20CampaignVault.open(seated_shell if seated_shell!=null else self,self,"save")
+
+func begin_campaign_save(path: String,title_value: String) -> Hearth20CampaignProgress:
+	if is_instance_valid(campaign_progress) and campaign_progress.active:return campaign_progress
+	campaign_progress=Hearth20CampaignProgress.open(self,"save",path,title_value)
+	return campaign_progress
 
 func _load_campaign() -> void:
 	if board.role != "dm":
@@ -1655,21 +1669,17 @@ func _load_campaign() -> void:
 	if not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer) or not session.remote_players.is_empty():
 		_on_status("Disconnect the active table before loading another campaign.")
 		return
-	var result := Hearth20Identity.load_campaign(Hearth20Identity.SAVE_ROOT + "/table." + Hearth20Identity.SAVE_EXTENSION)
-	if not result.ok:
-		_on_status("; ".join(result.errors))
-		return
-	install_loaded_campaign(result.campaign)
+	Hearth20CampaignVault.open(seated_shell if seated_shell!=null else self,self,"open")
 
-func install_loaded_campaign(loaded_campaign: Dictionary) -> void:
-	if session.local_role!="dm" or not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer): return
-	campaign = loaded_campaign
-	lite_bridge.detach()
-	lite_adapter = LITE_ADAPTER_SCRIPT.new(campaign)
-	var rules_result: Dictionary = lite_bridge.attach(lite_adapter)
+func install_loaded_campaign(loaded_campaign: Dictionary,source_path="") -> Dictionary:
+	if session.local_role!="dm" or not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer):return {"ok":false,"error":"Leave the active table before loading another campaign."}
+	var candidate_adapter=LITE_ADAPTER_SCRIPT.new(loaded_campaign)
+	var candidate_bridge=LITE_BRIDGE_SCRIPT.new()
+	var rules_result: Dictionary = candidate_bridge.attach(candidate_adapter)
 	if not rules_result.ok:
 		_on_status("Campaign loaded, but rules bridge could not attach: " + str(rules_result.get("error", "unknown error")))
-		return
+		return rules_result
+	lite_bridge.detach();campaign=loaded_campaign;lite_adapter=candidate_adapter;lite_bridge=candidate_bridge;current_save_path=source_path
 	dm_notes_editor.text = str(campaign.get("dm_notes", ""))
 	sheet_render_signature = ""
 	vision_render_signature = ""
@@ -1677,6 +1687,7 @@ func install_loaded_campaign(loaded_campaign: Dictionary) -> void:
 	board.set_campaign(campaign, session, "dm")
 	_update_session_ui()
 	_on_status("Hearth20 campaign loaded from the separate Hearth20 save root.")
+	return {"ok":true}
 
 func _on_selection(actor_id: String) -> void:
 	if actor_id.is_empty():
@@ -1763,7 +1774,7 @@ func _on_snapshot(value: Dictionary) -> void:
 	board.set_player_snapshot(value)
 	if session.local_role=="player" and not value.get("connection_closed",false):
 		if value.get("character_required",false) and not is_instance_valid(join_character_window) and not (multiplayer_lab!=null and multiplayer_lab.auto_character()):
-			join_character_window=Hearth20JoinPawnWindow.new();add_child(join_character_window);join_character_window.setup(self)
+			open_join_character()
 		elif not value.get("character_required",false) and is_instance_valid(join_character_window):
 			join_character_window.cancelled=true;join_character_window._close()
 	if bool(value.get("connection_closed", false)):
@@ -1899,3 +1910,21 @@ func open_fx_studio() -> Hearth20FxStudioWindow:
 
 func open_casino() -> void:
 	if session.local_role=="dm" and casino_portal!=null:casino_portal.open()
+
+func open_connections(action="") -> Window:
+	return Hearth20ConnectionWindow.open(self,action)
+func open_join_character() -> Hearth20JoinPawnWindow:
+	if is_instance_valid(join_character_window):return join_character_window
+	join_character_window=Hearth20JoinPawnWindow.new()
+	# The map is a texture-backed nested viewport. Modal input belongs to the player's screen.
+	(seated_shell if seated_shell!=null else self).add_child(join_character_window)
+	join_character_window.setup(self)
+	return join_character_window
+func _on_steam_invite() -> void:
+	open_connections("join").accept_invitation()
+func _steam_connection_changed() -> void:
+	if not is_instance_valid(host_button):return
+	var link=get_node("/root/SteamLink")
+	var signature=str(session.local_role)+"|"+str(session.transport)+"|"+str(session.multiplayer.multiplayer_peer.get_connection_status())+"|"+str(link.busy())
+	if signature==connection_signature:return
+	connection_signature=signature;board.set_role(session.local_role);_update_session_ui()

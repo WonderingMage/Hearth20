@@ -12,6 +12,7 @@ const MAX_PROJECTION_BYTES := 64 * 1024 * 1024
 const MAX_RECIPE_JSON_BYTES := 262_144
 const MAX_RECIPE_JSON_NODES := 20_000
 const MAX_RECIPE_JSON_DEPTH := 16
+const MAX_REVISION := 9_007_199_254_740_990
 const MOVEMENT_MODES := ["blocked", "turn_allowance", "grant", "free_until_revoked"]
 const RECIPE_PATTERNS := ["forest_camp", "ruined_chapel", "cave", "castle", "ruins"]
 const RECIPE_NUMBER_WORDS := {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20}
@@ -70,7 +71,7 @@ static func valid_scene(scene: Variant) -> bool:
 		return false
 	if int(scene.width_cells) < 1 or int(scene.height_cells) < 1 or int(scene.width_cells) > 256 or int(scene.height_cells) > 256:
 		return false
-	if not scene.get("feet_per_cell") is float and not scene.get("feet_per_cell") is int:
+	if not _finite_number(scene.get("feet_per_cell")):
 		return false
 	if float(scene.feet_per_cell) <= 0.0 or float(scene.feet_per_cell) > 1000.0:
 		return false
@@ -158,6 +159,14 @@ static func validate_campaign(campaign: Variant) -> Dictionary:
 	if not result.ok:
 		return result
 	var checked: Dictionary = campaign
+	if not _integer_number(checked.get("revision",0)) or checked.get("revision",0)<0 or checked.get("revision",0)>MAX_REVISION:
+		return {"ok":false,"errors":["Campaign revision is invalid."]}
+	var turn_budgets=checked.get("turn_remaining_feet",{})
+	if not turn_budgets is Dictionary or turn_budgets.size()>MAX_ACTORS:
+		return {"ok":false,"errors":["Turn movement allowances are invalid."]}
+	for actor_id in turn_budgets:
+		if not valid_identifier(actor_id) or not _finite_number(turn_budgets[actor_id]) or turn_budgets[actor_id]<0 or turn_budgets[actor_id]>1_000_000:
+			return {"ok":false,"errors":["Turn movement allowances must be finite, non-negative distances."]}
 	if checked.scenes.size() > MAX_SCENES or checked.actors.size() > MAX_ACTORS:
 		return {"ok": false, "errors": ["Campaign exceeds scene or actor count limits."]}
 	var encoded_asset_bytes := 0
@@ -230,7 +239,7 @@ static func validate_campaign(campaign: Variant) -> Dictionary:
 		if not finite_point(actor.get("position", null)) or actor_scene.is_empty() or not _inside_scene(actor.position, actor_scene):
 			return {"ok": false, "errors": ["Actor position or scene reference is invalid."]}
 		var policy: Variant = actor.get("movement_policy", default_movement_policy("blocked"))
-		if not policy is Dictionary or str(policy.get("mode", "blocked")) not in MOVEMENT_MODES or not policy.get("controllers", []) is Array or policy.get("controllers", []).size() > 256:
+		if not valid_movement_policy(policy):
 			return {"ok": false, "errors": ["Actor movement policy is unsupported."]}
 		var actor_asset_id := str(actor.get("png_asset_id", ""))
 		if not actor_asset_id.is_empty() and (not checked.assets.has(actor_asset_id) or checked.assets[actor_asset_id].get("kind", "") != "token"):
@@ -255,6 +264,22 @@ static func validate_campaign(campaign: Variant) -> Dictionary:
 		if not handout is Dictionary or not valid_identifier(handout.get("id", "")) or not handout.get("public", false) is bool or not handout.get("title", "") is String or str(handout.get("title", "")).length() > 96 or not handout.get("body", "") is String or str(handout.get("body", "")).length() > 12000:
 			return {"ok": false, "errors": ["Handout fields exceed supported bounds."]}
 	return {"ok": true, "errors": []}
+
+static func valid_movement_policy(policy: Variant) -> bool:
+	if not policy is Dictionary or policy.get("mode","blocked") not in MOVEMENT_MODES:
+		return false
+	var controllers=policy.get("controllers",[])
+	if not controllers is Array or controllers.size()>256:return false
+	for controller in controllers:
+		if not valid_identifier(controller):return false
+	var remaining=policy.get("remaining_feet",0.0)
+	if not _finite_number(remaining) or remaining<0 or remaining>1_000_000:return false
+	var revision=policy.get("revision",0)
+	if not _integer_number(revision) or revision<0 or revision>MAX_REVISION:return false
+	if policy.get("expiry","campaign") not in ["campaign","scene","turn"]:return false
+	for field in ["grant_id","expiry_id"]:
+		if not policy.get(field,"") is String or policy.get(field,"").length()>96:return false
+	return true
 
 static func default_movement_policy(mode: String = "blocked", controllers: Array[String] = []) -> Dictionary:
 	if not MOVEMENT_MODES.has(mode) or controllers.size() > 256:
@@ -323,7 +348,9 @@ static func authorize_and_apply_move(campaign: Dictionary, authenticated_player:
 		return {"ok": false, "reason": "blocked_by_wall_or_door"}
 	if actor_role != "player" or not valid_identifier(authenticated_player):
 		return {"ok": false, "reason": "invalid_role"}
-	var policy: Dictionary = actor.get("movement_policy", {})
+	var policy_value=actor.get("movement_policy", {})
+	if not valid_movement_policy(policy_value):return {"ok":false,"reason":"invalid_policy"}
+	var policy: Dictionary=policy_value
 	var mode := str(policy.get("mode", "blocked"))
 	if mode == "blocked":
 		return {"ok": false, "reason": "blocked"}
@@ -332,12 +359,15 @@ static func authorize_and_apply_move(campaign: Dictionary, authenticated_player:
 	if mode == "turn_allowance":
 		if str(campaign.get("active_turn_actor", "")) != actor_id or str(actor.get("turn_allowance_turn_id", "")) != str(campaign.get("turn_id", "turn-0")):
 			return {"ok": false, "reason": "not_active_turn"}
-		if not campaign.get("turn_remaining_feet") is Dictionary:
-			campaign.turn_remaining_feet = {}
-		var remaining := float(campaign.get("turn_remaining_feet", {}).get(actor_id, 0.0))
+		var budgets=campaign.get("turn_remaining_feet",{})
+		if not budgets is Dictionary:return {"ok":false,"reason":"invalid_policy"}
+		var budget=budgets.get(actor_id,0.0)
+		if not _finite_number(budget) or budget<0 or budget>1_000_000:return {"ok":false,"reason":"invalid_policy"}
+		var remaining := float(budget)
 		if measured_distance_feet > remaining:
 			return {"ok": false, "reason": "insufficient_turn_allowance"}
-		campaign.turn_remaining_feet[actor_id] = remaining - measured_distance_feet
+		budgets[actor_id]=remaining-measured_distance_feet
+		campaign.turn_remaining_feet=budgets
 	elif mode == "grant":
 		if policy.get("expiry") == "turn" and str(campaign.get("turn_id", "")) != str(policy.get("expiry_id", "")):
 			return {"ok": false, "reason": "grant_expired"}
@@ -345,7 +375,7 @@ static func authorize_and_apply_move(campaign: Dictionary, authenticated_player:
 			return {"ok": false, "reason": "grant_expired"}
 		if measured_distance_feet > float(policy.get("remaining_feet", 0.0)):
 			return {"ok": false, "reason": "insufficient_grant"}
-		policy.remaining_feet = float(policy.remaining_feet) - measured_distance_feet
+		policy.remaining_feet = float(policy.get("remaining_feet",0.0)) - measured_distance_feet
 		policy.revision = int(policy.get("revision", 0)) + 1
 	elif mode != "free_until_revoked":
 		return {"ok": false, "reason": "invalid_policy"}

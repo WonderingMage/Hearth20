@@ -10,6 +10,7 @@ var check_button: Button
 var download_button: Button
 var install_button: Button
 var stop_button: Button
+var update_channel: OptionButton
 var preview: ConfirmationDialog
 var preview_until=0
 var preview_label: Label
@@ -31,7 +32,7 @@ func setup(owner_app: Hearth20App) -> void:
 	var column=VBoxContainer.new();column.custom_minimum_size=Vector2(740,460);column.add_theme_constant_override("separation",12);add_child(column)
 	var heading=Label.new();heading.text="THE CHAMBER OF PREFERENCES";heading.add_theme_font_override("font",Hearth20Design.font(true));heading.add_theme_font_size_override("font_size",25);heading.add_theme_color_override("font_color",Hearth20Regal.swatch(Hearth20Regal.GOLD));column.add_child(heading)
 	tabs=TabContainer.new();tabs.custom_minimum_size=Vector2(740,440);tabs.size_flags_vertical=Control.SIZE_EXPAND_FILL;column.add_child(tabs)
-	updater=Hearth20Updater.new();add_child(updater);updater.changed.connect(_update_status);updater.app=app
+	updater=Hearth20Updater.service(self);updater.changed.connect(_update_status);updater.app=app
 	_build();confirmed.connect(_apply);canceled.connect(_cancel);close_requested.connect(_cancel)
 	Hearth20Regal.sync(self)
 func page(caption: String) -> VBoxContainer:
@@ -76,12 +77,19 @@ func _build() -> void:
 		var key=entry[1];slider.value_changed.connect(func(value):pending[key]=value/100.;percent.text=str(roundi(value))+"%";Hearth20Preferences.apply_audio(pending))
 	toggle(audio,"Mute while Hearth20 is in the background","mute_unfocused");button(audio,"♪ Play a sound preview",_sound_preview)
 	var updates=page("Updates");note(updates,"HEARTH20 BETA · "+Hearth20Identity.VERSION+"\nOfficial updates: WonderingMage/Hearth20 on GitHub. Campaigns, player identities, settings and website sign-in remain in your local profile.")
+	toggle(updates,"Check for updates when Hearth20 opens","startup_updates")
+	update_channel=choice(updates,"Update channel","update_channel",[["Beta releases","beta"],["Beta + Steam test builds","steam-test"]])
+	if not updater.busy and updater.channel!=pending.update_channel:updater.set_channel(pending.update_channel)
+	update_channel.item_selected.connect(func(index):updater.set_channel(str(update_channel.get_item_metadata(index))))
+	note(updates,"Both channels include prereleases. Steam test builds contain the latest multiplayer fixes. Apply changes to remember your selected channel.")
 	var buttons=HBoxContainer.new();buttons.add_theme_constant_override("separation",10);updates.add_child(buttons)
 	check_button=button(buttons,"Check for updates",func():updater.check());download_button=button(buttons,"Download update",func():updater.download());install_button=button(buttons,"Restart & update",func():updater.install());stop_button=button(buttons,"Cancel download",func():updater.cancel())
 	update_note=note(updates,"");update_progress=ProgressBar.new();update_progress.show_percentage=true;update_progress.custom_minimum_size.y=18;updates.add_child(update_progress)
 	button(updates,"Open Hearth20 releases",func():OS.shell_open(Hearth20Updater.RELEASES_PAGE));_update_status()
 func _update_status() -> void:
 	if update_note==null:return
+	update_channel.disabled=updater.busy or updater.install_requested
+	install_button.disabled=updater.busy or updater.install_requested
 	update_note.text=updater.message;update_progress.visible=updater.busy;update_progress.value=updater.progress;check_button.disabled=updater.busy;download_button.visible=not updater.release.is_empty() and not updater.verified;download_button.disabled=updater.busy;install_button.visible=updater.verified;stop_button.visible=updater.busy and updater.stage=="download"
 func _display_changed() -> bool:
 	for key in ["window_mode","width","height","monitor","vsync","fps","background_fps","quality"]:
@@ -112,7 +120,9 @@ func _cancel() -> void:
 	_revert();Hearth20Preferences.apply_audio(Hearth20Preferences.values);_close()
 func _close() -> void:
 	if closed:return
-	closed=true;updater.cancel();hide();queue_free()
+	closed=true
+	if not updater.busy and updater.channel!=Hearth20Preferences.values.update_channel:updater.set_channel(Hearth20Preferences.values.update_channel)
+	hide();queue_free()
 func _sound_preview() -> void:
 	Hearth20Preferences.apply_audio(pending)
 	var clip=AudioStreamWAV.new();clip.format=AudioStreamWAV.FORMAT_16_BITS;clip.mix_rate=22050;var data=PackedByteArray();data.resize(13230)

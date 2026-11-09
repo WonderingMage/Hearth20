@@ -35,6 +35,8 @@ var game_loader: Control
 var bet_prefs={}
 var table_prefs={}
 var balance_notice: Hearth20CasinoBalanceNotice
+var balance_drafts={}
+var balance_game_id=""
 func setup(owner_app: Hearth20App) -> void:
 	app=owner_app;app.session.state_changed.connect(func(_s):sync());app.session.snapshot_received.connect(func(_s):sync());app.session.casino_action_result.connect(_result)
 	balance_notice=Hearth20CasinoBalanceNotice.new();add_child(balance_notice);balance_notice.setup(app)
@@ -138,8 +140,15 @@ func _process(_delta: float) -> void:
 			_build_hud();signature="";phase="ready";_refresh();progress.value=100;loader.queue_free();loader=null
 func _label(text: String, points: int=14) -> Label:
 	var label=Label.new();label.text=text;label.add_theme_font_size_override("font_size",points);label.add_theme_color_override("font_color",Color("#e1cfaa"));return label
-func _button(parent: Node, text: String, action: Callable) -> Button:
-	var button=Button.new();button.text=text;button.custom_minimum_size.y=36;button.pressed.connect(action);parent.add_child(button);return button
+func _button(parent: Node, text: String, action: Callable, numbers: Array=[]) -> Button:
+	var button=Button.new();button.text=text;button.custom_minimum_size.y=36
+	button.pressed.connect(func():
+		var committed=Hearth20Design.commit_numbers(numbers)
+		if not committed.ok:
+			if is_instance_valid(status):status.text=committed.error
+			return
+		action.call())
+	parent.add_child(button);return button
 func _panel(at: Rect2) -> VBoxContainer:
 	var panel=PanelContainer.new();panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT);panel.anchor_left=at.position.x;panel.anchor_top=at.position.y;panel.anchor_right=at.end.x;panel.anchor_bottom=at.end.y;panel.offset_left=16;panel.offset_top=16;panel.offset_right=-16;panel.offset_bottom=-16;panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Color(.055,.043,.026,1.),3,16,Color("#66502c")));hud.add_child(panel)
 	var scroll=ScrollContainer.new();scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;panel.add_child(scroll);var column=VBoxContainer.new();column.size_flags_horizontal=Control.SIZE_EXPAND_FILL;column.add_theme_constant_override("separation",9);scroll.add_child(column);return column
@@ -238,7 +247,7 @@ func _catalog() -> void:
 		var row=HBoxContainer.new();box.add_child(row);var buyin=Hearth20CasinoGamesUI.number(row,1,1000000,int(prefs.buyin));buyin.prefix="Buy-in ";var minimum=Hearth20CasinoGamesUI.number(row,1,int(buyin.value),int(prefs.minimum));minimum.prefix="Min ";buyin.value_changed.connect(func(v):prefs.buyin=int(v);minimum.max_value=v);minimum.value_changed.connect(func(v):prefs.minimum=int(v))
 		row.visible=type!="three_dragon_ante"
 		if type=="tymoras_spinner":_button(box,"Set wheel payouts",_wheel_terms)
-		_button(box,"Open for the party",func():_send("open",{"game":type,"chip_cp":[1,10,100,1000][denomination.selected],"buyin":int(buyin.value),"minimum":int(minimum.value),"payouts":wheel_payouts.duplicate(true)}))
+		_button(box,"Open for the party",func():_send("open",{"game":type,"chip_cp":[1,10,100,1000][denomination.selected],"buyin":int(buyin.value),"minimum":int(minimum.value),"payouts":wheel_payouts.duplicate(true)}),[buyin,minimum] if type!="three_dragon_ante" else [])
 func _game_loading(active: bool) -> void:
 	if is_instance_valid(game_loader):game_loader.queue_free();game_loader=null
 	if not active:return
@@ -254,21 +263,57 @@ func _wallet(s: Dictionary) -> void:
 		_text(actions,str(s.name)+(" · coins declared" if s.get("balance_declared",false) else " · awaiting player coin declaration"),13);return
 	_text(actions,"Your declared coins · "+str(s.name),16)
 	_text(actions,"Enter the balance on your D&D Beyond sheet. Hearth20 tracks this table only; update the website after payout or refund.",12)
-	var value=Hearth20CasinoWallet.coins(int(s.get("declared_cp",0)));var fields={}
+	var value=Hearth20CasinoWallet.coins(int(s.get("declared_cp",0)))
+	var fields={}
+	if balance_game_id!=str(game.get("id","")):
+		balance_game_id=str(game.get("id",""))
+		balance_drafts.clear()
+	var draft_key=str(game.get("id",""))+"/"+str(s.actor_id)
+	var draft=balance_drafts.get(draft_key,{})
 	for key in ["gp","sp","cp"]:
 		var row=HBoxContainer.new();actions.add_child(row);_text(row,str(key).to_upper(),13)
-		fields[key]=Hearth20CasinoGamesUI.number(row,0,1000000000,int(value[key]))
+		var input=LineEdit.new()
+		input.name="Declared"+str(key).to_upper()
+		input.text=str(draft.get(key,value[key]))
+		input.placeholder_text="0"
+		input.custom_minimum_size.y=38
+		input.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		row.add_child(input)
+		fields[key]=input
 	var id=str(s.actor_id)
-	_button(actions,"Update declaration" if s.get("balance_declared",false) else "Declare my balance",func():_send("declare_balance",{"actor_id":id,"gp":int(fields.gp.value),"sp":int(fields.sp.value),"cp":int(fields.cp.value)}))
+	var preview=_label("",13)
+	preview.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	actions.add_child(preview)
+	var submit=_button(actions,"Update declaration" if s.get("balance_declared",false) else "Declare my balance",func():
+		var parsed=_read_balance(fields)
+		if not parsed.ok:
+			preview.text=parsed.error
+			return
+		_send("declare_balance",{"actor_id":id,"gp":parsed.gp,"sp":parsed.sp,"cp":parsed.cp}))
+	var changed=func(_text=""):
+		var raw={}
+		for key in fields:raw[key]=fields[key].text
+		balance_drafts[draft_key]=raw
+		var parsed=Hearth20CasinoWallet.parse_declaration(raw)
+		submit.disabled=not parsed.ok
+		preview.text="Declared total · "+Hearth20CasinoWallet.label(parsed.total_cp) if parsed.ok else parsed.error
+	for field in fields.values():field.text_changed.connect(changed)
+	changed.call()
+func _read_balance(fields: Dictionary) -> Dictionary:
+	var raw={}
+	for key in fields:raw[key]=fields[key].text
+	return Hearth20CasinoWallet.parse_declaration(raw)
 func _motion_finished() -> void:
 	if phase=="ready":signature="";_refresh()
 func _wager_pick(wager: Dictionary) -> void:
 	var state=current();var id=str(state.get("id",""));var prefs=bet_prefs.get(id,{});prefs.kind=wager.kind;prefs.number=wager.number;bet_prefs[id]=prefs;signature="";_refresh()
 func _wheel_terms() -> void:
 	_clear(detail);_text(detail,"Wheel payouts",24);_text(detail,"Profit per winning chip. The original stake returns too. Terms lock when the table opens.",14)
+	var numbers=[]
 	for kind in ["odd","even","red","black","ends","number"]:
 		var key=kind;var row=HBoxContainer.new();detail.add_child(row);row.add_child(_label(kind.capitalize(),14));var value=Hearth20CasinoGamesUI.number(row,1,100,int(wheel_payouts[kind]));value.suffix=" : 1";value.value_changed.connect(func(v):wheel_payouts[key]=int(v))
-	_button(detail,"Return to casino board",func():signature="";_refresh())
+		numbers.append(value)
+	_button(detail,"Return to casino board",func():signature="";_refresh(),numbers)
 func _ledger() -> void:
 	_clear(detail);_text(detail,"Gold ledger",23)
 	var entries=app.campaign.get("tavern_ledger",[])
