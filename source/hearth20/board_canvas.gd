@@ -16,6 +16,7 @@ var panning := false
 var space_pan := false
 var drag_origin := Vector2.ZERO
 var drag_world_origin := Vector2.ZERO
+var drag_points: Array=[]
 var camera_pan := Vector2.ZERO
 var camera_zoom := 1.0
 var fit_pending := true
@@ -316,6 +317,8 @@ func _gui_input(event: InputEvent) -> void:
 				dragging_actor = not read_only_preview
 				drag_origin = event.position
 				drag_world_origin = hit.get("position", Vector2.ZERO)
+				drag_points=[drag_world_origin,drag_world_origin]
+				hint_changed.emit("Drag to move · Right-click to add a waypoint · Escape to cancel")
 			else:
 				selected_actor_id = ""
 				selection_changed.emit("")
@@ -356,9 +359,10 @@ func _gui_input(event: InputEvent) -> void:
 				accept_event()
 				return
 			if dragging_actor:
-				var destination := _screen_to_world(event.position)
-				_move_selected(drag_world_origin, destination)
+				drag_points[-1]=Hearth20TokenInventory.snap_position(current_scene(),_bounded_point(event.position))
+				_move_selected(drag_world_origin, drag_points.back(),drag_points)
 				dragging_actor = false
+				drag_points.clear()
 			if panning:
 				panning = false
 			accept_event()
@@ -374,6 +378,13 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 			accept_event()
 		elif dragging_actor:
+			if role=="dm" and not Rect2(Vector2.ZERO,size).has_point(event.position):
+				var actor=Hearth20Contracts.find_actor(campaign,selected_actor_id)
+				if not actor.is_empty() and not actor.get("decorative",false):
+					dragging_actor=false;drag_points.clear()
+					force_drag(Hearth20TokenDrag.payload(session,selected_actor_id),Hearth20TokenDrag.preview(self,actor))
+					accept_event();return
+			drag_points[-1]=Hearth20TokenInventory.snap_position(current_scene(),_bounded_point(event.position))
 			queue_redraw()
 			accept_event()
 
@@ -437,11 +448,7 @@ func _draw() -> void:
 	if texture == null and role == "dm" and not has_content:
 		_draw_empty_state("Bring your map into the table", "Your scene grid and tokens remain ready. Import a PNG or JPEG, then set how many 5-foot cells span its width.", "Use Scene inspector  →  Import map")
 	if dragging_actor:
-		var endpoint := _screen_to_world(get_local_mouse_position())
-		var start_px := _world_to_screen(drag_world_origin, cell_px)
-		var end_px := _world_to_screen(endpoint, cell_px)
-		draw_line(start_px, end_px, Hearth20Regal.swatch(Hearth20Regal.GOLD), 2.0, true)
-		draw_string(ThemeDB.fallback_font, end_px + Vector2(10, -8), "%.1f ft" % (drag_world_origin.distance_to(endpoint) * float(scene.get("feet_per_cell", 5.0))), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
+		_draw_ruler({"shape":"line","points":drag_points,"distance":"euclidean","color":Hearth20Regal.swatch(Hearth20Regal.GOLD).to_html()},cell_px,"")
 	if active_fx:
 		active_fx.world_scale = cell_px * camera_zoom
 		active_fx.world_offset = camera_pan * camera_zoom
@@ -845,11 +852,15 @@ func fire_rocket_to(destination: Vector2) -> Dictionary:
 		active_fx.play_fire_rocket(actor.position, destination)
 	return result
 
-func _move_selected(from: Vector2, to: Vector2) -> void:
+func _move_selected(from: Vector2, to: Vector2, path: Array=[]) -> void:
 	if selected_actor_id.is_empty() or read_only_preview:
 		return
 	var scene := current_scene()
 	var snapped := Hearth20TokenInventory.snap_position(scene,to)
+	if not path.is_empty():
+		var result: Dictionary=session.board_action({"action":"move_path","actor_id":selected_actor_id,"points":path,"expected_revision":int(campaign.get("revision",0)) if role=="dm" else int(snapshot.get("revision",-1))})
+		if not result.ok:hint_changed.emit(str(result.get("error","Token could not be moved.")))
+		queue_redraw();return
 	if role == "dm":
 		if session and session.local_role == "dm":
 			var actor := Hearth20Contracts.find_actor(campaign, selected_actor_id)
@@ -865,12 +876,8 @@ func _move_selected(from: Vector2, to: Vector2) -> void:
 	queue_redraw()
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
-	if role!="dm" or read_only_preview or not dragging_actor:return null
-	var actor=Hearth20Contracts.find_actor(campaign,selected_actor_id)
-	if actor.is_empty() or actor.get("decorative",false):return null
-	dragging_actor=false;panning=false;queue_redraw()
-	set_drag_preview(Hearth20TokenDrag.preview(self,actor))
-	return Hearth20TokenDrag.payload(session,str(actor.id))
+	# Keep native dragging off while planning. Leaving the board starts it explicitly.
+	return null
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	return not read_only_preview and Hearth20TokenDrag.accepts(session,data)
 func _drop_data(at_position: Vector2, data: Variant) -> void:
@@ -1047,6 +1054,7 @@ func activate_tool(value: String, dismiss_ruler: bool = false) -> void:
 	door_tool = false
 	fx_target_mode = false
 	dragging_actor = false
+	drag_points.clear()
 	panning = false
 	tool_name = value
 	queue_redraw()
@@ -1082,6 +1090,10 @@ func _tool_input(event: InputEvent) -> bool:
 			if local_ruler.points.size() < 64: local_ruler.points.append(local_ruler.points.back())
 			return true
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if dragging_actor:
+			drag_points[-1]=Hearth20TokenInventory.snap_position(current_scene(),_bounded_point(event.position))
+			if drag_points.size()<64 and drag_points[-1]!=drag_points[-2]:drag_points.append(drag_points.back())
+			return true
 		if tool_name == "mask" and mask_polygon and polygon_points.size() >= 3:
 			var result: Dictionary = session.board_action({"action":"mask_polygon", "points":polygon_points, "reveal":mask_reveal})
 			hint_changed.emit(str(result.get("error", "Map mask updated.")))

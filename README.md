@@ -2,32 +2,47 @@
 
 <img src="branding/hearth20-beta-icon.png" width="128" alt="A beer mug with a golden d20 inside" />
 
-A gilded virtual tabletop with a first-person tavern, private D&D Beyond sheets and four multiplayer fantasy casino games.
+A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-**[Download Hearth20 Beta 0.2.4-beta](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.2.4-beta)** · Windows 64-bit portable. Open `Hearth20_Beta_Portable.exe`; no installer is needed. The player edition omits diagnostic menus and the local testing lab.
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.11](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.11-beta)
 
-Beta 0.2.4 fixes ordinary 3D dice rolls being covered by the focused battlemap. Public and private rolls now render above the map, including after returning from the casino. Existing 0.2.3 users can update from Settings → Updates.
+## Gather your party
 
-## At your table
+1. Open Steam and Hearth20 on each PC, using different Steam accounts.
+2. The DM chooses **Host a new game**. The guided screen prepares a private lobby and lists friends to invite.
+3. Players choose **Join a table** and accept the DM's invitation while Hearth20 is open.
+4. Each new player gives a display name, character name and PNG. The character arrives in the DM's token inventory for placement and movement permission.
 
-Host or join with a display name, character name and PNG. The DM places size-one character tokens from the campaign vault and grants movement. Click the battlemap to focus its controls or the papyrus sheet to open your private D&D Beyond browser. Website sign-in storage stays on your device.
+The title and connection screens include an illustrated host/join guide. Advanced connection provides Direct IP. Optional Steam networking currently uses Valve's shared AppID 480 and may appear as Spacewar.
 
-Use drawing, styled text, waypoint rulers, area templates, shared 3D effects, public/private dice and fifteen prepared maps. The DM controls layers, masks, full-map cover and shared environmental lighting, including time of day and board north. Look up and pull an engraved wooden handle to switch the table between adventure and casino.
+## At the adventure table
 
-The casino offers Three-Dragon Ante, Gambit of Ord, Run of Luck and Tymora’s Spinner. Players declare gold, silver and copper, then follow private payout/refund notices to update their website sheet. The physical rulebook explains each game. Personal refreshments use fifteen foods and six drinks; food lasts two bites and drinks three sips.
+Focus the battlemap to draw, add styled text, measure routes and areas, place effects, roll dice or manage tokens. The DM controls layers, common environmental lighting, day/night settings and map cover. Fifteen prepared maps demonstrate the tools and lighting. Token movement previews snap to square centers when grid snapping is enabled. Hold left and right-click to add movement waypoints, then release left to submit the route.
 
-## Settings and updates
+The DM can store tokens by dragging outside the map to an inventory target. Player ownership, portraits, map data, casino balances and campaign state are saved in the Campaign Vault. Save progress confirms completion and previous-copy recovery handles interrupted saves.
 
-Settings are available from the title, table and battlemap toolbar. Choose window/fullscreen mode, resolution, monitor, VSync, foreground/background frame limits and smoothing. Adjust output device and master, party, creature-video and wake-up volumes. Display changes revert after twenty seconds unless kept.
+Click the papyrus to focus a private D&D Beyond sheet. The Windows-browser option uses a dedicated window in the user's normal browser. Sign-in, cookies and passwords stay on that PC. A built-in WebView2 option is also available.
 
-**Settings → Updates → Check for updates** reads this repository’s Hearth20 Beta releases. Downloads are verified against GitHub’s SHA-256 asset digests and the matching edition manifest. Installation saves a campaign backup, waits for the current portable to close, retains the previous EXE and restores it if the replacement does not finish starting. Leave multiplayer before installing; all participants should use the same version. Existing campaigns, identities, settings and browser storage remain local.
+## At the gilded casino
+
+The DM uses the ceiling pulls to switch between adventure and casino. Three-Dragon Ante, Gambit of Ord, Run of Luck and Tymora's Spinner share one tavern. Players declare their gold, silver and copper, then receive private payout/refund totals to enter on D&D Beyond. Da Rolls provides chapters and illustrated instructions for each game.
+
+Personal refreshments include fifteen foods and six drinks. Food lasts two bites and drinks three sips. Beer effects accumulate, blackout restricts the player to spectating, and waking clears the beer timers.
+
+## Settings and automatic updates
+
+Display settings include window/fullscreen modes, resolution, monitor, VSync, frame limits and smoothing. Display changes use a timed confirmation. Audio settings separate master, effects, party, creature-showcase and wake-up volumes.
+
+Fresh installations use the ordinary **Beta releases** update channel. The title checks for updates and offers a verified download and restart. Existing Beta users can use **Settings → Updates → Check for updates**. Each download is checked against GitHub's SHA-256 digest and the Hearth20 edition manifest. The installer retains the previous EXE and supports rollback when startup confirmation fails.
+
+Use the same release on all participating PCs. Profiles, campaign saves and browser storage stay local. The optional combined update channel remains available in Settings for development test builds.
+
+## Verification
+
+The release includes **Verification-Report.md** with the exact scope of system checks, adversarial inputs, native UI tests, multiplayer campaign verification and update handling. The report also identifies checks requiring real accounts or target hardware. The GTX 1060 / i5-8500 30 FPS 1% low target still requires measurement on that hardware.
 
 ## Source and credits
 
-This repository contains application code and resource metadata. The release’s **Hearth20-Full-Source.zip** contains the complete Godot project with its large models, textures, fonts and bundled helpers. Extract it and open `source/project.godot` with Godot 4.5.1. The generated GitHub source-code ZIP does not include the large runtime assets. No private campaign, character PDF, account cookie or development report is included.
+**Hearth20-Full-Source.zip** contains the complete Godot project, large runtime assets and native components. Extract it and open **source/project.godot** with Godot 4.5.1. GitHub's automatic code archive omits large runtime assets.
 
-See [asset credits](Hearth20-Credits.md) and [foundation license](THIRD_PARTY/Hearthtable-CC0.txt). This repository is separate from Hearthtable; earlier editions and their save formats are preserved.
-
-## Performance status
-
-Hidden scenes pause, off-camera animation is culled, ordinary token moves reuse exact-source lighting/map caches, and soul calculations use bounded workers. Functional audits use a DM plus four independent players. The GTX 1060 / i5-8500 target of 30 FPS 1% lows still needs measurement on that hardware; faster-PC measurements are not certification.
+Keep **Hearth20-Credits.md** with redistributed copies. **SHA256SUMS.txt** lists the release asset checksums. This repository is separate from the original Hearthtable project. Earlier Hearth20 forks retain their own saved checkpoints.

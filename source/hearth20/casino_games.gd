@@ -16,6 +16,7 @@ static func seat_index(g: Dictionary, id: String) -> int:
 	return -1
 static func actor_for(campaign: Dictionary, g: Dictionary, principal: String, command: Dictionary) -> int:
 	var index=seat_index(g,str(command.get("actor_id","")))
+	if command.has("actor_id") and index<0:return -1
 	if index<0 and g.game=="gambit_of_ord":index=int(g.turn)
 	if index<0:
 		for i in g.seats.size():

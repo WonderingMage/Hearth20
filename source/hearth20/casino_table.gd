@@ -246,6 +246,9 @@ func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;card_viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;soul_viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
 		return
+	if game_view!=null:
+		for content in [game_view.world_root,game_view.overlay_root]:
+			if is_instance_valid(content):content.visible=not book.opened
 	if card_viewport!=null:
 		var has_visible_overlay=false
 		if casino_active and not book.opened:

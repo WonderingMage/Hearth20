@@ -33,7 +33,7 @@ func setup(owner_app: Hearth20App) -> void:
 		status.text="Click and release on the map to place it. Escape cancels.",creation)
 	var divider:=HSeparator.new(); add_child(divider)
 	var label:=Label.new(); label.text="EDIT & ASSIGN"; add_child(label)
-	list=OptionButton.new(); list.size_flags_horizontal=Control.SIZE_EXPAND_FILL; add_child(list)
+	list=OptionButton.new();list.fit_to_longest_item=false; list.size_flags_horizontal=Control.SIZE_EXPAND_FILL; add_child(list)
 	list.item_selected.connect(func(index):
 		app.board.selected_actor_id=str(list.get_item_metadata(index)); app.board.selection_changed.emit(app.board.selected_actor_id); app.board.queue_redraw(); _refresh_selection())
 	detail=VBoxContainer.new(); detail.add_theme_constant_override("separation",9); add_child(detail)
@@ -45,7 +45,7 @@ func setup(owner_app: Hearth20App) -> void:
 	_button("Choose token image…",func(): app.token_dialog.popup_centered_ratio(.75),detail)
 	_button("Apply appearance",_apply,detail)
 	var grant_label:=Label.new(); grant_label.text="CONTROLLED BY"; detail.add_child(grant_label)
-	controller=OptionButton.new(); detail.add_child(controller)
+	controller=OptionButton.new();controller.fit_to_longest_item=false; detail.add_child(controller)
 	may_move=CheckBox.new(); may_move.text="Allow movement in exploration"; may_move.button_pressed=true; detail.add_child(may_move)
 	controller.item_selected.connect(func(index):
 		var dm_only:=str(controller.get_item_metadata(index)).is_empty()

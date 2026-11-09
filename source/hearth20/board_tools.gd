@@ -22,7 +22,7 @@ static func valid_object(o: Variant, scene: Dictionary) -> bool:
 		return false
 	if o.get("kind", "") not in ["freehand", "line", "rectangle", "ellipse", "text", "beacon", "wall", "window", "door", "light"] or o.get("layer", "tokens") not in LAYERS:
 		return false
-	if not o.get("points", []) is Array or o.points.is_empty() or o.points.size() > 512:
+	if not o.get("points") is Array or o.points.is_empty() or o.points.size() > 512:
 		return false
 	for p in o.points:
 		if not point_ok(p, scene): return false
@@ -40,7 +40,7 @@ static func valid_object(o: Variant, scene: Dictionary) -> bool:
 static func valid_measure(m: Variant, scene: Dictionary) -> bool:
 	if not m is Dictionary or m.size() > 14 or var_to_bytes(m).size() > 8192: return false
 	if m.get("shape", "line") not in SHAPES or m.get("origin", "center") not in ["center", "edge", "corner"] or m.get("snap", "none") not in ["none", "center", "corner"] or m.get("distance", "euclidean") not in ["euclidean", "grid", "alternating", "manhattan"]: return false
-	if not m.get("points", []) is Array or m.points.size() < 2 or m.points.size() > 64: return false
+	if not m.get("points") is Array or m.points.size() < 2 or m.points.size() > 64: return false
 	for p in m.points:
 		if not point_ok(p, scene): return false
 	if m.get("angle", 60) not in [45, 60, 90] or m.get("beam_width", 5) not in [5, 10, 15]: return false

@@ -85,16 +85,16 @@ func _button(parent: Node,text: String,action: Callable) -> Button:
 	var b=Button.new();b.text=text;b.custom_minimum_size.y=40;b.pressed.connect(action);parent.add_child(b);return b
 func _build_hud() -> void:
 	hud=Control.new();hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;hud.z_index=900;add_child(hud)
-	var panel=PanelContainer.new();panel.anchor_left=.25;panel.anchor_right=.75;panel.anchor_top=.88;panel.anchor_bottom=.985;panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Color(.045,.033,.019,.92),3,14,Color("#9c783a")));hud.add_child(panel)
+	var panel=PanelContainer.new();panel.anchor_left=.5;panel.anchor_right=.5;panel.anchor_top=1.;panel.anchor_bottom=1.;panel.offset_left=-355;panel.offset_right=355;panel.offset_top=-128;panel.offset_bottom=-16;panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Color(.045,.033,.019,.92),3,14,Color("#9c783a")));hud.add_child(panel)
 	var col=VBoxContainer.new();col.add_theme_constant_override("separation",5);panel.add_child(col);mode_label=_label(col,"THE ADVENTURE TABLE",16);mode_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	hint=_label(col,"Click the map or your character sheet · Right-drag to look around",12);hint.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	var row=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;col.add_child(row)
 	_button(row,"Focus battlemap",func():focus_map());_button(row,"Peek at my sheet",focus_sheet);_button(row,"Look up",toggle_pulls)
 	_button(row,"Refreshments",func():refreshments.glance())
 	_button(row,"⚙ Settings",func():app.open_preferences())
-	home_row=HBoxContainer.new();home_row.alignment=BoxContainer.ALIGNMENT_CENTER;home_row.anchor_left=.28;home_row.anchor_right=.72;home_row.anchor_top=.07;home_row.anchor_bottom=.13;hud.add_child(home_row)
-	_button(home_row,"Host a game",func():app._host_table();focus_map(app.session_page));_button(home_row,"Join a game",func():focus_map(app.session_page));_button(home_row,"Open campaign",func():focus_map();app._load_campaign())
-	back=Button.new();back.text="↙ Back to the table";back.anchor_top=1.;back.anchor_bottom=1.;back.offset_left=24;back.offset_right=214;back.offset_top=-54;back.offset_bottom=-12;back.z_index=1100;back.pressed.connect(leave_focus);add_child(back);back.hide()
+	home_row=HBoxContainer.new();home_row.alignment=BoxContainer.ALIGNMENT_CENTER;home_row.anchor_left=.28;home_row.anchor_right=.72;home_row.offset_top=76;home_row.offset_bottom=116;hud.add_child(home_row)
+	_button(home_row,"Host a game",func():app.open_connections("host"));_button(home_row,"Join a game",func():app.open_connections("join"));_button(home_row,"Open campaign",func():focus_map();app._load_campaign())
+	back=Button.new();back.text="↙";back.tooltip_text="Back to the table";back.custom_minimum_size=Vector2(40,36);back.size_flags_vertical=Control.SIZE_SHRINK_CENTER;back.pressed.connect(leave_focus);app.shell.toolbar.add_child(back);app.shell.toolbar.move_child(back,0);back.hide()
 	look_button=Button.new();look_button.text="↑ Ceiling pulls";look_button.tooltip_text="Look up · the DM can drag a wooden pull downward to choose map or casino";look_button.anchor_left=.5;look_button.anchor_right=.5;look_button.offset_left=-85;look_button.offset_right=85;look_button.offset_top=20;look_button.offset_bottom=60;look_button.z_index=950;look_button.pressed.connect(toggle_pulls);add_child(look_button)
 func look_at_pulls() -> void:
 	look_up=true;look=Vector2.ZERO
@@ -111,8 +111,10 @@ func _build_map() -> void:
 func desired_mode() -> String:
 	return str(app.campaign.get("table_mode","map")) if app.session.local_role=="dm" else str(app.session.client_snapshot.get("table_mode","map"))
 func focus_join_when_ready() -> void:
+	focus_connections_when_ready("join")
+func focus_connections_when_ready(role: String) -> void:
 	while not ready_to_show:await get_tree().process_frame
-	focus_map(app.session_page);app.player_name.grab_focus()
+	app.open_connections(role)
 func use_casino_scene(parent: Node) -> Hearth20CasinoTable:
 	table.casino_active=true;table.reparent(parent,false);table.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);table.book.process_mode=Node.PROCESS_MODE_INHERIT;table.book.show();table.show();table.process_mode=Node.PROCESS_MODE_INHERIT;table.viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS;return table
 func release_casino_scene() -> void:
@@ -192,7 +194,7 @@ func _camera(delta: float) -> void:
 func _process(delta: float) -> void:
 	if not ready_to_show:return
 	elapsed+=delta;viewport_tick+=delta
-	look_button.visible=focus_state=="table" and not switching and not app.session.is_spectating()
+	look_button.visible=focus_state=="table" and not switching and not app.session.is_spectating() and not table.book.opened
 	if desired_mode()!=requested_mode and not switching:requested_mode=desired_mode();_switch(requested_mode)
 	if focus_state=="table":
 		_camera(delta)
@@ -262,6 +264,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if has_modal():return
 	if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE and focus_state!="table":leave_focus();get_viewport().set_input_as_handled()
 func has_modal() -> bool:
-	for node in get_children()+app.get_children():
+	for node in get_children()+app.get_children()+get_tree().root.get_children():
 		if node is Window and node.visible:return true
 	return false

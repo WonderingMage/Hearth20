@@ -24,9 +24,13 @@ var welcome_title: Label
 var welcome_copy: Label
 var welcome_import: Button
 var welcome_open: Button
+var toolbar: HBoxContainer
+var brand_box: VBoxContainer
+var campaign_box: VBoxContainer
 
 func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer, footer: PanelContainer) -> void:
 	app=owner_app
+	self.toolbar=toolbar
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme=Hearth20Design.theme()
@@ -43,6 +47,7 @@ func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer,
 	mark.custom_minimum_size=Vector2(38,42)
 	toolbar.add_child(mark)
 	var brand:=VBoxContainer.new()
+	brand_box=brand
 	brand.add_theme_constant_override("separation",0)
 	brand.size_flags_vertical=Control.SIZE_SHRINK_CENTER
 	brand.custom_minimum_size.x=164
@@ -54,6 +59,7 @@ func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer,
 	divider.size_flags_vertical=Control.SIZE_SHRINK_CENTER
 	toolbar.add_child(divider)
 	var title_box:=VBoxContainer.new()
+	campaign_box=title_box
 	title_box.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	title_box.size_flags_vertical=Control.SIZE_SHRINK_CENTER
 	title_box.add_theme_constant_override("separation",2)
@@ -72,7 +78,7 @@ func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer,
 	var appearance:=Hearth20Regal.ThemeMedallion.new()
 	appearance.name="AppearanceMedallion"
 	toolbar.add_child(appearance)
-	var preferences_button=make_button("gear","⚙",func():app.open_preferences());preferences_button.tooltip_text="Settings · Display, audio and updates";preferences_button.custom_minimum_size=Vector2(40,36);toolbar.add_child(preferences_button)
+	var preferences_button=make_button("gear","",func():app.open_preferences());preferences_button.tooltip_text="Settings · Display, audio and updates";preferences_button.custom_minimum_size=Vector2(40,36);toolbar.add_child(preferences_button)
 	search_button=make_button("search","Find a tool   Ctrl K",toggle_palette)
 	search_button.custom_minimum_size.x=160
 	toolbar.add_child(search_button)
@@ -80,6 +86,7 @@ func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer,
 	app.chat_shortcut_button.icon=Hearth20Design.icon("chat",18)
 	app.chat_shortcut_button.add_theme_constant_override("icon_max_width",18)
 	app.chat_shortcut_button.custom_minimum_size.y=36
+	app.chat_shortcut_button.size_flags_vertical=Control.SIZE_SHRINK_CENTER
 	toolbar.add_child(app.chat_shortcut_button)
 	app.save_button.text="Save"
 	app.save_button.icon=Hearth20Design.icon("save",17)
@@ -252,8 +259,13 @@ func _update_labels() -> void:
 	app.inspector_toggle.text=""
 	app.inspector_toggle.button_pressed=app.inspector_tabs.visible
 	app.chat_shortcut_button.text="Chat"+(" · %d"%app.unread_chat_count if app.unread_chat_count>0 else "")
-	search_button.text="Find a tool   Ctrl K" if size.x>=1150 else "Ctrl K"
-	search_button.custom_minimum_size.x=160 if size.x>=1150 else 74
+	var compact=size.x<1500
+	brand_box.visible=size.x>=1150;campaign_box.visible=size.x>=1050
+	toolbar.add_theme_constant_override("separation",8 if compact else 12)
+	app.inventory_drop_button.text="Tokens" if compact else "✧ Token vault"
+	app.cover_map_button.text=("Reveal map" if app.cover_map_button.button_pressed else "Cover map") if compact else ("◇ Reveal map" if app.cover_map_button.button_pressed else "◇ Cover map")
+	search_button.text="Ctrl K" if compact else "Find a tool   Ctrl K"
+	search_button.custom_minimum_size.x=74 if compact else 160
 	app.toolbox.refresh_density(size.y<720)
 	var waiting: bool=is_player and (scene.is_empty() or scene.get("id","")=="disconnected")
 	var empty: bool=not is_player and str(scene.get("map_asset","")).is_empty() and app.board.current_actors().is_empty()

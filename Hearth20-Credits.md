@@ -638,3 +638,38 @@ express Statement of Purpose.
  d. Affirmer understands and acknowledges that Creative Commons is not a
     party to this document and has no duty or obligation with respect to
     this CC0 or use of the Work.
+
+
+## Steam networking
+
+GodotSteam GDExtension 4.23.2 — GP Garcia, Chris Ridenour and contributors. MIT license in GodotSteam-LICENSE.txt.
+Steamworks SDK redistributable steam_api64.dll, version 1.65, supplied in the official GodotSteam asset. Steam and Steamworks are trademarks of Valve Corporation.
+Pinned asset commit: f99b9f54ea64974b8f5288713adc778172e3c60a
+Source: https://codeberg.org/godotsteam/godotsteam
+Official asset: https://godotengine.org/asset-library/asset/2445
+AppID 480 is Valve's shared Spacewar sample identity.
+
+
+## Steam networking
+
+MIT License
+
+Copyright (c) 2015-Current | GP Garcia, Chris Ridenour, and Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

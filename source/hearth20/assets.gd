@@ -11,12 +11,13 @@ const TOKEN_MAX_PIXELS := 4_194_304
 const PNG_SIGNATURE := [137, 80, 78, 71, 13, 10, 26, 10]
 static var validated_cache={}
 static var validated_bytes=0
+static var cache_mutex=Mutex.new()
 const CACHE_BUDGET=64*1024*1024
 
 static func inspect_map_file(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {"ok": false, "error": "Map image does not exist."}
-	var bytes := FileAccess.get_file_as_bytes(path)
+	var bytes := _read_image_file(path,MAP_MAX_BYTES)
 	if bytes.is_empty() or bytes.size() > MAP_MAX_BYTES:
 		return {"ok": false, "error": "Map image must be at most 40 MiB."}
 	var header_dimensions := _map_dimensions_from_header(bytes)
@@ -25,7 +26,8 @@ static func inspect_map_file(path: String) -> Dictionary:
 	if not _dimensions_ok_values(header_dimensions.x, header_dimensions.y, MAP_MAX_SIDE, MAP_MAX_PIXELS):
 		return {"ok": false, "error": "Map image dimensions exceed the declared 16,384-side or 67,108,864-pixel limit."}
 	var image := Image.new()
-	if image.load(path) != OK:
+	var error=image.load_png_from_buffer(bytes) if bytes.slice(0,8)==PackedByteArray(PNG_SIGNATURE) else image.load_jpg_from_buffer(bytes)
+	if error != OK:
 		return {"ok": false, "error": "Could not decode the selected map image."}
 	if image.get_width() != header_dimensions.x or image.get_height() != header_dimensions.y or not _dimensions_ok(image, MAP_MAX_SIDE, MAP_MAX_PIXELS):
 		return {"ok": false, "error": "Map image dimensions exceed the declared 16,384-side or 67,108,864-pixel limit."}
@@ -37,7 +39,15 @@ static func inspect_map_file(path: String) -> Dictionary:
 static func inspect_token_png(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {"ok": false, "error": "Token PNG does not exist."}
-	return inspect_token_png_bytes(FileAccess.get_file_as_bytes(path), path.get_file())
+	return inspect_token_png_bytes(_read_image_file(path,TOKEN_MAX_BYTES), path.get_file())
+
+static func _read_image_file(path: String,limit: int) -> PackedByteArray:
+	var file=FileAccess.open(path,FileAccess.READ)
+	if file==null:return PackedByteArray()
+	var length=file.get_length()
+	if length<1 or length>limit:return PackedByteArray()
+	var bytes=file.get_buffer(length)
+	return bytes if bytes.size()==length else PackedByteArray()
 
 static func inspect_token_png_bytes(bytes: PackedByteArray, name: String = "token.png") -> Dictionary:
 	if bytes.size() < PNG_SIGNATURE.size() or bytes.size() > TOKEN_MAX_BYTES or bytes.slice(0, PNG_SIGNATURE.size()) != PackedByteArray(PNG_SIGNATURE):
@@ -73,6 +83,12 @@ static func store_asset(campaign: Dictionary, inspected: Dictionary, kind: Strin
 	return asset_id
 
 static func read_asset(campaign: Dictionary, asset_id: String, expected_kind: String = "") -> PackedByteArray:
+	cache_mutex.lock()
+	var bytes=_read_asset(campaign,asset_id,expected_kind)
+	cache_mutex.unlock()
+	return bytes
+
+static func _read_asset(campaign: Dictionary, asset_id: String, expected_kind: String) -> PackedByteArray:
 	var record: Variant = campaign.get("assets", {}).get(asset_id, null)
 	if not record is Dictionary or record.get("kind", "") not in ["map", "token"] or (not expected_kind.is_empty() and record.get("kind", "") != expected_kind):
 		return PackedByteArray()
