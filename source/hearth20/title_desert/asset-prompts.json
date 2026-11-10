@@ -1,0 +1,23 @@
+{
+  "mode": "built-in image_gen",
+  "assets": [
+    {
+      "file": "ancient-hide.png",
+      "prompt": "Use case: stylized-concept. Asset type: production seamless PBR albedo texture for an original high-detail 3D tarrasque reptilian hide. Generate a perfectly flat orthographic square texture tile, edge-to-edge tileable. Dense irregular dinosaur crocodilian pebbled scales with deep fine creases, subtly wrinkled leathery tissue between angular scutes, scarred ancient rough T-rex skin. Color variation warm dark burnt umber to rusty ochre and desaturated warm taupe, charcoal recesses, minute sand grit. Realistic physical surface, rich microdetail intended for a cinematic orange desert creature. Uniform neutral diffuse illumination with no directional shadows, no highlight spots, no perspective, no text, no border, no creature anatomy or eyes, no mockup or swatch chart. Scales should be varied, organically fitted and small, with some broad folds stretching diagonally through the hide. High fidelity texture photography."
+    },
+    {
+      "file": "amber-wastes.png",
+      "prompt": "Use case: stylized-concept. Asset type: high-end cinematic distant environment matte painting for the background of a real-time 3D game title. Ultra-wide landscape, 21:9 composition. A barren burnt-orange Saharan badlands desert at sunset, sharp jagged sandstone spires, deeply eroded layered mesas, fractured black and rust stone, wind-swept ochre sand, atmospheric perspective, fine sand streaming sideways low across the horizon. Monumental lonely landscape, realistic physical materials with art-directed stylized silhouettes, beautiful dark terracotta cliffs at the outer edges, distant low mountain chains near the bottom third, immense warm smoky orange sky with delicate long streaks of illuminated clouds. Sun low near the right-of-center horizon. Keep central area between 35% and 80% width open distant terrain and sky so a separate colossal 3D creature can be composited in front without overlap. Camera low, looking across the horizon, no overhead view. Detailed but calm distant landscape, premium dark fantasy game cinematography, sophisticated color grading, ochre light against deep earthy shadows. No creatures, no human figures, no UI, no text, no logos, no watermark. No foreground objects covering the center."
+    },
+    {
+      "file": "wind-carved-sand.png",
+      "prompt": "Use case: photorealistic-natural. Asset type: seamless tileable terrain albedo texture for a cinematic desert environment in a 3D game. Flat orthographic directly overhead macro photograph, edge-to-edge dry warm ochre and burnt sienna desert sand with varied fine grain, subtle wind ripple traces and scattered tiny chipped dark sandstone grit. Natural irregular surface variation, small shallow cracks, mostly fine sand, no large rocks, neutral flat diffuse illumination, no baked shadows or specular highlights. Sophisticated subdued earthy colors, no bright orange saturation. Absolutely no horizon, sky, objects, labels, text, borders, logos or watermarks. Fine physical detail that reads beautifully from a low camera across a barren desert floor."
+    }
+  ],
+  "model": {
+    "source": "https://www.printables.com/model/50569-tarrasque-updated",
+    "author": "Miguel Zavala (mz4250)",
+    "license": "Creative Commons Attribution",
+    "modifications": "Runtime reduction, UV mapping, material regions and 20-second skeletal idle. See CREDITS.md."
+  }
+}

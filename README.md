@@ -4,7 +4,17 @@
 
 A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.11](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.11-beta)
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.12](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.12-beta)
+
+## The Amber Wastes
+
+![Animated tarrasque title](screenshots/title.png)
+
+Join and Host lead the opening menu. An articulated tarrasque breathes, shifts its weight, turns its head and moves its tail above a windblown orange desert. Small travelers and a ruined gate establish its scale. Amber irises and slit pupils, ivory teeth, gums, tongue, throat, horns and claws have their own skinned surfaces and finishes.
+
+The creature and foreground render in 3D. The distant landscape uses an illustrated matte. The scene has a bounded render resolution and releases its viewport when the table opens. Retired rotating-showcase assets are excluded from portable exports.
+
+The tarrasque adapts Miguel Zavala's credited sculpt and rig, with new runtime preparation, animation and materials. Scene credits are available from the title menu. The source archive includes the Blender authoring source, preparation script, texture import settings and generation prompts.
 
 ## Gather your party
 
