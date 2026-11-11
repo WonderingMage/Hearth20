@@ -22,7 +22,7 @@ static func signature(campaign: Dictionary,scene: Dictionary) -> String:
 		var settings=actor.get("vision",{})
 		if settings is Dictionary and float(settings.get("bright_light_feet",0))+float(settings.get("dim_light_feet",0))>0:carried.append([actor.get("position"),settings])
 	var sky=Hearth20NaturalLight.settings(scene);sky.erase("haze");sky.erase("exposure")
-	return Hearth20Contracts.sha256(var_to_bytes([scene.get("id"),scene.get("width_cells"),scene.get("height_cells"),scene.get("feet_per_cell"),scene.get("dynamic_lighting"),scene.get("blackout"),scene.get("ambient_light"),scene.get("walls",[]),scene.get("doors",[]),scene.get("lights",[]),scene.get("fog_rects",[]),sky,barriers,carried]))
+	return Hearth20Contracts.sha256(var_to_bytes([scene.get("id"),scene.get("width_cells"),scene.get("height_cells"),scene.get("feet_per_cell"),scene.get("dynamic_lighting"),scene.get("blackout"),scene.get("outdoor",false),scene.get("roof_rects",[]),scene.get("ambient_light"),scene.get("walls",[]),scene.get("doors",[]),scene.get("lights",[]),scene.get("fog_rects",[]),sky,barriers,carried]))
 
 static func valid_settings(value: Variant) -> bool:
 	if not value is Dictionary or not value.get("enabled", true) is bool:
@@ -34,6 +34,8 @@ static func valid_settings(value: Variant) -> bool:
 	return true
 
 static func build_view(campaign: Dictionary, player_id: String, scene: Dictionary,use_cache=true) -> Dictionary:
+	if bool(campaign.get("map_covered",false)) and not bool(scene.get("blackout",false)):
+		scene=scene.duplicate();scene.blackout=true
 	var key=signature(campaign,scene)
 	# This fork uses common environmental vision. Private actors and sheets are still
 	# filtered separately for every recipient in project_for_player.

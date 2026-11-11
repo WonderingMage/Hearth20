@@ -47,6 +47,8 @@ var friends_lobby_id=0
 var display_name_row: HBoxContainer
 var steam_actions: HBoxContainer
 var steam_footnote: Label
+var friend_search: LineEdit
+var friend_records: Array=[]
 static func open(owner_app: Hearth20App,action="") -> Hearth20ConnectionWindow:
 	if is_instance_valid(owner_app.connection_window) and not owner_app.connection_window.is_queued_for_deletion():
 		if action in ["host","join"]:owner_app.connection_window._set_intent(action)
@@ -103,7 +105,7 @@ func _build_steam() -> void:
 	connect_button=_button(actions,"Connect Steam",_prepare_steam)
 	steam_host=_button(actions,"Host private table",_host_steam)
 	open_steam_button=_button(actions,"Open Steam & continue",_open_steam)
-	invite_button=_button(actions,"Steam invite overlay",func():_result(link.invite_friends()))
+	invite_button=_button(actions,"Quick invite…",quick_invite)
 	join_row=HBoxContainer.new();page.add_child(join_row)
 	invite_field=LineEdit.new();invite_field.placeholder_text="Paste an invitation link or lobby number";invite_field.max_length=180;invite_field.size_flags_horizontal=Control.SIZE_EXPAND_FILL;join_row.add_child(invite_field)
 	steam_join=_button(join_row,"Join invitation",_join_steam)
@@ -113,6 +115,10 @@ func _build_steam() -> void:
 	var friend_heading=HBoxContainer.new();friend_heading.add_theme_constant_override("separation",10);host_tools.add_child(friend_heading);var caption=_label(friend_heading,"INVITE A STEAM FRIEND",12);caption.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	copy_button=_button(friend_heading,"Copy invitation",func():DisplayServer.clipboard_set(link.invite_link());steam_status.text="Invitation copied. Send your Steam friend an invite first, then share this link.")
 	friend_refresh=_button(friend_heading,"Refresh friends",_load_friends)
+	friend_search=LineEdit.new();friend_search.placeholder_text="Find a Steam friend by name…";friend_search.max_length=64;host_tools.add_child(friend_search)
+	friend_search.text_changed.connect(func(_text):_filter_friends())
+	friend_search.text_submitted.connect(func(_text):
+		if friend_list.item_count==1:friend_list.select(0);_invite_selected())
 	friend_list=ItemList.new();friend_list.custom_minimum_size.y=80;friend_list.size_flags_vertical=Control.SIZE_EXPAND_FILL;host_tools.add_child(friend_list)
 	friend_list.item_selected.connect(func(_index):refresh())
 	friend_invite=_button(host_tools,"Invite selected friend",_invite_selected)
@@ -142,9 +148,22 @@ func _direct_details() -> String:
 		if ":" not in address and not address.begins_with("127.") and not address.begins_with("169.254.") and address!="0.0.0.0":addresses.append(address)
 	return "Local host addresses: "+(", ".join(addresses) if not addresses.is_empty() else "not found")+"\nPort: "+str(app.session.listening_port if app.session.listening_port>0 else int(direct_port.value))+" UDP"+("\nInvite code: "+app.session.invite_secret if app.session.transport=="direct" and app.session.listening_port>0 else "\nStart hosting to generate an invite code.")
 func _load_friends() -> void:
-	friend_list.clear();friends_loaded=true
-	for friend in link.friends():var index=friend_list.add_item(str(friend.name));friend_list.set_item_metadata(index,friend.id)
+	friends_loaded=true;friend_records=link.friends();_filter_friends()
 	refresh()
+func _filter_friends() -> void:
+	friend_list.clear()
+	var query:=friend_search.text.strip_edges().to_lower()
+	for friend in friend_records:
+		if not query.is_empty() and query not in str(friend.name).to_lower():continue
+		var index:=friend_list.add_item(str(friend.name));friend_list.set_item_metadata(index,friend.id)
+	refresh()
+func quick_invite() -> void:
+	if link.state!="hosting":_result({"ok":false,"error":"Host a Steam table first."});return
+	if link.api.isOverlayEnabled():_result(link.invite_friends());return
+	invitation_sent=false;refresh()
+	friend_search.grab_focus.call_deferred()
+	steam_status.text="Type your friend's name below. Press Enter when one result remains, or choose a result and Invite."
+	steam_status.show()
 func _set_intent(value: String) -> void:
 	intent=value
 	if value=="host":link.pending_invite=0
@@ -239,7 +258,7 @@ func refresh() -> void:
 	steam_footnote.visible=not link.initialized
 	connect_button.visible=not link.initialized;open_steam_button.visible=not link.initialized;steam_instructions.visible=not link.initialized
 	steam_instructions.hide()
-	steam_host.visible=intent!="join" and not hosting and not link.busy();invite_button.visible=hosting and not invitation_sent and link.api.isOverlayEnabled()
+	steam_host.visible=intent!="join" and not hosting and not link.busy();invite_button.visible=hosting
 	steam_actions.visible=not link.initialized or steam_host.visible or invite_button.visible
 	role_button.disabled=online or link.busy();paste_button.disabled=online or link.busy();invite_field.editable=not online and not link.busy()
 	steam_status.text=link.message;connection_detail.text=link.transfer_message if not link.transfer_message.is_empty() else ("Private lobby · "+str(link.lobby_id) if link.lobby_id>0 else "Your campaign, token permissions and private sheet stay under the same local profile.")
@@ -249,7 +268,7 @@ func refresh() -> void:
 	journey.current_step=2 if link.state=="joined" or ready_panel.visible else 1 if hosting or link.busy() or (intent=="join" and link.initialized) else 0
 	journey.queue_redraw()
 	_update_guidance(hosting)
-	invite_button.disabled=link.state!="hosting" or not link.initialized or not link.api.isOverlayEnabled()
+	invite_button.disabled=link.state!="hosting" or not link.initialized
 	copy_button.disabled=link.state!="hosting";friend_refresh.disabled=link.state!="hosting"
 	friend_invite.disabled=link.state!="hosting" or friend_list.get_selected_items().is_empty()
 	cancel_button.visible=link.busy();end_button.visible=online;direct_host.disabled=online or link.busy();direct_join.disabled=online or link.busy()
@@ -261,7 +280,7 @@ func refresh() -> void:
 func _update_guidance(hosting: bool) -> void:
 	if hosting:
 		step_title.text="3 · Your table is open" if invitation_sent else "2 · Invite your friends"
-		step_description.text="Your friends can join while you prepare the adventure." if invitation_sent else "Select a friend below and press Invite selected friend. They accept the Steam invitation while Hearth20 is open on their PC."
+		step_description.text="Your friends can join while you prepare the adventure. Quick invite stays available for the next player." if invitation_sent else "Press Quick invite, or find a Steam friend by name below. They accept the invitation while Hearth20 is open on their PC."
 		var guests=app.session.remote_players.values().map(func(player):return str(player.get("nickname","Player")))
 		ready_note.text=("Invitation sent to "+invited_name+".\n" if not invited_name.is_empty() else "")+("Waiting for players to arrive." if guests.is_empty() else "At your table · "+", ".join(guests))+"\nNew characters arrive in Tokens. Place their pawns and grant movement when you are ready."
 	elif link.busy():

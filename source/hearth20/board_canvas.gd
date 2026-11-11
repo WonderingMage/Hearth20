@@ -582,8 +582,9 @@ func _draw_actors(_scene: Dictionary, cell_px: float, layer: String = "tokens") 
 		if not actor is Dictionary or not actor.get("position") is Vector2:
 			continue
 		var center := _world_to_screen(actor.position, cell_px)
-		var diameter := maxf(24.0, cell_px * camera_zoom * float(actor.get("token_size", 0.82)))
+		var diameter := maxf(24.0, cell_px * camera_zoom * float(actor.get("token_size", actor.get("size",0.82))))
 		var rect := Rect2(center - Vector2.ONE * diameter * 0.5, Vector2.ONE * diameter)
+		if actor.get("decorative",false):rect=_screen_rect(Hearth20TokenInventory.visual_bounds(actor))
 		if not rect.grow(44.).intersects(Rect2(Vector2.ZERO,size)):continue
 		var hidden_for_players := role == "dm" and (bool(actor.get("hidden", false)) or layer == "gm")
 		var token_tint := Color(1.0, 1.0, 1.0, 0.48) if hidden_for_players else Color.WHITE
@@ -592,7 +593,12 @@ func _draw_actors(_scene: Dictionary, cell_px: float, layer: String = "tokens") 
 				if other.get("layer","tokens")=="tokens" and other.get("position",Vector2(-999,-999)).distance_to(actor.position)<float(actor.get("token_size",1))*0.5: token_tint.a=0.42
 		var texture := _actor_texture(str(actor.get("png_asset_id", actor.get("asset_id", ""))))
 		if texture:
-			draw_texture_rect(texture, rect, false, token_tint)
+			if actor.get("decorative",false) and actor.has("display_width_cells"):
+				var extent:=Vector2(float(actor.display_width_cells),float(actor.display_height_cells))*cell_px*camera_zoom
+				draw_set_transform(center,deg_to_rad(float(actor.get("rotation_degrees",0))))
+				draw_texture_rect(texture,Rect2(-extent*0.5,extent),false,token_tint)
+				draw_set_transform(Vector2.ZERO)
+			else:draw_texture_rect(texture, rect, false, token_tint)
 		else:
 			var fill := Color("#547fa0") if bool(actor.get("is_hero", actor.get("kind", "") == "hero")) else Color("#9a624a")
 			if hidden_for_players:

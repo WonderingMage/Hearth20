@@ -4,26 +4,28 @@
 
 A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.12](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.12-beta)
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.13](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.13-beta)
 
 ## Gather around the new menu
 
 ![Party illustration with Join and Host controls](screenshots/title.png)
 
-Join and Host lead the opening menu over the creator's supplied fantasy party illustration. The original 2752 × 1536 JPG is retained at full resolution with lossless texture import and gentle display sharpening. Character faces and artwork are preserved. No generated face replacement is used.
+Join and Host lead the opening menu over the creator's revised fantasy party illustration. The exact 2752 × 1536 JPG is retained at full resolution with lossless texture import and gentle display sharpening. A separate crimson mist and weapon glow give the two axe-wielding warriors their rage aura; the base artwork and faces are preserved.
 
 The title has saved campaigns, the illustrated host/join guide, Settings and artwork information. It loads directly into the seated table and releases its artwork node on transition. Retired creature showcases and the unused 3D title scene are excluded from portable exports.
 
-## Maps that know their size
+## Complete playable map packages
 
-Generated PNG maps can carry a small `Hearth20.Map` text record containing their width, height and feet per cell. Importing a correctly stamped map sets its scale automatically and skips the calibration dialog. The scale persists in campaign saves. Existing PNG/JPEG files retain manual calibration in a bounded, scrollable window whose action buttons stay reachable.
+Import a **.hearth20map** through **+ Map**. Its artwork, exact grid scale, walls, doors, windows, source-aware lights and separate foreground PNGs install together into a new campaign map. No manual size prompt is needed. Everything is embedded in the campaign for saving/reopening. Existing PNG/JPEG imports and automatic PNG grid metadata remain supported.
 
-The [custom map guide](Hearth20-Custom-Map-Guide.md) gives another ChatGPT agent detailed artwork, scale, lighting, coordinate, asset, metadata and validation instructions. The full source includes `tools/stamp_map.py`, which adds size metadata while preserving image pixels. PNG metadata currently sets grid scale; separate wall/light plans require setup or source integration.
+Give another map-making agent the [custom map guide](Hearth20-Custom-Map-Guide.md). It specifies cohesive overhead artwork, measured placement, wall/aperture geometry, finite sunlight casts, board north, roofs, foregrounds, schema and validation. The release's **Hearth20-Map-Authoring-Kit.zip** includes the standalone Python packer and a complete editable inn example. Packages are bounded data-only stored archives, validated before campaign mutation.
+
+Loaded maps appear as scrollable host tabs. Right-click a particular tab → **Bring all heroes here** to gather deployed and stored heroes onto clear square centers, preserving control grants. **Cover map** stays on across tab switches and imports until the host explicitly reveals. Players see a thin received-byte progress bar while a new map downloads, followed by **Preparing map…**. Recently received exact maps and lighting are reused from bounded caches to reduce repeated reveal traffic; unseen or changed art still needs transfer.
 
 ## Gather your party
 
 1. Open Steam and Hearth20 on each PC, using different Steam accounts.
-2. The DM chooses **Host a new game**. The guided screen prepares a private lobby and lists friends to invite.
+2. The DM chooses **Host a new game**. The guided screen prepares a private lobby. **Quick invite…** opens Steam's invite overlay, or focuses friend-name search when the overlay is unavailable; Enter invites a unique match.
 3. Players choose **Join a table** and accept the DM's invitation while Hearth20 is open.
 4. Each new player gives a display name, character name and PNG. The character arrives in the DM's token inventory for placement and movement permission.
 

@@ -9,6 +9,8 @@ var action_area: VBoxContainer
 var scroller: ScrollContainer
 var fields: Dictionary = {}
 var rail_buttons: Dictionary = {}
+var tool_rail: VBoxContainer
+var rail_hint: Label
 var current := "draw"
 var title: Label
 var note: Label
@@ -34,6 +36,7 @@ var pending_dice_request=""
 var dice_status_text=""
 
 func setup(owner_app: Node, rail: VBoxContainer) -> void:
+	tool_rail=rail
 	app = owner_app
 	board = app.board
 	session = app.session
@@ -70,6 +73,7 @@ func setup(owner_app: Node, rail: VBoxContainer) -> void:
 		if tool[0] in ["tokens","casino","beacon","mask","lighting","layers"]: dm_controls.append(button)
 	rail_buttons.select.button_pressed = true
 	var hint := Label.new()
+	rail_hint=hint
 	hint.text="F  fit"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_font_size_override("font_size",10)
@@ -234,6 +238,8 @@ func choices(values: Array, selected_value: String, callback: Callable, columns:
 	return grid
 
 func refresh_density(compact: bool) -> void:
+	if is_instance_valid(tool_rail):tool_rail.add_theme_constant_override("separation",1 if compact else 4)
+	if is_instance_valid(rail_hint):rail_hint.visible=not compact
 	if current=="dice":
 		if note!=null: note.visible=not compact
 		for item in die_buttons:

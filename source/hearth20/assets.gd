@@ -18,6 +18,9 @@ static func inspect_map_file(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {"ok": false, "error": "Map image does not exist."}
 	var bytes := _read_image_file(path,MAP_MAX_BYTES)
+	return inspect_map_bytes(bytes,path.get_file())
+
+static func inspect_map_bytes(bytes: PackedByteArray, original_name: String="map.png") -> Dictionary:
 	if bytes.is_empty() or bytes.size() > MAP_MAX_BYTES:
 		return {"ok": false, "error": "Map image must be at most 40 MiB."}
 	var header_dimensions := _map_dimensions_from_header(bytes)
@@ -36,7 +39,7 @@ static func inspect_map_file(path: String) -> Dictionary:
 	var png := image.save_png_to_buffer()
 	if png.is_empty() or png.size() > MAP_MAX_BYTES:
 		return {"ok": false, "error": "Decoded map image could not be stored within the image limit."}
-	return {"ok": true, "bytes": png, "sha256": sha256(png), "width": image.get_width(), "height": image.get_height(), "mime_type": "image/png", "original_name": path.get_file().left(128),"grid":metadata.grid}
+	return {"ok": true, "bytes": png, "sha256": sha256(png), "width": image.get_width(), "height": image.get_height(), "mime_type": "image/png", "original_name": original_name.left(128),"grid":metadata.grid}
 
 static func inspect_token_png(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):

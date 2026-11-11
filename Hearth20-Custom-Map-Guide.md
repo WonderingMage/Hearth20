@@ -1,378 +1,293 @@
-# Hearth20 custom map creation guide for ChatGPT agents
+# Hearth20 Custom Map Agent Guide
 
-Version 1 · Hearth20 Seated Beta 0.3.12 · November 11, 2026
+**Target: Hearth20 Beta 0.3.13 or newer · `.hearth20map` format version 1 · guide revision 2**
 
-Give this entire document to an agent together with the user's map request. It is a practical authoring specification, an interchange-format reference and a quality checklist. Its defaults describe this Hearth20 fork; inspect the current source when working on a later version. The user's explicit instructions override artistic defaults here.
+Give this entire document to an agent with the user's map request. The deliverable is one playable **`.hearth20map` file**, not a picture accompanied by setup instructions. It includes the final map art, exact grid scale, walls, doors, windows, lighting, foreground PNGs and party entry positions. Hearth20 installs those together and adds a campaign map tab without asking the user to measure the image.
 
-## 1. The assignment
+## 1. Your job as the map-making agent
 
-Create a cohesive, attractive, playable battlemap tailored to the user's request. Deliver the actual image, not just a prompt. **Deliver the final map as a PNG with its grid size embedded inside that same PNG.** Hearth20 0.3.12 reads this record and sets its grid automatically, without asking the DM to enter the size.
+Build an attractive, coherent, usable top-down battlemap tailored to the user. Resolve routine creative decisions yourself. Ask only about missing information that materially changes play, such as a required physical size or encounter location. If nothing is specified, use a 32 × 24 grid with five feet per cell and artwork at 100–128 pixels per cell. State the chosen dimensions when delivering the file.
 
-Retain the user's original assets. Save new versions alongside them. Keep player-visible artwork free of secret room labels, trap markers, enemy placements and DM-only notes. Package a separate DM key when secrets are needed.
+Use image generation for original raster artwork when available, and follow the tool's image-editing and provenance instructions. An image-generation prompt alone is not a finished map. Inspect the actual generated image, repair contradictions, measure the final features and build the data from those measurements. The final image is the authority for feature placement. Do not invent coordinates from a prompt that the image failed to follow.
 
-The minimum successful delivery is:
+Deliver:
 
-1. A finished, inspected top-down PNG with valid embedded grid metadata.
-2. A short map key explaining dimensions, scale, entrances and important terrain.
-3. A lighting/wall plan when the map needs dynamic lighting, with coordinates tied to the final image.
-4. A validation record stating what was actually checked.
+1. `descriptive-map-name.hearth20map`, ready to import through **+ Map**.
+2. A preview image showing the map, plus its dimensions in cells and feet.
+3. A short description of the setting, lighting setup, entry position and any intentional gameplay restrictions.
+4. When possible, an editable authoring folder or ZIP containing `map.json` and `assets/`. This is optional source material; the playable package is mandatory.
 
-A map image with grid metadata imports automatically. **Walls, light sources, doors and props in a separate planning JSON do not automatically import with the PNG in this release.** Provide clear manual setup instructions, or build a validated campaign through the source APIs if source access is available and that work is authorized. Do not promise unsupported drag-and-drop scene packages.
+Use original, user-supplied or suitably licensed art. Keep credits in the manifest. Exclude account information, campaign saves, character PDFs, API keys and unrelated reference photos. Do not modify a person's appearance unless the user requested it.
 
-## 2. Turn the user's idea into a brief
+## 2. Plan the encounter and its scale before making art
 
-Extract the location, mood, intended encounter, party count, creature sizes, tactical features, entrances, desired scale, time of day and any reference art. Ask only about decisions that materially prevent a useful result. Otherwise state sensible assumptions and proceed.
+Write a compact private design brief: location, style, overall dimensions, intended party entry, important routes, sight lines, encounter spaces, cover, doors, windows, light sources and removable overhead objects. Every important doorway should connect real traversable space. Avoid rooms that cannot be reached, stairs that lead nowhere, mismatched floor levels and furniture that changes size between rooms.
 
-Record a compact brief before image generation:
+Use a strict orthographic overhead camera. Walls and furniture may have shallow relief and contact shadows, but roofs and tall facades must not obscure the playable floor. Do not use isometric perspective, a horizon, a cinematic side view or dramatic perspective convergence. No labels, watermark, legend, UI, compass or baked-in grid unless the user specifically asks. Hearth20 draws its own adjustable grid.
 
-| Item | Suggested default when unspecified |
-| --- | --- |
-| Projection | Strict orthographic overhead, roof removed for interiors |
-| Grid | Square; five feet per cell |
-| Playable footprint | 32 columns × 24 rows |
-| Final canvas | 2048 × 1536 pixels; 64 pixels per cell |
-| Larger detailed canvas | 4096 × 3072; 128 pixels per cell |
-| Grid lines in artwork | Omitted; Hearth20 draws its adjustable grid |
-| Labels | Separate DM key |
-| Visual style | Detailed fantasy cartography with readable paths and silhouettes |
-| Light painting | Restrained local shading; major animated beams come from Hearth20 |
-| Player start | A clear, safe entrance with room for the requested party |
+Keep scale consistent. With five feet per square, a typical single doorway is approximately one square wide, a corridor is at least one square wide, a bed is about 1 × 1.5 squares, and a dining table might span 1 × 2. Leave clear squares for tokens and distinct walkable boundaries. Use contrasting floor materials to explain terrain without making noise compete with pawns.
 
-These are authoring defaults, not engine requirements. A 40 × 30 map at 80 pixels per cell is 3200 × 2400. Choose a canvas that fits the design. Confirm generated dimensions from the file; image tools may return a different size from the prompt.
+The entire raster must correspond to complete square cells:
 
-Do not confuse image pixels with grid cells. A 2048-pixel-wide image is not a 2048-cell map. A token of size 1 should occupy a believable five-foot square at the intended scale.
+`pixels_per_cell = image_width / width_cells = image_height / height_cells`
 
-## 3. Design the geometry before the illustration
+For example, a 32 × 24 map at 128 px/cell is 4096 × 3072 pixels and covers 160 × 120 feet at five feet/cell. A 2048 × 1152 image fits 32 × 18 cells at 64 px/cell; it does not fit 32 × 24. Resize/crop/outpaint the art intentionally before measuring objects. Do not lie in the metadata to make a mismatched image pass. If image tools cannot reach the planned ratio exactly, choose a coherent grid that matches the actual finished raster and keep the promised encounter scale clear.
 
-Plan room bounds, routes, doors, windows, cover and elevations in cell coordinates. Make an adjacency list and verify that required areas connect. Establish an intentional main route plus alternative movement or interaction opportunities where appropriate.
+Useful generation prompt structure:
 
-For a typical four-player encounter, give the starting area several open squares. A five-foot corridor is one cell wide; a ten-foot corridor is two. A five-foot doorway is one cell wide. A large creature generally needs a two-cell footprint. Furnishings should not accidentally close every route.
+> Strict orthographic overhead fantasy tactical battlemap of [setting], [width] by [height] complete square cells, final aspect [ratio], consistent five-foot scale. [Precise room/terrain layout, entrances, traversable routes, furnishing scale]. [Visible light fixtures and window apertures]. [Palette/materials/weather]. Painterly high detail with restrained contact shadows and clean playable floor. No grid, labels, interface, people, perspective horizon or opaque roof over playable rooms. Leave [foreground feature] out of the floor image because it will be a separate transparent overhead prop.
 
-Reason through the location as a real place. An inn needs usable access to its kitchen and stores. A jail needs cells and a plausible guard route. Stairs need landings. A river needs consistent banks and crossings. Walls must connect; windows belong in walls. Drawn holes, bridges and walkways should be spatially unambiguous.
+Use separate reference/repair passes for structural problems. Preserve the composition while correcting inaccessible doors, impossible walls or inconsistent scale. Inspect at full size and at a typical 1000 × 650 game window.
 
-Put major wall faces on cell boundaries where practical. Allow thickness for masonry. Align straight furniture to the same orthographic plane. Use weathering and asymmetry to enrich surfaces without distorting the structural grid.
+## 3. Coordinate system and tracing the final art
 
-Set the coordinate convention once:
+All manifest positions and lengths are **grid cells**, not pixels or feet. Origin `(0,0)` is the image's top-left. X increases right; Y increases down. A cell's center is `(column + 0.5, row + 0.5)`. Grid corners are integer coordinates.
 
-```text
-Canvas top-left = cell (0, 0)
-x increases to the right; y increases down the image
-cell-space point = pixel-space point / cell_pixels
-cell center for column c, row r = (c + 0.5, r + 0.5)
-pixel center = ((c + 0.5) * cell_pixels, (r + 0.5) * cell_pixels)
-physical distance in feet = cell distance * feet_per_cell
-```
+Convert a measured point in the final raster using:
 
-For a 2048 × 1536, 32 × 24 map, the center of column 7, row 10 is cell `(7.5, 10.5)` or pixel `(480, 672)`. A wall along the top of row 5 is at `y = 5`, not `5.5`.
+`x_cells = x_pixels / pixels_per_cell`
 
-## 4. Generate and refine the artwork
+`y_cells = y_pixels / pixels_per_cell`
 
-Use the available image-generation skill/tool for fantasy illustration and transparent foreground assets. Read its instructions first. Do not substitute a few colored rectangles for the requested finished artwork. If generation is unavailable, be honest and deliver the best authorized alternative without claiming it was generated.
+Keep fractional positions where the art needs them; do not force a wall onto the nearest grid line if that would put it across a doorway. Segment endpoints may reach the map edges. Token/entry positions must remain inside the map. Foreground positions describe the **center** of their image, including transparent margins.
 
-A useful prompt structure is:
+Make a temporary diagnostic preview of the final art with cell lines, traced segments, aperture IDs, light arrows, prop rectangles and entry markers. Inspect that every data element matches its visual source. Do not include that diagnostic image as the actual background. After any crop, rescale or regeneration, remeasure every affected coordinate and recompute image hashes.
+
+## 4. The actual `.hearth20map` container
+
+The extension is `.hearth20map`. Its content is a small, tightly constrained **ZIP_STORED archive**. No compression is used because images are already compressed. Changing the extension of a normal compressed ZIP is insufficient.
+
+Expected structure:
 
 ```text
-Create a production-quality fantasy virtual-tabletop battlemap of [location].
-Strict overhead orthographic view, no isometric perspective, no horizon.
-Intended canvas [pixel width] × [pixel height], [columns] × [rows] square cells,
-[feet] feet per cell. All architecture and objects share that scale.
-
-Layout: [explicit room bounds, entrances, connections and landmarks].
-Encounter needs: [open areas, cover, routes and creature footprints].
-Materials and mood: [specific visual details appropriate to the request].
-Lighting: [visible fixtures and natural openings]; keep strong directional
-sunbeams and heavy fog out of the painted base because the VTT adds them.
-No characters, tokens, UI, labels, numbers, logos, borders or baked grid lines.
-Preserve clear walkable floor space. Keep walls, doors and windows coherent.
+ashen-watch.hearth20map
+├── map.json
+└── assets/
+    ├── map.png
+    ├── chandelier.png
+    └── canopy.png
 ```
 
-For image edits, explicitly preserve the accepted layout and change only the requested feature. Do not replace people's faces or change supplied character likenesses unless the user requests that change.
+There are no directory entries in the actual ZIP; the paths contain `assets/` directly. It contains only the manifest and the raster files referenced by that manifest. No scripts, models, URLs, executable files, extra thumbnails, OS metadata or unused assets. Hearth20 reads the archive in memory and does not extract it into arbitrary folders.
 
-Inspect the actual output at full composition and at gameplay scale. Check doors, stair edges, paths, repeated furnishings, water flow and object scale. Generated art is not proof of geometric correctness. If a passage is only painted and not actually open, fix the art or the plan.
+Use the standard-library packing tool from **Hearth20-Map-Authoring-Kit.zip** or `tools/pack_hearth20map.py` in [WonderingMage/Hearth20](https://github.com/WonderingMage/Hearth20). Run:
 
-The final bitmap must match its declared grid. Use a suitable non-generative image-layout workflow for exact canvas sizing when authorized, or regenerate with a corrected layout. Do not stretch a square room into a rectangle. If padding or cropping changes the playable area, recompute coordinates and metadata afterward. A model's output resolution may not equal the requested one; never stamp guessed dimensions.
-
-Provide a grid-free primary map. An optional preview may show a temporary grid for QA; label it as a preview so the user does not import two overlapping grids.
-
-## 5. Automatic map-size metadata: implemented file contract
-
-**Canonical generated format: PNG containing one uncompressed `tEXt` chunk with keyword `Hearth20.Map`.** Do not put JSON in the filename and assume it will be detected. Do not rely on EXIF DPI, image width alone, a screenshot, the PNG's physical-resolution tag or an adjacent JSON file.
-
-The text value is an ASCII JSON object:
-
-```json
-{
-  "schema": 1,
-  "width_cells": 32,
-  "height_cells": 24,
-  "feet_per_cell": 5,
-  "pixel_width": 2048,
-  "pixel_height": 1536
-}
+```text
+python pack_hearth20map.py AshenWatch/map.json --out AshenWatch.hearth20map
 ```
 
-| Field | Contract |
+The tool reads final image dimensions, checks the recipe, calculates SHA-256 hashes, fills the image records and writes a new stored archive. It never overwrites the input art or an existing output. Choose a new output name when rebuilding. Its successful JSON result includes dimensions, object counts, byte size and final SHA-256. Keep that as build evidence.
+
+If the helper is unavailable, construct the file with Python's `zipfile.ZipFile(..., compression=zipfile.ZIP_STORED, allowZip64=False)`, using a seekable new output file. Write UTF-8 `map.json` and referenced asset paths only. Calculate each raster's SHA-256 from its exact final file bytes with `hashlib.sha256(data).hexdigest()`. The full schema below still applies. Do not use ZIP64, encryption, streaming data descriptors, comments, extra fields, nested archive roots or directory entries. Use only ASCII filenames.
+
+### Hard limits
+
+| Item | Supported bound |
 | --- | --- |
-| `schema` | Required integer `1` |
-| `width_cells` | Required whole number from 1 through 256 |
-| `height_cells` | Optional whole number equal to the height derived below; include it in generated maps |
-| `feet_per_cell` | Optional finite number greater than 0 and at most 1000; default 5 |
-| `pixel_width`, `pixel_height` | Optional integers matching the actual image dimensions; include both to detect accidental resizing |
+| Complete archive | 64 MiB, 2–66 entries |
+| Manifest | 262,144 UTF-8 bytes; nesting depth ≤16; ≤20,000 JSON nodes |
+| Background | PNG/JPEG; ≤40 MiB; each side ≤16,384 px; ≤67,108,864 pixels |
+| Foreground image | PNG; ≤8 MiB; each side ≤2,048 px; ≤4,194,304 pixels |
+| Grid | 1–256 whole cells in each dimension; square pixel pitch |
+| Feet per cell | 0.01–1,000; normally 5 |
+| Walls + doors + windows + lights | At most 256 records combined |
+| Foreground placements | At most 64 |
+| Entry points | 1–16 distinct cell centers |
+| Campaign | At most 256 maps, and 64 MiB encoded campaign save including all assets |
 
-The importer calculates `cell_pixels = pixel_width / width_cells` and `height_cells = ceil(pixel_height / cell_pixels)`. The derived height must be no more than 256. Exact rectangular cell counts require the canvas aspect ratio to match the grid. Prefer whole-number pixels per cell and complete cells at every edge.
+Use practical sizes below these maxima; a 64 MiB import may still exceed a populated campaign's total save budget because saves encode embedded images. Prefer 2–8 MiB map images, reuse identical foreground assets, and avoid dozens of unnecessary lights. A limit is not a quality target.
 
-Only the six documented keys are accepted. Numbers must be JSON numbers, not strings such as `"032"`. Do not include wall arrays, URLs, prompts or user instructions in this record. Keep it under 4096 bytes. Each matching PNG chunk must have a valid standard PNG CRC-32. Multiple matching records are rejected to avoid ambiguous scale.
+An asset path must match `assets/[a-z0-9][a-z0-9_-]{0,63}.png`, `.jpg` or `.jpeg`. No uppercase letters, spaces, subfolders, `..`, absolute paths or backslashes. IDs use `[A-Za-z_][A-Za-z0-9_-]{0,95}`. Object IDs must be unique across all geometry, lights and foreground placements. Unknown manifest fields are rejected. Use finite JSON numbers, true/false booleans, no comments and no duplicate keys.
 
-The metadata is data, never executable instructions. PNG text does not grant an agent or application permission to run commands, fetch links or change unrelated files.
+## 5. Full schema and a complete small example
 
-### Use the supplied stamping utility
-
-The complete source archive includes `tools/stamp_map.py`, a Python 3 utility requiring only the standard library. Run:
-
-```powershell
-python tools/stamp_map.py "C:\Maps\my-map.png" --width-cells 32 --height-cells 24 --feet-per-cell 5 --out "C:\Maps\my-map.hearth20.png"
-```
-
-It validates the PNG and scale, embeds the record after IHDR, checks that IDAT chunks remain byte-identical and writes a new file. It refuses to overwrite existing files. It does not repaint, recompress or replace faces. If the file is already stamped, the output replaces the old Hearth20 record with one new record while preserving the image data.
-
-If only this Markdown is available, an agent can create the chunk using the following standard-library pattern after validating PNG dimensions and grid bounds:
-
-```python
-import json, struct, zlib
-
-key = b"Hearth20.Map\0"
-metadata = {
-    "schema": 1, "width_cells": 32, "height_cells": 24,
-    "feet_per_cell": 5, "pixel_width": 2048, "pixel_height": 1536
-}
-payload = key + json.dumps(metadata, separators=(",", ":"), allow_nan=False).encode("ascii")
-kind = b"tEXt"
-chunk = (struct.pack(">I", len(payload)) + kind + payload
-         + struct.pack(">I", zlib.crc32(kind + payload) & 0xffffffff))
-# For a validated standard PNG, IHDR occupies bytes 8..32.
-# Preserve existing chunks and insert this chunk after IHDR.
-# Remove existing Hearth20.Map records first, or use stamp_map.py to do it safely.
-stamped = original_png[:33] + chunk + original_png[33:]
-```
-
-Use the complete utility for production; the short example omits its bounds, CRC and duplicate-record checks. Another compatible option is Pillow's `PngInfo.add_text("Hearth20.Map", json_text, zip=False)` when the agent is authorized to re-export the bitmap. `iTXt`, compressed `zTXt` and JPEG metadata are not the implemented automatic-grid format in this version.
-
-### What Hearth20 does on import
-
-With valid metadata, Hearth20 installs the declared width and feet-per-cell, derives height, displays a success message and skips the calibration popup. That scale is stored with the campaign and shared with players.
-
-Without the record, PNG/JPEG maps use the bounded manual dialog. Invalid, stale, duplicate or corrupt Hearth20 metadata rejects the import with an explanation; it does not silently guess the scale or alter the current map. Remove or regenerate the metadata to recover. Image editors and messaging services can strip text chunks, so distribute the original stamped PNG as a file or ZIP attachment. Stamp again after resizing or cropping.
-
-## 6. Derive lighting from the final art
-
-Inspect the final pixels before placing sources. Do not place light only from the generation prompt: the output may have moved a window or fireplace. Make a fixture table with ID, pixel position, converted cell position, source type, color, bright range, additional dim range, direction, aperture and rationale.
-
-Supported `source_type` values are `torch`, `brazier`, `window`, `sunlight`, `moonlight` and `crystal`. Use the closest actual type; inventing `spotlight` or `area_light` fields will not create an engine feature.
-
-Point sources should sit in the visible flame/crystal area. Offset wall-mounted lights slightly into the accessible room so a source is not exactly inside its own occluder. Use warm amber for fire, a source-appropriate crystal tint, comfortable warm sunlight and softer blue moonlight. Keep ranges proportionate to the space. Do not illuminate through intact masonry.
-
-The bright and dim fields are distances **in feet**. For a light with `bright: 20` and `dim: 20`, the outer range is 40 feet, not 20 feet. Positions are in grid cells. `angle_degrees` uses screen-space angles: 0 points right, 90 down, 180 left and -90 up. `spread_degrees` is the full cone width, not a half angle. Use 360 for an omnidirectional fixture.
-
-Suggested starting values, to be visually adjusted:
-
-| Fixture | Bright / additional dim | Tint | Rays |
-| --- | --- | --- | --- |
-| Wall torch | 20 / 20 ft | `#ffc77d` | 0.35–0.55 |
-| Hearth or brazier | 20 / 20 ft | `#ffd397` | 0.45–0.65 |
-| Small magic crystal | 10 / 15 ft | choose from the art | 0.25–0.50 |
-| Window | Natural-light-controlled | `#fff0bb` as fallback | 0.50–0.80 |
-
-These are visual starting points, not an assertion of official rules for every item. Follow the user's requested game mechanics where specified.
-
-### Windows and projected sunlight
-
-A window needs both a `window` segment defining the aperture and a separate `light` annotation with `source_type: "window"`, near that aperture and directed inward. Break the surrounding wall at the opening; a continuous duplicate wall across it will block the light.
-
-The natural-light code pairs a window light with the nearest window annotation within 1.5 cells. Its segment determines aperture width. The light direction selects which perpendicular points into the room. Prefer one light per window and avoid ambiguous equally near windows.
-
-`window_height` and `sill_height` are in feet. For altitude α, the projected near edge is approximately `sill_height / tan(α)` and the far edge is `(sill_height + window_height) / tan(α)`. Hearth20 converts these distances to cells and clips rays against walls. Low sun makes a longer cast; high sun shortens it. Face the wrong way and direct sun should diminish. Use diffuse fill to keep a plausible room rather than painting a giant uniform yellow circle.
-
-Do not bake a strong afternoon beam into the base art and then promise that moving the time slider will rotate it. Painted shadows remain fixed. Prefer neutral static shading and live projection for time-dependent features.
-
-### Time, north and rendering limits
-
-Natural-light settings supported by the current source are:
+The following authoring example describes a 16 × 12 room. Use a matching 2048 × 1536 `assets/map.png`. The north wall has one window and the south wall one door. The chandelier image must be a separate transparent PNG. The helper inserts the omitted image `sha256` fields; **inside the final archive every image record must contain its exact hash**.
 
 ```json
 {
-  "time_hours": 16.5,
-  "north_degrees": 0,
-  "sun_intensity": 1,
-  "moon_intensity": 0.35,
-  "haze": 0.32,
-  "exposure": 1
-}
-```
-
-Time ranges from 0 to 24, north from 0 to 360 degrees, intensities/exposure from 0 to 3 and haze from 0 to 1. Zero board north means north points toward the top of the image. Verify the effect of rotation in the running app rather than compensating twice by rotating both geometry and north.
-
-This is an artistic equinox sky approximation with a maximum solar altitude of 65 degrees. Latitude, season, weather simulation and lunar phase are not authored fields. The board uses occluded 2D light geometry, filtered penumbrae and a height-integrated scattering shader; it is not a full physically traced 3D building.
-
-In 0.3.12, parallel outdoor sunlight and special roof rectangles are keyed to specific built-in `library_id` values in `natural_light.gd`. An arbitrary new custom map does not gain that behavior merely by declaring `source_type: "sunlight"`. For a custom outdoor map, use the supported ambient/local-light behavior, or implement explicit generic outdoor/roof support as a separately tested source change. Do not reuse another map's ID to activate unrelated roof masks.
-
-## 7. Walls, doors, roofs and foregrounds
-
-Trace structural wall faces in cell coordinates against the final image. Use joined endpoints and intentional gaps. Avoid self-intersections, zero-length segments and needless tiny segments. Prefer a few accurate segments over tracing every brick.
-
-Closed doors block light; open doors do not. A door occupies the opening in the wall, not a second segment laid over an intact wall. Confirm its hinge-side appearance in the image. Window segments represent apertures; a window light is separate from the window annotation.
-
-A sample library-style door is:
-
-```json
-{"id":"door-entry","a":{"x":14,"y":19},"b":{"x":16,"y":19},"open":true,"hidden":false}
-```
-
-A wall record is:
-
-```json
-{"a":{"x":4,"y":3},"b":{"x":12,"y":3},"hidden":true}
-```
-
-`hidden` on a wall controls its representation; it does not make the wall stop blocking light. Keep semantic DM secrets in DM-only data rather than relying on a player's inability to notice a painted mark.
-
-Foreground items should be separate transparent PNGs only when separation has a purpose: removable tree canopies, a chandelier or movable cover. Use the image tool's real transparent-background mode for cutouts. Do not flatten a black or checkerboard background into a purported transparent prop.
-
-Avoid painting the same canopy into the base and then placing an identical foreground on top. Record anchor position, intended cell footprint, layer and whether it affects movement or light. A decorative foreground image does not automatically generate a collider or wall occluder.
-
-Hearth20 layers are `map`, `tokens`, `gm`, `foreground` and `light`. GM-only information must stay in the `gm` layer or other validated private fields. A normal player pawn starts at size 1 and is centered on a cell. Ownership and movement permissions remain DM-controlled; map generation must not assign real player access or import account data.
-
-## 8. Scene data examples and integration
-
-The following is an **authoring manifest**, not an automatically importable PNG payload. It mirrors relevant Hearth20 scene fields and can guide manual setup or a source-side adapter:
-
-```json
-{
-  "id":"custom-amber-sanctum",
-  "title":"Amber Sanctum",
-  "width_cells":32,"height_cells":24,"cell_pixels":64,"feet_per_cell":5,
-  "grid_visible":true,"grid_opacity":0.34,"grid_thickness":1,"grid_color":"#d8c99e",
-  "snap_to_grid":true,"map_asset":"",
-  "dynamic_lighting":true,"ambient_light":"dark","blackout":false,
-  "natural_light":{"time_hours":16.5,"north_degrees":0,"sun_intensity":1,"moon_intensity":0.35,"haze":0.32,"exposure":1},
-  "walls":[{"a":{"x":4,"y":3},"b":{"x":12,"y":3},"hidden":true}],
-  "doors":[],
-  "annotations":[
-    {"id":"window-west","owner":"dm-local","kind":"window","layer":"light","points":[{"x":4,"y":7},{"x":4,"y":9}],"color":"#97c9d3","open":false},
-    {"id":"window-west-light","owner":"dm-local","kind":"light","layer":"light","points":[{"x":4.1,"y":8}],"enabled":true,"bright":35,"dim":20,"light_color":"#fff0bb","source_type":"window","angle_degrees":0,"spread_degrees":24,"ray_strength":0.7,"window_height":7,"sill_height":3},
-    {"id":"hearth-light","owner":"dm-local","kind":"light","layer":"light","points":[{"x":25.5,"y":5.5}],"enabled":true,"bright":20,"dim":20,"light_color":"#ffc77d","source_type":"brazier","angle_degrees":0,"spread_degrees":360,"ray_strength":0.5}
+  "format": "hearth20-map",
+  "version": 1,
+  "id": "ashen-watch",
+  "title": "Ashen Watch",
+  "description": "An abandoned watch hall at late afternoon.",
+  "credits": "Map and foreground art: original artwork created for this encounter.",
+  "grid": {"width_cells": 16, "height_cells": 12, "feet_per_cell": 5},
+  "background": {"path": "assets/map.png"},
+  "walls": [
+    {"id": "north-west", "a": {"x": 2, "y": 2}, "b": {"x": 7, "y": 2}},
+    {"id": "north-east", "a": {"x": 9, "y": 2}, "b": {"x": 14, "y": 2}},
+    {"id": "east", "a": {"x": 14, "y": 2}, "b": {"x": 14, "y": 10}},
+    {"id": "south-east", "a": {"x": 14, "y": 10}, "b": {"x": 9, "y": 10}},
+    {"id": "south-west", "a": {"x": 7, "y": 10}, "b": {"x": 2, "y": 10}},
+    {"id": "west", "a": {"x": 2, "y": 10}, "b": {"x": 2, "y": 2}}
   ],
-  "props":[],"fx":[],"fog_rects":[]
+  "doors": [
+    {"id": "entry-door", "a": {"x": 7, "y": 10}, "b": {"x": 9, "y": 10}, "open": true}
+  ],
+  "windows": [
+    {"id": "north-window", "a": {"x": 7, "y": 2}, "b": {"x": 9, "y": 2}}
+  ],
+  "lights": [
+    {
+      "id": "north-daylight", "position": {"x": 8, "y": 2.08},
+      "source_type": "window", "window_id": "north-window",
+      "angle_degrees": 90, "spread_degrees": 90,
+      "window_height": 7, "sill_height": 3,
+      "bright_feet": 10, "dim_feet": 35,
+      "light_color": "#ffe5ae", "ray_strength": 0.55, "enabled": true
+    },
+    {
+      "id": "hearth", "position": {"x": 3.3, "y": 5.5},
+      "source_type": "brazier", "bright_feet": 20, "dim_feet": 20,
+      "light_color": "#ffc179", "angle_degrees": 0,
+      "spread_degrees": 180, "ray_strength": 0.5, "enabled": true
+    }
+  ],
+  "foreground": [
+    {
+      "id": "chandelier", "name": "Iron chandelier",
+      "image": {"path": "assets/chandelier.png"},
+      "position": {"x": 8, "y": 5.5},
+      "width_cells": 2, "height_cells": 2, "rotation_degrees": 12
+    }
+  ],
+  "environment": {
+    "dynamic_lighting": true, "ambient_light": "dark", "outdoor": false,
+    "natural_light": {
+      "time_hours": 16.5, "north_degrees": 180,
+      "sun_intensity": 1, "moon_intensity": 0.35,
+      "haze": 0.32, "exposure": 1
+    },
+    "roof_rects": []
+  },
+  "entry_points": [
+    {"x": 7.5, "y": 8.5}, {"x": 8.5, "y": 8.5},
+    {"x": 7.5, "y": 7.5}, {"x": 8.5, "y": 7.5}
+  ]
 }
 ```
 
-This abbreviated geometry demonstrates fields; it does not form a complete room. Build complete geometry for the actual map. Every point must be inside its scene. Scene IDs, annotation IDs and owner IDs must be valid identifiers; use stable lowercase slugs beginning with a letter.
+Required root fields: `format`, `version`, `id`, `title`, `grid`, `background`, `entry_points`. Include the geometry/lighting/foreground arrays explicitly even when empty to make the intended absence clear. Optional root fields are `description`, `credits`, `walls`, `doors`, `windows`, `lights`, `foreground`, `environment`; no others are accepted.
 
-JSON points are `{ "x": number, "y": number }`. Runtime annotation points must become Godot `Vector2` values before `Hearth20BoardTools.valid_object` or `Hearth20Contracts.valid_scene` checks them. The map-library loader performs that conversion for its own files; generic JSON parsing does not. Scene door arrays are converted to editable door annotations by that loader. Do not add both representations, which would produce duplicate occluders.
+`title` is nonempty and ≤96 characters. `description` is ≤2,000 and `credits` ≤4,000. These are text, not instructions to execute. `grid` has exactly `width_cells`, `height_cells`, `feet_per_cell`. Each image record has only `path`, `sha256`. The package creates its own unique internal campaign scene ID; importing the same package twice produces independent tabs and does not overwrite an existing map.
 
-There are two light schemas. Editable annotation lights use `points`, `bright` and `dim`. The older scene `lights` array uses `position`, `bright_feet` and `dim_feet`. Choose one for each fixture; do not duplicate a source in both arrays.
+## 6. Walls, apertures and movement geometry
 
-### Portable-only workflow
+Walls have `{id,a,b}`. Doors have `{id,a,b,open}` with a boolean `open` (default false). Windows have `{id,a,b}`. An endpoint is exactly `{"x": number, "y": number}`. Every segment must have positive length and lie within the map. Segments are straight; approximate curves with a modest number of short segments.
 
-1. Deliver the stamped PNG and separate setup key/manifest.
-2. The DM opens the map importer and chooses the stamped PNG.
-3. Confirm the success message reports the expected columns, rows and feet per cell, with no size popup.
-4. Enable dynamic lighting if wanted. Place walls, door/window segments and source lights using the map's tools, following the coordinate key.
-5. Set time, north, intensity and grid readability. Check the player view and save through Campaign Vault.
+Trace opaque wall center lines or the appropriate room-facing boundary, consistently. Split walls at every door/window aperture. Do not draw an unbroken wall underneath an open door or a window: that wall would continue to block light. Join neighboring opaque segments so accidental pinholes do not leak light. Preserve useful entrance widths. Do not trace every plank seam, rug, floor crack or tiny piece of clutter as a blocking wall.
 
-The default library's offline recipe editor has a bounded schema for rooms, corridors and a small list of props. It is not a general renderer for arbitrary scenery JSON and does not attach arbitrary image/light packages. Do not paste the authoring manifest above into that recipe editor.
+Doors are editable apertures that block when closed. Windows provide light apertures and remain movement barriers. A foreground sprite is decorative and does **not** automatically create collision or a lighting occluder. If a large boulder, column or closed chest should block sight/movement, add suitable explicit geometry around it. Judge this according to the actual image, and avoid creating unexplained barriers over walkable art.
 
-### Source-aware workflow
+All imported segments and lights are editable objects on the DM's **Light** layer. They are not flattened into the artwork. Geometry data is not distributed as GM-only editor controls to players.
 
-The active project is `Forks/Hearth20-Seated/source`. The canonical original and Hearth20-Beyond checkpoints are separate and must remain untouched. Consult `AGENTS.md` before changes. Relevant source files are:
+## 7. Choose lights from visible sources in the final image
 
-| Source path relative to project | Responsibility |
+Use `lights` records with `id`, `position` and a `source_type` from:
+
+| Type | Use |
 | --- | --- |
-| `hearth20/map_metadata.gd` | PNG metadata detection, CRC and scale validation |
-| `hearth20/assets.gd` | Bounded image inspection and asset storage |
-| `hearth20/board_canvas.gd` | Map import, calibration and board rendering |
-| `hearth20/app.gd` | Import status and manual calibration UI |
-| `hearth20/contracts.gd` | Scene/campaign validation and player projection |
-| `hearth20/board_tools.gd` | Editable annotations and layers |
-| `hearth20/map_library.gd` | Built-in scene loading and asset installation |
-| `hearth20/sample_maps/catalog.json` | Built-in map metadata |
-| `hearth20/sample_maps/lantern-larch-inn.json` | Working window/hearth/door example |
-| `hearth20/natural_light.gd` | Time/north, window projection and outdoor behavior |
-| `hearth20/lighting.gd`, `hearth20/soft_light.gd` | Occlusion, source geometry and rendering |
-| `hearth20/vision.gd` | Common environmental visibility and clipping |
-| `hearth20/identity.gd` | Campaign identity, encoding, save and load |
+| `torch` | Small warm flame; commonly 20 ft bright plus 20 ft dim |
+| `brazier` | Fire bowl, fireplace or larger warm emitter |
+| `window` | Day/night aperture tied to one explicit window segment |
+| `sunlight` | Time-dependent natural sky; use with `outdoor:true` for exterior parallel illumination |
+| `moonlight` | Natural night source; same exterior sky system changes with time |
+| `crystal` | Magical localized colored emitter |
 
-For a custom prepared campaign, start from `Hearth20Identity.new_campaign`, use `Hearth20Assets.inspect_map_file`/`store_asset` or `board.import_map`, normalize vectors, validate with `Hearth20Contracts.validate_campaign`, and save using `Hearth20Identity.save_campaign`. This API accepts paths only under `Hearth20Identity.SAVE_ROOT` (`user://hearth20/campaigns`); use an isolated authoring profile and a unique filename. Load it back and check it before copying an export to the delivery folder. The portable's Campaign Vault reads its own AppData campaign directory; a recipient must place the exported campaign there while the game is closed, keeping a backup and avoiding name collisions. Do not hand-write a file with a `.h20scampaign` extension and assume it matches the serializer. Never overwrite a user's active campaign to create an example.
+Do not place lights at arbitrary decorative coordinates just to make the map bright. Put each position on the fixture or just on its room-facing side. Use warm oranges for fire, pale warm sunlight, subdued blue moonlight, and deliberate magical hues. Keep enough shadow for the geometry to matter without making the entire playable area illegible.
 
-Bundled-library changes require deliberate source work. Currently the catalog loader requires exactly 15 entries and bundled art is checked as 2048 × 1536. Boot also preloads catalog thumbnails; scenery uses a separate lookup. Simply dropping a sixteenth file into the folder will not add a library entry. If asked to extend the library, remove the fixed-count assumption safely, handle dimensions deliberately and test the library, thumbnail loading, saves and player projection. Keep IDs unique and preserve existing maps.
+Optional light fields and bounds:
 
-This fork uses common environmental lighting. Character-sheet darkvision is not the current player-visibility authority. Do not resurrect token-specific darkvision/import requirements as part of map creation. Preserve full-map cover, explicit masks, private sheets and GM-secret filtering.
-
-## 9. Limits and performance budgets
-
-| Limit | Current behavior |
+| Field | Meaning / allowed value |
 | --- | --- |
-| Imported PNG/JPEG file | At most 40 MiB |
-| Image side | At most 16,384 pixels |
-| Total map pixels | At most 67,108,864 |
-| Scene grid | 1–256 cells on each axis |
-| PNG grid text | At most 4096 bytes; one `Hearth20.Map` record |
-| Annotation objects | At most 256 per scene |
-| Walls/doors/props/fog/FX collections | At most 512 entries in each applicable collection |
-| Legacy scene lights / templates | At most 128 each |
-| Campaign scenes / actors | At most 256 / 2000 |
-| Encoded campaign save | At most 64 MiB |
-| Foreground/token PNG | At most 8 MiB, 2048 per side, 4,194,304 pixels |
+| `bright_feet` | Bright reach in feet, 0–1,000; default 20 |
+| `dim_feet` | Additional dim reach beyond bright reach, 0–1,000; default 20 |
+| `light_color` | `#RRGGBB` or `#RRGGBBAA`; default warm light |
+| `angle_degrees` | Board-space direction, −360–360; 0 right, 90 down, 180 left, 270 up |
+| `spread_degrees` | 1–360; default 360; a directional cone for localized lights |
+| `ray_strength` | 0–1; default 0.55; avoid washing out the floor |
+| `enabled` | Boolean; default true |
+| `window_id` | Exact window-segment ID for `window` sources |
+| `window_height` | Window opening height in feet, 0.1–100; default 7 |
+| `sill_height` | Sill above floor in feet, 0.1–100; default 3 |
 
-These ceilings are validation limits, not recommended design targets. Use a manageable number of lights and occluders. The current point-light mesh path considers the first 32 point sources; do not build a scene assuming all 128 are equally cheap or fully rendered. Prefer a few visually important fixtures and restrained fill.
+For a window, place the source within 1.5 cells of the referenced aperture midpoint. Set its direction **inward across the aperture**, not along the wall. The runtime uses the window's perpendicular normal, choosing its inward sign from your angle. A source whose axis is nearly parallel to the aperture is rejected. Each window light names its aperture explicitly; proximity alone is not the binding rule.
 
-Use thumbnails for browsing. Avoid huge transparent margins around props. Keep a playable map's detail readable at normal zoom. Strong blur, too much haze or bright bloom can hide tokens and grid lines. Test grid opacity/thickness on both light and dark floors. Hidden scenes and unused 3D work should not keep rendering.
+For example, a north wall with a horizontal window and the room below it uses 90° inward; a room left of an east wall uses 180°. A fireplace facing into a room uses an appropriate half-plane or narrower spread. Multiple candles on a chandelier generally need one modest emitter, not one expensive light per flame. A dangling foreground chandelier may have a separate light at its actual center.
 
-The project's stated target is GTX 1060 / i5-8500 with at least 30 FPS at the 1% low. That target is not yet certified. Do not claim a custom map meets it without measurements on comparable hardware. Report test machine, resolution, map, player count, frame-time sampling method and results when benchmarking.
+### Daylight, moonlight and physical plausibility
 
-## 10. Verification before handoff
+`environment.natural_light` accepts exactly `time_hours` (0–24), `north_degrees` (0–360), `sun_intensity` (0–3), `moon_intensity` (0–3), `haze` (0–1), `exposure` (0–3). The DM can change time and rotate board north after import. Use a coherent time and north orientation, and inspect whether the desired windows actually face the sky direction then.
 
-Run the checks you can actually perform and state any limits. At minimum:
+Hearth20 uses an artistic equinox sky model, not geographic ephemerides: a day/night sine drives altitude, with a 65° maximum sun altitude, and azimuth rotates with time. Board-space light travel is `Vector2.from_angle(radians(azimuth + 90 + north_degrees))`. At 16:30 with north 0°, rays travel approximately toward the upper-right; rotating north 180° reverses that direction. Do not assume a window will cast direct sun at every hour.
 
-- Read final width, height and file size from disk. Confirm square-cell pitch and metadata math.
-- Reopen the final PNG and parse its `Hearth20.Map` record. Verify CRC, one record, numeric fields and matching pixel dimensions.
-- Confirm that stamping preserved the IDAT bytes and did not change the artwork.
-- Inspect the full image and close-ups of doors, stairs, windows, intersections and repeated props.
-- Overlay a temporary grid in a preview or use Hearth20's grid. Check multiple distant landmarks, not just one room.
-- Import the exact delivered PNG into the target version. Check automatic scale, centered size-one tokens and a measured known distance.
-- Test an ordinary unstamped map still gets the manual dialog. Confirm Apply, Cancel and Close remain reachable on a small window.
-- If lighting is included, test closed/open doors, source visibility, wall leaks, blocked windows, morning/noon/evening/night and rotated board north.
-- Check shared player visibility with masks and cover, and ensure private notes never appear in player art or payloads.
-- Save, reopen and verify scale, lights and annotations. If multiplayer was tested, verify those values on a client too.
+Window projection uses physical aperture width and the floor distances:
 
-Source test commands, from the seated fork root, include:
+`near_feet = sill_height / tan(solar_altitude)`
 
-```powershell
-python tools/run_source_check.py import
-python tools/run_source_check.py map_metadata --headless
-python tools/run_source_check.py title_menu
-```
+`far_feet = (sill_height + window_height) / tan(solar_altitude)`
 
-`map_metadata` tests missing/valid/bad/duplicate/oversized records, checksums and image compatibility. `title_menu` tests the actual import UI, automatic grid installation and campaign persistence as well as the menu. Use isolated test profiles; do not log in to real accounts or control Steam for map QA without authorization.
+Converted to cells, these create the finite elongated rectangular/slanted patch rather than a generic spotlight. Low sun creates long casts; high sun short casts. Inward-facing sky alignment scales the direct beam. Rays clip against the wall solver. A subdued radial, wall-occluded diffuse contribution approximates scattered/first-bounce illumination. It is not full path-traced global illumination, and this file cannot supply arbitrary volumetric meshes or a custom renderer.
 
-If an agent can generate images but cannot run Hearth20, deliver the stamped file, measured metadata, visual inspection and a clearly labeled in-app test still needed. Do not invent screenshots or test results.
+For outdoors, set `outdoor:true` and include **one** `sunlight` or `moonlight` source. The runtime uses the active day/night sky across the board, so do not scatter hundreds of suns over the image. Optional `roof_rects` are axis-aligned covered areas: `{x,y,width,height}` in cells, positive width/height, fully inside the map, at most 64. They exclude direct sky under intact roofs. Walls also cast projected exterior shadows. An interior-only map usually uses `outdoor:false`, dark ambient, windows and fixture lights. `ambient_light` accepts only `bright`, `dim`, `dark`; bright ambient intentionally reduces dramatic darkness.
 
-## 11. Delivery structure and reusable handoff prompt
+Avoid painting strong contradictory directional beams permanently into the base artwork. Use restrained local fixture glow/contact shadow in the raster, allowing the dynamic overlay to change when the DM moves the sun or extinguishes a fire. Test noon, late afternoon and midnight, including windows facing away from the sun and rooms behind closed doors.
 
-Recommended files:
+## 8. Separate foreground objects
+
+Foreground records have exactly `id`, `name`, `image`, `position`, `width_cells`, `height_cells`, optional `rotation_degrees`. `name` is ≤64 characters. Width/height are 0.1–64 cells. Rotation is −360–360°, clockwise on the downward-Y board. The entire rotated footprint must fit within the map.
+
+Generate transparent **RGBA PNGs** with matching overhead perspective, material style, scale and light direction. Suitable objects include chandeliers, tree crowns, hanging banners, awnings, overhead bridges and removable canopy sections. Keep their true silhouette and soft contact/occlusion detail; avoid opaque rectangular backgrounds, halos and excessive empty margins.
+
+Do not bake the exact same object into the floor image and also place it in the foreground. If the user should be able to hide/move an overhead object, leave the underlying floor complete. Derive placement from final image measurements, use its actual aspect ratio, and make the raster's center match the declared anchor. Verify alignment after rotating it.
+
+Several placements may reuse the same asset path/hash. They still need unique object IDs. Imported objects appear as decorative foreground-layer actors; they do not grant player movement or ownership. The host can edit or hide them using layer controls. Explicit concealment masks and map cover continue to take priority over foreground display.
+
+## 9. Party entry and map tabs
+
+Give `entry_points` as 1–16 distinct **square centers**, on genuinely clear walkable floor. Prefer enough positions for the expected party, separated from closed walls and hazards. Four points in a 2 × 2 floor area are a reasonable default. The importer may search nearby clear square centers for additional heroes; do not rely on that to rescue an inaccessible start.
+
+Importing the package adds a map to the current campaign and moves the currently deployed heroes from the prior active map to clear entry positions, preserving their identity and control grants. Stored heroes remain stored during ordinary import. Existing NPCs remain with their existing map. Do not define new player accounts, ownership policies, imported character sheets or financial balances in the map manifest; those belong to the campaign.
+
+The host sees loaded maps as horizontal tabs. Left-click opens a map. Right-click a particular tab and choose **Bring all heroes here** to gather heroes, including stored heroes, onto that specific map. This action is host-only. Map names and editor controls are not shown to players while the map is covered.
+
+## 10. Import, concealment and delivery behavior
+
+The user imports the single `.hearth20map` through **+ Map** or the map-file picker. It installs the correct grid immediately, along with editable geometry, source-aware lights and foreground actors. It does not open the manual width-calibration prompt. Save the campaign afterward to persist all embedded assets and placements. Saving/reopening does not require the authoring folder to remain on disk.
+
+The host's **Cover map** toggle is a campaign-wide cover. It stays active across tab switches, imports and hero transfers until the host explicitly reveals the map. A package cannot silently turn it off. A malformed package is rejected before the current campaign is changed. The importer creates no partially loaded map on failure.
+
+Players see a thin gold progress indicator at the bottom of the map while an actual map transfer is underway: percentage/received bytes, then **Preparing map…** while the received scene is installed. First-time art, changed masked art or an evicted cached map can require download. Returning to recently received exact map/lighting data uses bounded caches rather than resending it. This avoids repeated large transfers but does not make an unseen map instantaneous or change the host's network connection speed.
+
+If a package is rejected, fix the stated cause in the authoring folder and produce a new package. Do not ask the user to disable validation. Common causes include wrong image/grid aspect ratio, missing/stale image hash, a window light pointing along its wall, off-map foreground corners, duplicated IDs, unsupported ZIP compression and unreferenced thumbnail files.
+
+Legacy fallback: a PNG may carry `Hearth20.Map` tEXt metadata for automatic **scale only**. That is supported for older simple imports, but it does not install walls/lights/foregrounds. JPEG/plain PNG without metadata still needs manual calibration. For this assignment, deliver `.hearth20map`; do not substitute the legacy PNG format or a `.hearth20map` file that is merely renamed JSON.
+
+## 11. Required quality checks before handing over
+
+Check the final picture and the final data together:
+
+- Orthographic plan, consistent scale, connected routes, intentional bottlenecks and no accidental blocked entrance.
+- Exact image/grid ratio; grid origin at the actual image corner; no decorative frame counted as playable cells.
+- Every opaque wall aligned with art, door/window gaps split correctly, no pinhole leakage or duplicate full wall behind an aperture.
+- Every light visibly motivated, correctly oriented, appropriately colored and bounded; explicit window IDs and plausible sill/opening heights.
+- Afternoon/day/night behavior coherent with board north, roofs and room boundaries; flame and magic sources remain independent of the sun.
+- Foregrounds transparent, registered to the map, separately removable, neither duplicated in the base nor floating off-map after rotation.
+- Entry squares clear, centered and large enough for the party. Hero controls are preserved by the application rather than hardcoded in the package.
+- Strict manifest fields, all unique IDs, exact hashes, local raster paths only, ZIP_STORED, no extra entries, limits respected.
+- Packer completes successfully. If the game is available, import the actual package, inspect each relevant layer, cover/switch/reveal, move a hero, save/reopen, and verify foreground/lighting/scale persistence. Test a player window when possible.
+- If runtime testing is unavailable, say so plainly. A successful packer/header check does not prove that a visual layout is attractive, every PNG decodes, a real Steam session transfers quickly or a user-specific encounter is balanced.
+
+Useful game implementation references for an agent with source access:
 
 ```text
-map-slug/
-  map-slug.hearth20.png       # Final image, embedded size, player-safe
-  map-slug-preview.png       # Optional, clearly labeled grid preview
-  map-slug-map-key.md         # User instructions and separate DM secrets
-  map-slug-scene-plan.json    # Optional coordinate/lighting plan, not auto-imported
-  foreground/                # Optional transparent items
-  provenance.md              # Asset sources/licenses, prompts and edit history
-  validation.md              # Actual checks, version and unresolved limits
+source/hearth20/map_package.gd      archive/manifest validation and atomic import
+source/hearth20/map_metadata.gd     legacy PNG grid metadata
+source/hearth20/contracts.gd        scene bounds, projection, masks and cover
+source/hearth20/natural_light.gd    sun/moon and window projection
+source/hearth20/lighting.gd         source types and wall-clipped light geometry
+source/hearth20/token_inventory.gd  foreground bounds and clear party entries
+tools/pack_hearth20map.py           standalone package builder
 ```
 
-Keep licensing/provenance for external assets. Record the image tool and final prompt. Preserve rejected drafts separately from the delivery. Do not include personal photos, browser data, credentials or unrelated campaign files.
-
-The user can give a future agent this prompt together with this document:
-
-> Use the attached Hearth20 custom map guide to create a map for: **[my request]**. Choose a coherent layout and sensible scale, use high-quality artwork, inspect it, and deliver a PNG with valid embedded `Hearth20.Map` size metadata so Hearth20 0.3.12+ imports it automatically. Include a map key and a lighting/wall plan tied to the final image. Preserve my supplied art and character appearances unless I request edits. Complete all verification available to you and state any in-app checks you could not perform.
+The kit's complete inn example is a working format/lighting reference, not a template that must be copied for every new setting. Build the user's requested location, take time to make its art cohesive, and return an actual playable package.

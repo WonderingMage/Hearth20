@@ -119,6 +119,7 @@ var multiplayer_lab: Hearth20MultiplayerLab
 var dice_stage: Hearth20DiceStage
 var connection_window: Window
 var connection_signature=""
+var map_tabs: Hearth20MapTabs
 
 func open_token_inventory() -> Hearth20TokenInventoryWindow:
 	if session.local_role!="dm": return null
@@ -215,6 +216,7 @@ func _build_ui() -> void:
 		var result=session.store_inventory_token(str(data.actor_id));_on_status("Token stowed in the campaign vault." if result.ok else str(result.get("error","Unable to stow token.")));board.dragging_actor=false;board.queue_redraw())
 	status_label = Label.new()
 	var body := HBoxContainer.new()
+	map_tabs=Hearth20MapTabs.new();root.add_child(map_tabs);map_tabs.setup(self)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 12)
@@ -224,7 +226,10 @@ func _build_ui() -> void:
 	dm_rail.add_theme_constant_override("separation", 6)
 	var rail_frame:=PanelContainer.new()
 	rail_frame.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#121925"),12,5,Hearth20Design.BORDER,true))
-	rail_frame.add_child(dm_rail)
+	var rail_scroll:=ScrollContainer.new()
+	rail_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	rail_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO
+	rail_frame.add_child(rail_scroll);rail_scroll.add_child(dm_rail)
 	body.add_child(rail_frame)
 	mode_select = _add_button(dm_rail, "↖\nSelect", _select_mode)
 	mode_select.toggle_mode = true
@@ -328,7 +333,7 @@ func _build_ui() -> void:
 	var files := FileDialog.new()
 	files.access = FileDialog.ACCESS_FILESYSTEM
 	files.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	files.add_filter("*.png, *.jpg, *.jpeg", "Battle map image")
+	files.add_filter("*.hearth20map, *.png, *.jpg, *.jpeg", "Hearth20 maps and images")
 	files.file_selected.connect(_on_map_selected)
 	files.title="Choose a battlemap · Cancel returns to your table"
 	files.use_native_dialog=OS.get_name()=="Windows"
@@ -987,7 +992,7 @@ func _build_scene_section(parent: VBoxContainer) -> void:
 	intro.text = "Bring in your own battle map, then align its 5-foot grid. The artwork stays separate from walls, doors, fog and tokens."
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(intro)
-	map_import_button = _add_button(parent, "Import PNG / JPEG…", _open_map_dialog)
+	map_import_button = _add_button(parent, "Import map package / image…", _open_map_dialog)
 	_accent_button(map_import_button)
 	var library_button:=_add_button(parent,"Browse 15 sample maps…",_open_map_library)
 	library_button.icon=Hearth20Design.icon("map",18)
@@ -1423,8 +1428,8 @@ func _load_sample_map(map_id: String, move_party: bool=true) -> Dictionary:
 	if result.get("ok",false): _finish_library_scene_change(str(result.get("title","Sample map")))
 	return result
 
-func _switch_library_scene(scene_id: String, move_party: bool=true) -> Dictionary:
-	var result: Dictionary=session.switch_library_scene(scene_id,move_party)
+func _switch_library_scene(scene_id: String, move_party: bool=true, include_stored: bool=false) -> Dictionary:
+	var result: Dictionary=session.switch_library_scene(scene_id,move_party,include_stored)
 	if result.get("ok",false): _finish_library_scene_change(str(result.get("title","Scene")))
 	return result
 
@@ -1445,6 +1450,13 @@ func _finish_library_scene_change(title_value: String) -> void:
 	_on_status("%s · Scene ready with calibrated grid, editable lights, walls and doors."%title_value)
 
 func _on_map_selected(path: String) -> void:
+	if path.get_extension().to_lower()=="hearth20map":
+		var imported: Dictionary=session.import_map_package(path)
+		if imported.ok:
+			_finish_library_scene_change(str(imported.title))
+			_on_status("%s · Imported %d × %d cells, %d walls/doors/lights and %d foreground objects. Previous maps are kept in the map tabs."%[imported.title,imported.width_cells,imported.height_cells,imported.annotation_count,imported.foreground_count])
+		else:_on_status(str(imported.get("error","Could not import map package.")))
+		return
 	var previous_revision := int(campaign.get("revision", 0))
 	_capture_scene_recovery()
 	var result: Dictionary = board.import_map(path)

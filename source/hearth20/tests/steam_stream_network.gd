@@ -23,6 +23,7 @@ var port=0
 var last={}
 var checks=0
 var errors=[]
+var map_progress=[]
 func _initialize() -> void:
 	var args=OS.get_cmdline_user_args();role=args[0];port=int(args[1]);output=args[2];folder=args[3];call_deferred("run")
 func expect(value: bool,note: String) -> void:
@@ -43,6 +44,7 @@ func run() -> void:
 	session=Hearth20Session.new();session.name="Hearth20Session";root.add_child(session);session.configure(Hearth20Identity.new_campaign("Chunked Steam campaign fixture"))
 	session.status_changed.connect(func(note):print(role+" STATUS "+note))
 	session.snapshot_received.connect(func(value):last=value)
+	session.map_transfer_progress.connect(func(value):map_progress.append(value))
 	link=LinkFixture.new();root.add_child(link);link.session=session;session.steam_link=link
 	var peer=ENetMultiplayerPeer.new();var gate="a".repeat(32)
 	if role=="host":
@@ -96,6 +98,9 @@ func run() -> void:
 		expect(not str(last).contains("STEAM-PRIVATE-NOTES-DO-NOT-SEND"),"chunked snapshots preserve DM note redaction")
 		expect(last.get("character_required",false),"new authenticated players still need a character name and PNG")
 		expect(link.progress.any(func(value):return value>0. and value<1.),"chunked download reports intermediate progress")
+		expect(map_progress.any(func(value):return value.active and value.progress>0. and value.progress<1. and value.received<value.total),"player map bar receives real intermediate download bytes")
+		await until(func():return not session.map_transfer_state.active,"download bar finishes after deferred map installation")
+		expect(map_progress.any(func(value):return value.active and value.progress==1. and "Preparing" in value.phase) and not session.map_transfer_state.active,"map bar shows preparation then completes when the map is installed")
 		mark("latest-map")
 		var portrait=noise_png(512,512,598);expect(portrait.size()>524288,"portrait fixture exceeds the native Steam message limit")
 		expect(session.submit_join_character({"name":"Steam portrait fixture"},portrait).ok,"portrait upload is queued")
@@ -111,7 +116,9 @@ func run() -> void:
 		await until(func():return last.get("scene",{}).get("id","")=="blackout","covered snapshot reaches the player")
 		expect(last.map_png.is_empty() and last.assets.is_empty() and last.actors.is_empty(),"covered active view has no map/token content")
 		mark("cover-seen");await wait("revealed")
+		var reveal_began=Time.get_ticks_msec()
 		await until(func():return last.get("scene",{}).get("id","")!="blackout","same-map reveal reaches the player")
+		expect(Time.get_ticks_msec()-reveal_began<3000,"cached reveal completes without a fresh bulk download in loopback")
 		expect(last.map_png==expected_map and Hearth20Assets.read_asset(last,str(own.get("asset_id","")),"token")==portrait,"reference-only reveal restores exactly the authorized pixels and portrait")
 		mark("reveal-seen");await wait("stowed")
 		await until(func():return last.get("character_in_inventory",false),"stowed status reaches the player")

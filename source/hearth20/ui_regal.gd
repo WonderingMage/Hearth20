@@ -87,7 +87,7 @@ static func sync(node: Node) -> void:
 		if node is ColorRect:
 			if not node.has_meta("regal_raw_color"): node.set_meta("regal_raw_color",node.color)
 			node.color=resolve(node.get_meta("regal_raw_color"))
-		if node is Button and int(node.get_meta("regal_button_revision",-1))!=revision:
+		if node is Button and not node.get_meta("regal_custom_button",false) and int(node.get_meta("regal_button_revision",-1))!=revision:
 			var primary: bool=node.get_meta("h20_primary",false)
 			for state in ["normal","hover","pressed"]: node.add_theme_stylebox_override(state,button_style(state,primary))
 			node.set_meta("regal_button_revision",revision)

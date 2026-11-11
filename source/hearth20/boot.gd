@@ -2,7 +2,7 @@ extends Control
 class_name Hearth20Boot
 ## The original full-resolution party illustration stays separate from table loading.
 const APP_SCENE := "res://hearth20_seated.tscn"
-const TITLE_ART := preload("res://hearth20/menu_art/party-original.jpg")
+const TITLE_ART := preload("res://hearth20/menu_art/party-revised.jpg")
 const SCRIM := """
 shader_type canvas_item;
 void fragment(){
@@ -41,6 +41,10 @@ func _ready() -> void:
 	artwork.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);artwork.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var detail=ShaderMaterial.new();detail.shader=preload("res://hearth20/menu_art/detail.gdshader");artwork.material=detail
 	add_child(artwork)
+	var rage:=TextureRect.new();rage.name="WarriorRage";rage.texture=preload("res://hearth20/menu_art/rage-overlay.png")
+	rage.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;rage.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	rage.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;rage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);rage.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	var rage_material:=ShaderMaterial.new();rage_material.shader=preload("res://hearth20/menu_art/rage.gdshader");rage.material=rage_material;add_child(rage)
 	var scrim=ColorRect.new();scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);scrim.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var shader=Shader.new();shader.code=SCRIM;var material=ShaderMaterial.new();material.shader=shader;scrim.material=material;add_child(scrim)
 	var margin=MarginContainer.new();margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -108,7 +112,7 @@ func _show_scene_credits() -> void:
 	dialog.ok_button_text="Return to the menu"
 	var label=RichTextLabel.new()
 	label.custom_minimum_size=Vector2(560,310)
-	label.text="Party illustration supplied by the Hearth20 creator.\n\nThe original 2752 × 1536 image is included at full resolution, with lossless texture import and a gentle display sharpening pass. No faces were replaced or redrawn.\n\nThe menu opens directly into Join, Host or saved campaigns."
+	label.text="Revised party illustration supplied by the Hearth20 creator.\n\nThe 2752 × 1536 image is preserved at full resolution. A separate AI-generated crimson mist/glow layer adds rage around the two axe-wielding warriors. Their original faces and physical artwork are retained.\n\nThe menu opens directly into Join, Host or saved campaigns."
 	dialog.add_child(label)
 	dialog.confirmed.connect(dialog.queue_free)
 	dialog.canceled.connect(dialog.queue_free)

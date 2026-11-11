@@ -82,12 +82,15 @@ static func valid_scene(scene: Variant) -> bool:
 	for collection in ["walls", "doors", "props", "fog_rects", "fx"]:
 		if not scene.get(collection, []) is Array or scene.get(collection, []).size() > MAX_RECIPE_OBJECTS:
 			return false
-	for flag in ["dynamic_lighting", "blackout"]:
+	for flag in ["dynamic_lighting", "blackout", "outdoor"]:
 		if scene.has(flag) and not scene[flag] is bool:
 			return false
 	if scene.get("ambient_light", "bright") not in ["bright", "dim", "dark"]:
 		return false
 	if scene.has("natural_light") and not Hearth20NaturalLight.valid(scene.natural_light): return false
+	if not scene.get("roof_rects",[]) is Array or scene.get("roof_rects",[]).size()>64:return false
+	for roof in scene.get("roof_rects",[]):
+		if not _valid_scene_rect(_rect_from_record(roof),scene):return false
 	if scene.has("grid_opacity") and (not _finite_number(scene.grid_opacity) or float(scene.grid_opacity)<0 or float(scene.grid_opacity)>1): return false
 	if scene.has("grid_thickness") and (not _finite_number(scene.grid_thickness) or float(scene.grid_thickness)<0.5 or float(scene.grid_thickness)>4): return false
 	if scene.has("grid_color") and (not scene.grid_color is String or not Color.html_is_valid(scene.grid_color)): return false
@@ -159,6 +162,7 @@ static func validate_campaign(campaign: Variant) -> Dictionary:
 	if not result.ok:
 		return result
 	var checked: Dictionary = campaign
+	if checked.has("map_covered") and not checked.map_covered is bool:return {"ok":false,"errors":["Invalid campaign map-cover flag."]}
 	if not _integer_number(checked.get("revision",0)) or checked.get("revision",0)<0 or checked.get("revision",0)>MAX_REVISION:
 		return {"ok":false,"errors":["Campaign revision is invalid."]}
 	var turn_budgets=checked.get("turn_remaining_feet",{})
@@ -211,6 +215,8 @@ static func validate_campaign(campaign: Variant) -> Dictionary:
 		if actor.has("vision") and not Hearth20Vision.valid_settings(actor.vision):
 			return {"ok": false, "errors": ["Actor vision settings exceed supported ranges."]}
 		if actor.has("decorative") and not actor.decorative is bool: return {"ok":false,"errors":["Invalid foreground object flag."]}
+		for field in ["display_width_cells","display_height_cells","rotation_degrees"]:
+			if actor.has(field) and (not actor.get("decorative",false) or not _finite_number(actor[field]) or (absf(float(actor[field]))>360 if field=="rotation_degrees" else float(actor[field])<0.1 or float(actor[field])>64)):return {"ok":false,"errors":["Invalid foreground display geometry."]}
 		if actor.has("in_inventory") and not actor.in_inventory is bool: return {"ok":false,"errors":["Invalid token inventory flag."]}
 		if actor.get("layer", "tokens") not in ["map", "tokens", "gm", "foreground"]:
 			return {"ok":false,"errors":["Unknown token layer."]}
@@ -435,6 +441,7 @@ static func project_for_player(campaign: Dictionary, player_id: String, map_asse
 	var scene := find_scene(campaign, str(campaign.get("active_scene", "")))
 	if scene.is_empty() or not valid_scene(scene) or not valid_identifier(player_id):
 		return {}
+	if bool(campaign.get("map_covered",false)) or bool(scene.get("blackout",false)):return covered_projection(campaign,player_id)
 	var sight := Hearth20Vision.build_view(campaign, player_id, scene)
 	var projected_actors: Array[Dictionary] = []
 	var visible_ids := {}
@@ -453,7 +460,7 @@ static func project_for_player(campaign: Dictionary, player_id: String, map_asse
 			continue
 		var token_size_value: Variant = actor.get("token_size", 1.0)
 		var token_size := clampf(float(token_size_value), 0.1, 10.0) if _finite_number(token_size_value) else 1.0
-		if actor.get("decorative",false)==true and not Hearth20BoardTools.area_visible(Rect2(actor_position-Vector2.ONE*token_size*0.5,Vector2.ONE*token_size),sight): continue
+		if actor.get("decorative",false)==true and not Hearth20BoardTools.area_visible(Hearth20TokenInventory.visual_bounds(actor),sight): continue
 		var actor_asset_id := str(actor.get("png_asset_id", ""))
 		var clean := {
 			"id": str(actor.get("id", "")) if owned else _neutral_id(player_id, str(actor.get("id", ""))), "kind": "hero" if owned else "token",
@@ -461,7 +468,10 @@ static func project_for_player(campaign: Dictionary, player_id: String, map_asse
 			"asset_id": actor_asset_id,
 			"layer": str(actor.get("layer", "tokens")),
 		}
-		if actor.get("decorative",false)==true: clean.decorative=true
+		if actor.get("decorative",false)==true:
+			clean.decorative=true
+			for field in ["display_width_cells","display_height_cells","rotation_degrees"]:
+				if actor.has(field):clean[field]=actor[field]
 		if owned:
 			var movement_value: Variant = actor.get("movement_policy", {})
 			var movement: Dictionary = movement_value if movement_value is Dictionary else {}
@@ -542,6 +552,11 @@ static func project_for_player(campaign: Dictionary, player_id: String, map_asse
 		return {}
 	var snapshot := Hearth20Identity.network_identity()
 	snapshot.merge({"revision": int(campaign.get("revision", 0)), "scene": snapshot_scene, "actors": projected_actors, "sheets": Hearth20TableData.owned_sheets(campaign, player_id), "fx": projected_fx, "map_png": map_bytes, "map_sha256": sha256(map_bytes), "assets": safe_assets, "view_actor_id":Hearth20Vision.view_actor_id(campaign,player_id,scene),"vision_mask": Hearth20Vision.public_mask(sight) if not bool(sight.blackout) else {}}, true)
+	return snapshot
+
+static func covered_projection(campaign: Dictionary, player_id: String) -> Dictionary:
+	var snapshot:=Hearth20Identity.network_identity()
+	snapshot.merge({"revision":int(campaign.get("revision",0)),"scene":{"id":"blackout","title":"The DM has covered the table","width_cells":24,"height_cells":16,"cell_pixels":64.0,"feet_per_cell":5.0,"grid_visible":false,"walls":[],"doors":[],"props":[]},"actors":[],"sheets":Hearth20TableData.owned_sheets(campaign,player_id),"fx":[],"map_png":PackedByteArray(),"map_sha256":sha256(PackedByteArray()),"assets":{},"view_actor_id":"","vision_mask":{}},true)
 	return snapshot
 
 static func _public_scene(scene: Dictionary, sight: Dictionary = {}) -> Dictionary:

@@ -27,6 +27,7 @@ var welcome_open: Button
 var toolbar: HBoxContainer
 var brand_box: VBoxContainer
 var campaign_box: VBoxContainer
+var download_meter: Hearth20MapDownloadMeter
 
 func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer, footer: PanelContainer) -> void:
 	app=owner_app
@@ -140,6 +141,9 @@ func make_button(icon_name: String, caption: String, callback: Callable) -> Butt
 	return result
 
 func _build_map_controls(overlay: Control) -> void:
+	download_meter=Hearth20MapDownloadMeter.new();download_meter.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	download_meter.offset_left=16;download_meter.offset_right=-16;download_meter.offset_top=-30;download_meter.offset_bottom=-5
+	overlay.add_child(download_meter);download_meter.setup(app.session)
 	var top:=HBoxContainer.new()
 	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	top.offset_left=16; top.offset_top=14; top.offset_right=-16; top.offset_bottom=58

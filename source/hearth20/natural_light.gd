@@ -34,7 +34,7 @@ static func prepare(lights: Array, scene: Dictionary, context: Dictionary) -> Ar
 	if not scene.has("natural_light"): return lights
 	var sky_state:=sky(scene)
 	var result: Array=[]
-	var exterior:=str(scene.get("library_id","")) in ["briarwood-crossroads","moonwater-bridge","mossfall-chapel","oldwatch-keep","saltwind-docks","willowfen-ruins","frostpass-ambush","market-of-lanterns","red-sail-sloop"]
+	var exterior:=bool(scene.get("outdoor",false)) or str(scene.get("library_id","")) in ["briarwood-crossroads","moonwater-bridge","mossfall-chapel","oldwatch-keep","saltwind-docks","willowfen-ruins","frostpass-ambush","market-of-lanterns","red-sail-sloop"]
 	var added_sky:=false
 	for original in lights:
 		var light: Dictionary=original.duplicate(true)
@@ -43,6 +43,9 @@ static func prepare(lights: Array, scene: Dictionary, context: Dictionary) -> Ar
 			var best:=1.5
 			for object in scene.get("annotations",[]):
 				if object.kind!="window" or object.points.size()<2: continue
+				if not str(light.get("window_id","")).is_empty():
+					if object.id==light.window_id:nearest=object;break
+					continue
 				var center: Vector2=(object.points[0]+object.points[-1])*0.5
 				var distance: float=center.distance_to(light.position)
 				if distance<best: best=distance; nearest=object
@@ -81,6 +84,10 @@ static func prepare(lights: Array, scene: Dictionary, context: Dictionary) -> Ar
 	return result
 
 static func _roofs(scene: Dictionary) -> Array:
+	if scene.has("roof_rects"):
+		var roofs: Array=[]
+		for record in scene.roof_rects:roofs.append(Hearth20Contracts._rect_from_record(record))
+		return roofs
 	match str(scene.get("library_id","")):
 		"oldwatch-keep": return [Rect2(4.8,3.75,7.2,7.2),Rect2(21,3.75,7.15,7.2)]
 		"saltwind-docks": return [Rect2(2,3,10,13)]

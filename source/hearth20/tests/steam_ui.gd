@@ -29,7 +29,15 @@ func run() -> void:
 	expect(link.initialized and window.nickname.text=="Fixture Adventurer","Connect fills an empty display name from Steam")
 	window.steam_host.pressed.emit();api.lobby_created.emit(1,109775240000000001);await process_frame;await process_frame
 	expect(not window.copy_button.disabled and window.friend_list.item_count==2,"host gets copyable invitation and a friend list")
-	expect(window.invite_button.disabled,"missing overlay keeps its button disabled")
+	expect(not window.invite_button.disabled and window.invite_button.visible,"Quick invite remains available without Steam overlay")
+	window.quick_invite();await process_frame
+	expect(window.host_tools.visible and window.friend_search.has_focus(),"Quick invite focuses name search when overlay is unavailable")
+	window.friend_search.text="AuReL";window.friend_search.text_changed.emit("AuReL")
+	expect(window.friend_list.item_count==1 and window.friend_list.get_item_text(0)=="Aurelia","friend names filter without case sensitivity or scrolling")
+	window.friend_search.text_submitted.emit("AuReL");await process_frame
+	expect(window.invitation_sent and window.invite_button.visible,"Quick invite stays available after inviting one player")
+	api.overlay=true;window.invite_button.pressed.emit()
+	expect(api.calls.any(func(value):return value[0]=="overlay" and value[1]==link.lobby_id),"available Steam overlay opens for the exact hosted lobby")
 	window.friend_list.select(0);window.friend_list.item_selected.emit(0);window.friend_invite.pressed.emit()
 	expect(api.calls.any(func(value):return value[0]=="invite"),"friend-list fallback sends an invite without invoking overlay")
 	expect(window.direct_host.disabled and window.direct_join.disabled,"active Steam table cannot be silently replaced by Direct IP")

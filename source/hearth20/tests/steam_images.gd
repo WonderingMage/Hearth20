@@ -28,7 +28,23 @@ func run() -> void:
 	var masked=view.duplicate(true);masked.map_png=png(Color.BLACK);masked.map_sha256=Hearth20Contracts.sha256(masked.map_png)
 	var changed=server.encode(masked);expect(not changed.get("map_cached",false) and changed.map_png==masked.map_png,"a newly redacted map cannot reuse the previous map")
 	server.remember(masked,true);client.remember(masked)
-	expect(not server.encode(view).get("map_cached",false),"only the last authorized map is retained")
+	expect(server.encode(view).get("map_cached",false),"returning to a recently authorized map reuses its exact image")
+	var legacy=Hearth20SteamImages.new();legacy.protocol_version=1;legacy.remember(view,true);legacy.remember(masked,true)
+	expect(not legacy.encode(view).get("map_cached",false),"legacy cache-v1 peers keep their original single-map behavior")
+	var lit=view.duplicate(true);lit.scene={"id":"page-a","light_field":{"width":64,"height":64,"codec":"rgb8-deflate-v1","data":PackedByteArray([1,2,3,4])}}
+	server.remember(lit,true);client.remember(lit)
+	var dark=lit.duplicate(true);dark.scene={"id":"blackout"};dark.map_png=PackedByteArray();dark.map_sha256=Hearth20Contracts.sha256(dark.map_png);dark.assets={};dark.actors=[]
+	server.remember(dark,true);client.remember(dark)
+	var compact_lit=server.encode(lit)
+	expect(compact_lit.get("light_cached",false) and compact_lit.scene.light_field.is_empty(),"reveal omits previously delivered lighting as well as the map")
+	var decoded_lit=client.decode(compact_lit)
+	expect(decoded_lit.ok and decoded_lit.snapshot.scene.light_field==lit.scene.light_field,"the exact retained authorized lighting is restored")
+	var missing_light=compact_lit.duplicate(true);missing_light.light_field_digest="0".repeat(64)
+	expect(not client.decode(missing_light).ok,"unknown lighting references fail closed")
+	for n in 7:
+		var map=png(Color(float(n)/7.,.4,.6));server.remember({"map_png":map,"map_sha256":Hearth20Contracts.sha256(map)},true)
+	expect(server.maps.size()==Hearth20SteamImages.MAP_COUNT and server.maps_bytes<=Hearth20SteamImages.MAP_LIMIT,"retained map references have explicit count and byte budgets")
+	server.remember(masked,true)
 	var missing=delta.duplicate(true);missing.asset_ids=["sha256-"+"f".repeat(64)]
 	expect(not client.decode(missing).ok,"unknown references cannot manufacture unseen assets")
 	missing=delta.duplicate(true);missing.asset_ids=[b,b];expect(not client.decode(missing).ok,"duplicate references are rejected")

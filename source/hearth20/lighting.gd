@@ -7,6 +7,7 @@ static var field_cache: Dictionary={}
 static var projected_field_cache={}
 
 static func valid_source(value: Dictionary) -> bool:
+	if value.has("window_id") and (not value.window_id is String or not Hearth20Contracts.valid_identifier(value.window_id)):return false
 	if value.get("source_type","torch") not in SOURCE_TYPES: return false
 	if not value.get("light_color",value.get("color","#ffcd8e")) is String or not Color.html_is_valid(str(value.get("light_color",value.get("color","#ffcd8e")))): return false
 	for field in ["angle_degrees","spread_degrees","ray_strength"]:
@@ -21,7 +22,7 @@ static func valid_source(value: Dictionary) -> bool:
 	return true
 
 static func source(position: Vector2, bright: float, dim: float, metadata: Dictionary={}) -> Dictionary:
-	return {"position":position,"bright":bright,"dim":dim,"type":str(metadata.get("source_type","torch")),"angle":float(metadata.get("angle_degrees",0)),"spread":float(metadata.get("spread_degrees",360)),"strength":float(metadata.get("ray_strength",0.55)),"color":str(metadata.get("light_color",metadata.get("color","#ffcd8e"))),"portal_width":float(metadata.get("portal_width",6.0)),"window_height":float(metadata.get("window_height",7.0)),"sill_height":float(metadata.get("sill_height",3.0))}
+	return {"position":position,"bright":bright,"dim":dim,"type":str(metadata.get("source_type","torch")),"angle":float(metadata.get("angle_degrees",0)),"spread":float(metadata.get("spread_degrees",360)),"strength":float(metadata.get("ray_strength",0.55)),"color":str(metadata.get("light_color",metadata.get("color","#ffcd8e"))),"portal_width":float(metadata.get("portal_width",6.0)),"window_height":float(metadata.get("window_height",7.0)),"sill_height":float(metadata.get("sill_height",3.0)),"window_id":str(metadata.get("window_id",""))}
 
 static func inside_cone(point: Vector2, light: Dictionary) -> bool:
 	if float(light.get("spread",360))>=359.99: return true

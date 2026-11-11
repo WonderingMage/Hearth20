@@ -36,7 +36,7 @@ func run() -> void:
 	# Exported image paths remap to lossless texture containers, not raw JPG bytes.
 	# Compare every decoded pixel instead; the source JPG hash is in build evidence.
 	var original_pixels=boot.artwork.texture.get_image();original_pixels.clear_mipmaps();original_pixels.convert(Image.FORMAT_RGB8)
-	expect(Hearth20Contracts.sha256(original_pixels.get_data())=="3a6011810945d03698e0aeea09039f69cdaabc45ee025061b3dfc315c812eb19","every decoded image pixel matches the supplied original; no face replacement")
+	expect(Hearth20Contracts.sha256(original_pixels.get_data())=="90f1bdb451a2831cc2026c0056082722241bcec749cfb144e818d26bccbda6a7","every decoded base-image pixel matches the revised JPG; no face replacement")
 	original_pixels=null
 	expect(boot.find_children("*","SubViewport",true,false).is_empty(),"the menu does not render an unused 3D showcase")
 	await click(boot.find_child("JoinTable",true,false));await click(boot.find_child("HostTable",true,false))

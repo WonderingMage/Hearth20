@@ -56,6 +56,7 @@ class Api extends Node:
 	var pending=0
 	var unacknowledged=0
 	var send_rate=262144
+	var overlay=false
 	func isSteamRunning() -> bool:return running
 	func steamInitEx(id: int,embed: bool) -> Dictionary:calls.append(["init",id,embed]);return {"status":init_status}
 	func loggedOn() -> bool:return online
@@ -76,7 +77,7 @@ class Api extends Node:
 	func setLobbyMemberLimit(_id: int,_count: int) -> bool:return true
 	func setLobbyJoinable(_id: int,_value: bool) -> bool:return true
 	func requestLobbyData(id: int) -> bool:calls.append(["data",id]);return true
-	func isOverlayEnabled() -> bool:return false
+	func isOverlayEnabled() -> bool:return overlay
 	func activateGameOverlayInviteDialog(id: int) -> void:calls.append(["overlay",id])
 	func getFriendCount(_flags: int) -> int:return 2
 	func getFriendByIndex(index: int,_flags: int) -> int:return 76561198000000002+index
