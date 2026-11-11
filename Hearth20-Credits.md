@@ -4,6 +4,25 @@ Original foundation: Hearthtable (CC0), retained in THIRD_PARTY/Hearthtable-CC0.
 
 
 
+hearth20/menu_art/CREDITS.md
+
+# Menu artwork
+
+The party illustration was supplied by the Hearth20 creator as
+`Gemini_Generated_Image_st9h1vst9h1vst9h.jpg`.
+
+`party-original.jpg` is a byte-for-byte copy of that original 2752 × 1536 JPG.
+Its faces, composition and colors were not repainted. The supplied portrait
+reference and the rejected AI face edit are not included in the application.
+
+The image imports losslessly with mipmaps. A mild, range-limited display shader
+sharpens existing detail; it does not generate new facial detail or claim to
+recover information absent from the original image.
+
+
+The following title-desert prototype is retained only in the source archive; it is not the released menu or a portable runtime asset.
+
+
 hearth20/title_desert/CREDITS.md
 
 # The Amber Wastes

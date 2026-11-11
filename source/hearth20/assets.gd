@@ -25,6 +25,8 @@ static func inspect_map_file(path: String) -> Dictionary:
 		return {"ok": false, "error": "Map image must have a readable PNG or JPEG header."}
 	if not _dimensions_ok_values(header_dimensions.x, header_dimensions.y, MAP_MAX_SIDE, MAP_MAX_PIXELS):
 		return {"ok": false, "error": "Map image dimensions exceed the declared 16,384-side or 67,108,864-pixel limit."}
+	var metadata := Hearth20MapMetadata.read(bytes,header_dimensions)
+	if not metadata.ok:return metadata
 	var image := Image.new()
 	var error=image.load_png_from_buffer(bytes) if bytes.slice(0,8)==PackedByteArray(PNG_SIGNATURE) else image.load_jpg_from_buffer(bytes)
 	if error != OK:
@@ -34,7 +36,7 @@ static func inspect_map_file(path: String) -> Dictionary:
 	var png := image.save_png_to_buffer()
 	if png.is_empty() or png.size() > MAP_MAX_BYTES:
 		return {"ok": false, "error": "Decoded map image could not be stored within the image limit."}
-	return {"ok": true, "bytes": png, "sha256": sha256(png), "width": image.get_width(), "height": image.get_height(), "mime_type": "image/png", "original_name": path.get_file().left(128)}
+	return {"ok": true, "bytes": png, "sha256": sha256(png), "width": image.get_width(), "height": image.get_height(), "mime_type": "image/png", "original_name": path.get_file().left(128),"grid":metadata.grid}
 
 static func inspect_token_png(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):

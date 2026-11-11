@@ -1454,36 +1454,86 @@ func _on_map_selected(path: String) -> void:
 		_on_status("Map import failed: %s" % result.get("error", "unknown error"))
 		return
 	_mark_scene_recovery_revision(previous_revision)
+	if result.get("auto_calibrated",false):
+		grid_cells_edit.value=int(result.calibration_width_cells)
+		_on_status("Map ready · %d × %d cells · %s ft per cell. Grid scale read from the image."%[int(result.calibration_width_cells),int(result.height_cells),str(result.feet_per_cell)])
+		_update_grid_state()
+		return
 	_on_status("Map imported (%d × %d px). Set its grid scale to finish setup." % [int(result.width), int(result.height)])
 	_update_grid_state()
 	_calibrate_prompt()
 
-func _calibrate_prompt() -> void:
-	var dialog := AcceptDialog.new()
+func _calibrate_prompt() -> AcceptDialog:
+	var dialog_owner: Node = seated_shell if is_instance_valid(seated_shell) else self
+	var existing := dialog_owner.get_node_or_null("GridCalibration") as AcceptDialog
+	if is_instance_valid(existing) and not existing.is_queued_for_deletion():
+		Hearth20Design.popup_window(existing)
+		return existing
+	var dialog := ConfirmationDialog.new()
+	dialog.name = "GridCalibration"
 	dialog.title = "Grid calibration"
+	dialog.theme = Hearth20Design.theme()
+	dialog.dialog_hide_on_ok = false
+	dialog.ok_button_text = "Apply grid"
+	dialog.cancel_button_text = "Keep current grid"
+	# A wrapped label with no initial width can report one word per line and
+	# expand an AcceptDialog beyond the screen before its first layout pass.
+	# Bound the content with a scroll region; the native action footer stays out.
+	var available := get_tree().root.size - Vector2i(48, 96)
+	var content_width := clampi(available.x - 40, 240, 440)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(content_width, mini(172, maxi(80, available.y - 100)))
+	dialog.add_child(scroll)
 	var form := VBoxContainer.new()
+	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	form.custom_minimum_size.x = content_width
+	form.add_theme_constant_override("separation", 12)
+	scroll.add_child(form)
 	var description := Label.new()
 	description.text = "Set how many 5-foot cells span the imported map's width. Height follows the image aspect ratio."
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	form.add_child(description)
 	var cells := SpinBox.new()
+	cells.name = "WidthCells"
 	cells.min_value = 1
 	cells.max_value = 256
 	cells.step = 1
 	cells.value = int(board.current_scene().get("calibration_width_cells", board.current_scene().get("width_cells", 24)))
 	grid_cells_edit.value = cells.value
 	form.add_child(cells)
-	dialog.add_child(form)
+	Hearth20Design.track_number(cells)
+	var error_label := Label.new()
+	error_label.name = "ValidationError"
+	error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	error_label.add_theme_color_override("font_color", Color("#ffb896"))
+	form.add_child(error_label)
 	dialog.confirmed.connect(func():
+		var valid := Hearth20Design.commit_numbers([cells])
+		if not valid.ok:
+			error_label.text = str(valid.error)
+			cells.get_line_edit().grab_focus()
+			return
 		var previous_revision := int(campaign.get("revision", 0))
 		var outcome: Dictionary = board.calibrate_map_width(int(cells.value))
 		_on_status(outcome.get("error", "Map calibration saved at %.2f px per cell." % float(outcome.get("cell_pixels", 0.0))))
 		if outcome.get("ok", false):
 			_mark_scene_recovery_revision(previous_revision)
 			_update_grid_state()
+			dialog.queue_free()
+		else:
+			error_label.text = str(outcome.get("error", "Could not calibrate this map."))
 	)
-	add_child(dialog)
-	dialog.popup_centered(Vector2i(380, 170))
+	var keep_current := func():
+		_on_status("Map imported with its current grid. You can adjust the grid from the map toolbar.")
+		dialog.queue_free()
+	dialog.canceled.connect(keep_current)
+	dialog.close_requested.connect(keep_current)
+	dialog_owner.add_child(dialog)
+	dialog.size = Vector2i(content_width + 40, mini(280, maxi(180, available.y)))
+	Hearth20Design.popup_window(dialog)
+	cells.get_line_edit().grab_focus.call_deferred()
+	return dialog
 
 func _toggle_grid_snap() -> void:
 	var enabled: bool = board.toggle_snap_to_grid()

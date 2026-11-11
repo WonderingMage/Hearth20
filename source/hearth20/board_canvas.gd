@@ -695,17 +695,23 @@ func import_map(path: String) -> Dictionary:
 	var scene := current_scene()
 	if scene.is_empty():
 		return {"ok": false, "error": "Create a scene first."}
+	var grid: Dictionary=inspected.get("grid",{})
+	var target_cells := int(grid.get("width_cells",maxi(1,int(scene.get("calibration_width_cells",scene.get("width_cells",24))))))
+	if grid.is_empty():target_cells=mini(target_cells,maxi(1,floori(256.0*float(inspected.width)/float(inspected.height))))
+	var target_height := ceili(float(inspected.height)/(float(inspected.width)/float(target_cells)))
+	if target_height>256:return {"ok":false,"error":"Map is too tall for square cells. Crop or pad the image so it fits within 256 cells."}
 	var asset_id := Hearth20Assets.store_asset(campaign, inspected, "map")
 	if asset_id.is_empty():
 		return {"ok": false, "error": "Map image could not be stored."}
 	# The DM calibrates by setting the number of cells spanning the image width.
-	var target_cells := maxi(1, int(scene.get("calibration_width_cells", scene.get("width_cells", 24))))
 	scene.cell_pixels = float(inspected.width) / float(target_cells)
 	scene.width_cells = target_cells
 	scene.height_cells = maxi(1, ceili(float(inspected.height) / float(scene.cell_pixels)))
 	scene.map_asset = asset_id
 	scene.map_width = int(inspected.width)
 	scene.map_height = int(inspected.height)
+	scene.calibration_width_cells = target_cells
+	if not grid.is_empty():scene.feet_per_cell=float(grid.feet_per_cell)
 	campaign.revision = int(campaign.get("revision", 0)) + 1
 	actor_image_cache.clear()
 	map_texture_cache = null
@@ -714,7 +720,7 @@ func import_map(path: String) -> Dictionary:
 	queue_redraw()
 	if session and session.local_role == "dm":
 		session._broadcast_snapshots()
-	return {"ok": true, "sha256": inspected.sha256, "width": inspected.width, "height": inspected.height, "calibration_width_cells": target_cells}
+	return {"ok": true, "sha256": inspected.sha256, "width": inspected.width, "height": inspected.height, "calibration_width_cells": target_cells,"auto_calibrated":not grid.is_empty(),"height_cells":target_height,"feet_per_cell":scene.feet_per_cell}
 
 func calibrate_map_width(cells: int) -> Dictionary:
 	if role != "dm" or cells < 1 or cells > 256:
@@ -723,6 +729,8 @@ func calibrate_map_width(cells: int) -> Dictionary:
 	var image := _map_image()
 	if scene.is_empty() or image == null:
 		return {"ok": false, "error": "Import a map before calibrating it."}
+	if ceili(float(image.get_height())/(float(image.get_width())/float(cells)))>256:
+		return {"ok":false,"error":"This scale makes the map taller than 256 cells. Choose fewer width cells."}
 	scene.calibration_width_cells = cells
 	scene.cell_pixels = float(image.get_width()) / float(cells)
 	scene.width_cells = cells

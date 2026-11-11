@@ -6,15 +6,19 @@ A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&
 
 Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.12](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.12-beta)
 
-## The Amber Wastes
+## Gather around the new menu
 
-![Animated tarrasque title](screenshots/title.png)
+![Party illustration with Join and Host controls](screenshots/title.png)
 
-Join and Host lead the opening menu. An articulated tarrasque breathes, shifts its weight, turns its head and moves its tail above a windblown orange desert. Small travelers and a ruined gate establish its scale. Amber irises and slit pupils, ivory teeth, gums, tongue, throat, horns and claws have their own skinned surfaces and finishes.
+Join and Host lead the opening menu over the creator's supplied fantasy party illustration. The original 2752 × 1536 JPG is retained at full resolution with lossless texture import and gentle display sharpening. Character faces and artwork are preserved. No generated face replacement is used.
 
-The creature and foreground render in 3D. The distant landscape uses an illustrated matte. The scene has a bounded render resolution and releases its viewport when the table opens. Retired rotating-showcase assets are excluded from portable exports.
+The title has saved campaigns, the illustrated host/join guide, Settings and artwork information. It loads directly into the seated table and releases its artwork node on transition. Retired creature showcases and the unused 3D title scene are excluded from portable exports.
 
-The tarrasque adapts Miguel Zavala's credited sculpt and rig, with new runtime preparation, animation and materials. Scene credits are available from the title menu. The source archive includes the Blender authoring source, preparation script, texture import settings and generation prompts.
+## Maps that know their size
+
+Generated PNG maps can carry a small `Hearth20.Map` text record containing their width, height and feet per cell. Importing a correctly stamped map sets its scale automatically and skips the calibration dialog. The scale persists in campaign saves. Existing PNG/JPEG files retain manual calibration in a bounded, scrollable window whose action buttons stay reachable.
+
+The [custom map guide](Hearth20-Custom-Map-Guide.md) gives another ChatGPT agent detailed artwork, scale, lighting, coordinate, asset, metadata and validation instructions. The full source includes `tools/stamp_map.py`, which adds size metadata while preserving image pixels. PNG metadata currently sets grid scale; separate wall/light plans require setup or source integration.
 
 ## Gather your party
 

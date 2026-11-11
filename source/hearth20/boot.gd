@@ -1,7 +1,8 @@
 extends Control
 class_name Hearth20Boot
-## Join and Host render before the title creature or the tabletop is loaded.
+## The original full-resolution party illustration stays separate from table loading.
 const APP_SCENE := "res://hearth20_seated.tscn"
+const TITLE_ART := preload("res://hearth20/menu_art/party-original.jpg")
 const SCRIM := """
 shader_type canvas_item;
 void fragment(){
@@ -10,7 +11,7 @@ void fragment(){
     COLOR=vec4(.026,.018,.012,clamp(shade+edge,0.,.96));
 }
 """
-var desert: Hearth20TitleDesert
+var artwork: TextureRect
 var heading: Label
 var progress: ProgressBar
 var progress_note: Label
@@ -34,7 +35,12 @@ func _ready() -> void:
 	if not Hearth20MultiplayerLab.child_slot().is_empty():get_tree().change_scene_to_file.call_deferred(APP_SCENE);return
 	Hearth20Regal.load_preference();theme=Hearth20Design.theme()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	desert=Hearth20TitleDesert.new();desert.name="LivingDesert";add_child(desert)
+	artwork=TextureRect.new();artwork.name="PartyArtwork";artwork.texture=TITLE_ART
+	artwork.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;artwork.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	artwork.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	artwork.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);artwork.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	var detail=ShaderMaterial.new();detail.shader=preload("res://hearth20/menu_art/detail.gdshader");artwork.material=detail
+	add_child(artwork)
 	var scrim=ColorRect.new();scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);scrim.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var shader=Shader.new();shader.code=SCRIM;var material=ShaderMaterial.new();material.shader=shader;scrim.material=material;add_child(scrim)
 	var margin=MarginContainer.new();margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -70,7 +76,7 @@ func _ready() -> void:
 	progress_note=_label("",13);progress_note.hide();column.add_child(progress_note)
 	var footer=HBoxContainer.new();column.add_child(footer)
 	var version=_label("BETA  /  "+Hearth20Identity.VERSION,11);version.size_flags_horizontal=Control.SIZE_EXPAND_FILL;footer.add_child(version)
-	var place=_label("THE AMBER WASTES    /    TARRASQUE",11);place.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;footer.add_child(place)
+	var place=_label("YOUR PARTY.    YOUR LEGEND.",11);place.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;footer.add_child(place)
 	Hearth20Regal.sync(self)
 	RenderingServer.frame_post_draw.connect(_on_first_title_draw,CONNECT_ONE_SHOT)
 
@@ -78,7 +84,6 @@ func _on_first_title_draw() -> void:
 	menu_drawn_msec=Time.get_ticks_msec()
 	Hearth20Updater.confirm_startup()
 	get_node("/root/Updates").startup_check()
-	desert.start_pending()
 	if get_node("/root/SteamLink").pending_invite>0:begin_loading("join")
 
 func _label(text_value: String,points: int,serif: bool=false) -> Label:
@@ -97,13 +102,13 @@ func _unhandled_key_input(_event: InputEvent) -> void:
 
 func _show_scene_credits() -> void:
 	var dialog=AcceptDialog.new()
-	dialog.title="The Amber Wastes · Scene credits"
+	dialog.title="Hearth20 · Menu artwork"
 	dialog.theme=theme
 	dialog.size=Vector2i(620,410)
-	dialog.ok_button_text="Return to the wastes"
+	dialog.ok_button_text="Return to the menu"
 	var label=RichTextLabel.new()
 	label.custom_minimum_size=Vector2(560,310)
-	label.text="Tarrasque Updated\nMiguel Zavala · mz4250\nCreative Commons Attribution\n\nSculpt and original rig by the credited creator. Hearth20 adds runtime preparation, cavity shading, materials and the skeletal idle animation.\n\nhttps://www.printables.com/model/50569-tarrasque-updated\n\nHide, sand textures and the distant landscape were generated with AI. The creature, foreground, lighting and moving sand render in 3D."
+	label.text="Party illustration supplied by the Hearth20 creator.\n\nThe original 2752 × 1536 image is included at full resolution, with lossless texture import and a gentle display sharpening pass. No faces were replaced or redrawn.\n\nThe menu opens directly into Join, Host or saved campaigns."
 	dialog.add_child(label)
 	dialog.confirmed.connect(dialog.queue_free)
 	dialog.canceled.connect(dialog.queue_free)

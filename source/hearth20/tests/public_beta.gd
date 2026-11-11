@@ -11,7 +11,8 @@ func run() -> void:
 	expect(not Hearth20MultiplayerLab.enabled(),"multiplayer lab disabled")
 	expect(not ResourceLoader.exists("res://hearth20/tests/multiplayer_lab_title.gd"),"debug test scripts excluded from public package")
 	expect(not ResourceLoader.exists("res://hearth20/bestiary/catalog.json"),"retired startup showcases are excluded from the portable")
-	expect(ResourceLoader.exists(Hearth20TitleDesert.CREATURE_PATH,"PackedScene"),"the new tarrasque title model is bundled")
+	expect(ResourceLoader.exists("res://hearth20/menu_art/party-original.jpg","Texture2D"),"the supplied party artwork is bundled")
+	expect(not ResourceLoader.exists(Hearth20TitleDesert.CREATURE_PATH,"PackedScene"),"unused title creature assets are excluded")
 	var boot=Hearth20Boot.new();root.add_child(boot);await create_timer(.8).timeout
 	expect(not boot.debug_enabled,"title has no debug creature controls")
 	expect(boot.find_children("*","Button",true,false).all(func(b):return not ("debug" in b.text.to_lower()) and not ("multiplayer lab" in b.text.to_lower())),"title buttons are player-facing")
