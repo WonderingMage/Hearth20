@@ -42,7 +42,7 @@ func setup(owner_app: Hearth20App) -> void:
 	var size_label:=Label.new(); size_label.text="Token size · grid squares"; detail.add_child(size_label)
 	token_size=SpinBox.new(); token_size.min_value=.25; token_size.max_value=4; token_size.step=.25; detail.add_child(token_size)
 	shown=CheckBox.new(); shown.text="Visible to players with sight"; detail.add_child(shown)
-	_button("Choose token image…",func(): app.token_dialog.popup_centered_ratio(.75),detail)
+	_button("Choose token image…",func(): app._open_token_dialog(selected_id),detail)
 	_button("Apply appearance",_apply,detail)
 	var grant_label:=Label.new(); grant_label.text="CONTROLLED BY"; detail.add_child(grant_label)
 	controller=OptionButton.new();controller.fit_to_longest_item=false; detail.add_child(controller)

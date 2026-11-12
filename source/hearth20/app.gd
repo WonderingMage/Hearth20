@@ -28,6 +28,7 @@ var join_secret: LineEdit
 var player_name: LineEdit
 var map_dialog: FileDialog
 var token_dialog: FileDialog
+var token_image_actor_id := ""
 var recipe_current: Dictionary = {}
 var remote_players: Dictionary = {}
 var empty_state_label: Label
@@ -344,8 +345,14 @@ func _build_ui() -> void:
 	token_files.access = FileDialog.ACCESS_FILESYSTEM
 	token_files.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	token_files.add_filter("*.png", "PNG token image")
+	token_files.title="Hearth20 · Choose token image"
+	token_files.use_native_dialog=OS.get_name()=="Windows"
+	token_files.transient=true
+	token_files.transient_to_focused=false
 	token_files.file_selected.connect(_on_token_selected)
-	add_child(token_files)
+	token_files.canceled.connect(_cancel_token_dialog);token_files.close_requested.connect(_cancel_token_dialog)
+	# File pickers must belong to the real window, not the rendered map SubViewport.
+	(seated_shell if seated_shell!=null else self).add_child(token_files)
 	token_dialog = token_files
 	shell=Hearth20Shell.new()
 	add_child(shell)
@@ -1578,14 +1585,27 @@ func _update_grid_state() -> void:
 	grid_display_button.text = "Hide square grid" if grid_visible else "Show square grid"
 	grid_snap_button.text = "Turn snapping off" if snapping else "Turn snapping on"
 
-func _open_token_dialog() -> void:
-	if board.role == "dm":
-		token_dialog.popup_centered_ratio(0.7)
+func _open_token_dialog(actor_id: String="") -> void:
+	if session.local_role!="dm" or board.role!="dm":return
+	var target=actor_id if not actor_id.is_empty() else board.selected_actor_id
+	if Hearth20Contracts.find_actor(campaign,target).is_empty():_on_status("Select a token before choosing its image.");return
+	if seated_shell!=null and seated_shell.focus_state=="table":seated_shell.focus_map()
+	token_image_actor_id=target
+	token_dialog.exclusive=true
+	token_dialog.popup_centered_ratio(0.7)
+
+func _cancel_token_dialog() -> void:
+	if is_instance_valid(token_dialog):token_dialog.hide();token_dialog.exclusive=false
+	token_image_actor_id=""
+	_on_status("Token image selection cancelled. Appearance unchanged.")
 
 func _on_token_selected(path: String) -> void:
-	var result: Dictionary = board.attach_token_png(path)
+	var target=token_image_actor_id;token_image_actor_id=""
+	if is_instance_valid(token_dialog):token_dialog.hide();token_dialog.exclusive=false
+	if session.local_role!="dm" or target.is_empty():return
+	var result: Dictionary = board.attach_token_png(path,target)
 	_refresh_token_inspector()
-	_on_status("PNG override saved: %s" % result.get("sha256", result.get("error", "failed")))
+	_on_status("Token image saved: "+path.get_file() if result.ok else str(result.get("error","Unable to change the token image.")))
 
 func _toggle_fog() -> void:
 	board.set_fog_tool(not board.fog_tool)

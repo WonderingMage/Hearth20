@@ -765,13 +765,15 @@ func add_token(name: String, hero: bool = false, position: Vector2 = Vector2(4, 
 		session._broadcast_snapshots()
 	return id
 
-func attach_token_png(path: String) -> Dictionary:
-	if selected_actor_id.is_empty():
+func attach_token_png(path: String, target_id: String="") -> Dictionary:
+	if role!="dm":return {"ok":false,"error":"Only the DM changes token images."}
+	var actor_id=target_id if not target_id.is_empty() else selected_actor_id
+	if actor_id.is_empty():
 		return {"ok": false, "error": "Select a token first."}
 	var result := Hearth20Assets.inspect_token_png(path)
 	if not result.ok:
 		return result
-	var attached := Hearth20Assets.attach_token_override(campaign, selected_actor_id, result.bytes, result.name)
+	var attached := Hearth20Assets.attach_token_override(campaign, actor_id, result.bytes, result.name)
 	if attached.ok:
 		actor_image_cache.clear()
 		queue_redraw()
