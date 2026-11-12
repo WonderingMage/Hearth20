@@ -122,6 +122,8 @@ var dice_stage: Hearth20DiceStage
 var connection_window: Window
 var connection_signature=""
 var map_tabs: Hearth20MapTabs
+var autosave: Hearth20Autosave
+var autosave_indicator: Hearth20AutosaveIndicator
 
 func open_token_inventory() -> Hearth20TokenInventoryWindow:
 	if session.local_role!="dm": return null
@@ -157,6 +159,9 @@ func _ready() -> void:
 	session.snapshot_received.connect(_on_snapshot)
 	session.state_changed.connect(_on_host_state)
 	_build_ui()
+	autosave=Hearth20Autosave.new();add_child(autosave);autosave.setup(self)
+	autosave_indicator=Hearth20AutosaveIndicator.new()
+	(seated_shell if seated_shell!=null else self).add_child(autosave_indicator);autosave_indicator.setup(self,autosave)
 	dice_stage=Hearth20DiceStage.new(); dice_stage.z_index=100; add_child(dice_stage); dice_stage.setup(session)
 	casino_portal=Hearth20CasinoPortal.new();add_child(casino_portal);casino_portal.setup(self)
 	multiplayer_lab=Hearth20MultiplayerLab.new();add_child(multiplayer_lab);multiplayer_lab.setup(self)
@@ -1771,6 +1776,7 @@ func install_loaded_campaign(loaded_campaign: Dictionary,source_path="") -> Dict
 	vision_render_signature = ""
 	session.configure(campaign)
 	board.set_campaign(campaign, session, "dm")
+	if autosave!=null:autosave.reset_clock()
 	_update_session_ui()
 	_on_status("Hearth20 campaign loaded from the separate Hearth20 save root.")
 	return {"ok":true}

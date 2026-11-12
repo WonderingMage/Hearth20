@@ -1549,7 +1549,8 @@ func _pump_background_maps() -> void:
 			if slot.queue.is_empty():dry+=1;continue
 			slot.active=slot.queue.pop_front();var resumed: Dictionary=slot.files.get(slot.active,{})
 			slot.offset=int(resumed.get("offset",0));slot.acked=int(resumed.get("acked",0))
-		if int(slot.offset)-int(slot.acked)>=4*1024*1024 or (transport=="steam" and not steam_link.can_send(peer)):dry+=1;continue
+		var window=steam_link.bulk_window(peer) if transport=="steam" and steam_link.has_method("bulk_window") else 4*1024*1024
+		if int(slot.offset)-int(slot.acked)>=window or (transport=="steam" and not steam_link.can_send(peer)):dry+=1;continue
 		var record={}
 		for candidate in map_stream.records.values():
 			if candidate.id==slot.active:record=candidate;break

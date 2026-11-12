@@ -44,14 +44,15 @@ func setup() -> void:
 func _process(_delta: float) -> void:
 	if listing==null or not listing.done():return
 	var records: Array=listing.finish();listing=null
+	if action=="save":records=records.filter(func(record):return not record.get("autosave",false))
 	status.text="%d saved table%s · stored in this PC’s AppData"%[records.size(),"" if records.size()==1 else "s"]
 	if records.is_empty():label(rows,"Your adventures will appear here after their first save.",15)
 	for record in records:
 		var item=button(rows,"",func():select_record(record));item.custom_minimum_size.y=78;item.disabled=record.get("invalid",false)
 		item.set_meta("save_path",str(record.path))
-		var copy=VBoxContainer.new();copy.mouse_filter=Control.MOUSE_FILTER_IGNORE;copy.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);copy.offset_left=14;copy.offset_right=-14;copy.offset_top=9;copy.offset_bottom=-9;item.add_child(copy)
-		var title_copy=label(copy,str(record.get("title","Untitled table")),18);title_copy.mouse_filter=Control.MOUSE_FILTER_IGNORE;title_copy.max_lines_visible=1;title_copy.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
-		var meta=label(copy,str(record.get("scene",""))+"  ·  "+saved_time(int(record.get("saved_at",0))),12);meta.mouse_filter=Control.MOUSE_FILTER_IGNORE;meta.max_lines_visible=1;meta.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+		var copy=VBoxContainer.new();copy.mouse_filter=Control.MOUSE_FILTER_IGNORE;copy.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);copy.offset_left=14;copy.offset_right=-14;copy.offset_top=9;copy.offset_bottom=-9;copy.add_theme_constant_override("separation",6);item.add_child(copy)
+		var title_copy=label(copy,("Autosave · " if record.get("autosave",false) else "")+str(record.get("title","Untitled table")),18);title_copy.mouse_filter=Control.MOUSE_FILTER_IGNORE;title_copy.autowrap_mode=TextServer.AUTOWRAP_OFF;title_copy.custom_minimum_size.y=26;title_copy.max_lines_visible=1;title_copy.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+		var meta=label(copy,str(record.get("scene",""))+"  ·  "+saved_time(int(record.get("saved_at",0))),12);meta.mouse_filter=Control.MOUSE_FILTER_IGNORE;meta.autowrap_mode=TextServer.AUTOWRAP_OFF;meta.custom_minimum_size.y=18;meta.max_lines_visible=1;meta.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;meta.add_theme_color_override("font_color",Hearth20Regal.swatch(Hearth20Regal.MUTED))
 		if app!=null and record.path==app.current_save_path:select_record(record)
 	refresh_primary()
 func saved_time(value: int) -> String:return Time.get_datetime_string_from_unix_time(value+int(Time.get_time_zone_from_system().bias)*60).replace("T","  ")

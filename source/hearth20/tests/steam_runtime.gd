@@ -13,7 +13,7 @@ func run() -> void:
 	var peer=ClassDB.instantiate("SteamMultiplayerPeer");peer.transfer_channel=2
 	expect(peer.transfer_channel==2,"native peer accepts the dedicated background-map channel without signing in")
 	var native=Engine.get_singleton("Steam")
-	for name_value in ["steamInitEx","run_callbacks","createLobby","joinLobby","leaveLobby","getLobbyData","setLobbyData","inviteUserToLobby","getConnectionRealTimeStatus","setGlobalConfigValueInt32"]:expect(native.has_method(name_value),"native API is present: "+name_value)
+	for name_value in ["steamInitEx","run_callbacks","createLobby","joinLobby","leaveLobby","getLobbyData","setLobbyData","inviteUserToLobby","getConnectionRealTimeStatus","setGlobalConfigValueInt32","setConnectionConfigValueInt32","getConnectionInfo"]:expect(native.has_method(name_value),"native API is present: "+name_value)
 	for name_value in ["lobby_created","lobby_joined","join_requested","lobby_data_update","steam_shutdown"]:expect(native.has_signal(name_value),"native signal is present: "+name_value)
 	expect(not bool(ProjectSettings.get_setting("steam/initialization/processes/initialize_on_startup")),"loading the component does not auto-initialize Steam")
 	expect(not link.initialized and link.api==null,"the runtime inspection never signs in or contacts Steam")

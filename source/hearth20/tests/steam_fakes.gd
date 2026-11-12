@@ -1,6 +1,7 @@
 extends RefCounted
 class Packet extends RefCounted:
-	func get_connection_handle() -> int:return 7
+	var handle=7
+	func get_connection_handle() -> int:return handle
 class Peer extends MultiplayerPeerExtension:
 	var hosting=false
 	var status=MultiplayerPeer.CONNECTION_DISCONNECTED
@@ -56,6 +57,11 @@ class Api extends Node:
 	var pending=0
 	var unacknowledged=0
 	var send_rate=262144
+	var configured_rates={}
+	var connection_config_ok=true
+	var apply_connection_rate=true
+	var wire_rate=0.
+	var quality=1.
 	var overlay=false
 	func isSteamRunning() -> bool:return running
 	func steamInitEx(id: int,embed: bool) -> Dictionary:calls.append(["init",id,embed]);return {"status":init_status}
@@ -65,6 +71,13 @@ class Api extends Node:
 	func steamShutdown() -> void:calls.append(["shutdown"])
 	func initRelayNetworkAccess() -> void:calls.append(["relay"])
 	func setGlobalConfigValueInt32(key: int,value: int) -> bool:calls.append(["network-config",key,value]);return true
+	func setConnectionConfigValueInt32(handle: int,key: int,value: int) -> bool:
+		calls.append(["connection-config",handle,key,value])
+		if connection_config_ok:
+			configured_rates[key]=value
+			if apply_connection_rate and configured_rates.get(10)==configured_rates.get(11):send_rate=value
+		return connection_config_ok
+	func getConnectionInfo(_handle: int) -> Dictionary:return {"info_flags":16}
 	func run_callbacks() -> void:pass
 	func createLobby(kind: int,count: int) -> void:calls.append(["create",kind,count])
 	func joinLobby(id: int) -> void:calls.append(["join",id])
@@ -83,4 +96,4 @@ class Api extends Node:
 	func getFriendByIndex(index: int,_flags: int) -> int:return 76561198000000002+index
 	func getFriendPersonaName(id: int) -> String:return "Bram" if id==76561198000000002 else "Aurelia"
 	func inviteUserToLobby(lobby: int,id: int) -> bool:calls.append(["invite",lobby,id]);return true
-	func getConnectionRealTimeStatus(_handle: int,_lanes: int,_status: bool) -> Dictionary:return {"response":1,"connection_status":{"pending_reliable":pending,"sent_unacknowledged_reliable":unacknowledged,"send_rate":send_rate,"ping":50}}
+	func getConnectionRealTimeStatus(_handle: int,_lanes: int,_status: bool) -> Dictionary:return {"response":1,"connection_status":{"pending_reliable":pending,"sent_unacknowledged_reliable":unacknowledged,"send_rate":send_rate,"ping":50,"bytes_out_per_second":wire_rate,"bytes_in_per_second":0.,"local_quality":quality,"remote_quality":quality}}

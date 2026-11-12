@@ -30,6 +30,7 @@ var wired=false
 var fake_backend=false
 var closing=false
 var network_config_results={}
+var rate_controllers={}
 func _ready() -> void:
 	set_process(false)
 	var args=Array(OS.get_cmdline_args())+Array(OS.get_cmdline_user_args())
@@ -58,12 +59,11 @@ func initialize() -> Dictionary:
 	initialized=true;own_id=int(api.getSteamID());display_name=str(api.getPersonaName()).left(40)
 	if own_id<=0:initialized=false;api.steamShutdown();return _fail("Steam did not provide a player identity. Restart Steam and try again.")
 	_wire();api.initRelayNetworkAccess();set_process(true)
-	# Let Steam adapt to the link instead of inheriting its low bulk-transfer ceiling.
-	network_config_results.minimum_rate=api.setGlobalConfigValueInt32(10,65536)
-	# Use the SDK's supported maximum; congestion control chooses the actual rate.
-	# Zero is clamped to a tiny rate by some SDK versions, so it is not "unlimited".
-	network_config_results.adaptive_maximum=api.setGlobalConfigValueInt32(11,268435456)
-	network_config_results.send_buffer=api.setGlobalConfigValueInt32(9,8388608)
+	# Valve documents these as a chosen token-bucket rate, not an automatic
+	# upload-speed probe. Each connection is subsequently paced from live stats.
+	network_config_results.maximum_rate=api.setGlobalConfigValueInt32(11,Hearth20SteamRate.START)
+	network_config_results.minimum_rate=api.setGlobalConfigValueInt32(10,Hearth20SteamRate.START)
+	network_config_results.send_buffer=api.setGlobalConfigValueInt32(9,Hearth20SteamRate.BUFFER)
 	_set_status("ready","Connected to Steam as "+display_name+". Host a private table or accept a friend's invitation.")
 	return {"ok":true}
 func _wire() -> void:
@@ -177,12 +177,44 @@ func can_send(peer_id: int) -> bool:
 	var status=api.getConnectionRealTimeStatus(int(peer.get_connection_handle()),0,true)
 	if int(status.get("response",0))!=1:return false
 	var details: Dictionary=status.get("connection_status",{})
+	var handle=int(peer.get_connection_handle())
+	if not rate_controllers.has(peer_id) or rate_controllers[peer_id].handle!=handle:
+		rate_controllers[peer_id]=Hearth20SteamRate.new();rate_controllers[peer_id].handle=handle
+	var controller: Hearth20SteamRate=rate_controllers[peer_id]
+	var now=Time.get_ticks_msec()
+	if controller.sample(details,true,session.multiplayer.get_peers().size(),now) and now-controller.apply_msec>=250:
+		controller.apply_msec=now
+		var first=11 if controller.target>controller.applied else 10
+		var ok_first=api.setConnectionConfigValueInt32(handle,first,controller.target)
+		var ok_second=api.setConnectionConfigValueInt32(handle,10 if first==11 else 11,controller.target)
+		controller.config_ok=ok_first and ok_second
+		if controller.config_ok:controller.applied=controller.target
+		# Read the actual effective rate after applying, not merely the requested
+		# ceiling. Never use the binding's unsafe generic getConfigValue buffer.
+		var checked=api.getConnectionRealTimeStatus(handle,0,true)
+		if int(checked.get("response",0))==1:details=checked.get("connection_status",details);controller.last=details.duplicate()
 	var rate=maxi(65536,int(details.get("send_rate",262144)))
 	# A 25 ms-only window starves long-distance links between callbacks. Allow
 	# roughly one RTT of useful work while retaining a bounded native queue.
 	var pending_limit=clampi(int(float(rate)*(.025+float(details.get("ping",50))/1000.))+65536,131072,4194304)
-	var unacknowledged_limit=clampi(int(float(rate)*(.1+2.*float(details.get("ping",50))/1000.)),524288,8388608)
-	return int(details.get("pending_reliable",99999999))<pending_limit and int(details.get("sent_unacknowledged_reliable",99999999))<unacknowledged_limit
+	var unacknowledged_limit=clampi(int(float(rate)*(.1+2.*float(details.get("ping",50))/1000.)),524288,12*1024*1024)
+	var pending=int(details.get("pending_reliable",99999999));var unacknowledged=int(details.get("sent_unacknowledged_reliable",99999999))
+	return pending<pending_limit and unacknowledged<unacknowledged_limit and pending+unacknowledged<14*1024*1024
+func bulk_window(peer_id: int) -> int:
+	return rate_controllers[peer_id].window_bytes() if rate_controllers.has(peer_id) else 4*1024*1024
+func transfer_diagnostics() -> Array:
+	var result=[]
+	for peer in rate_controllers:
+		if not is_instance_valid(session) or not allows_peer(peer):continue
+		var item: Dictionary=rate_controllers[peer].report();item.peer=peer;item.route="Unknown"
+		var packet=session.multiplayer.multiplayer_peer.get_peer(peer)
+		if initialized and packet!=null and api.has_method("getConnectionInfo"):
+			var current=api.getConnectionRealTimeStatus(int(packet.get_connection_handle()),0,true)
+			if int(current.get("response",0))==1:rate_controllers[peer].last=current.get("connection_status",{}).duplicate();item=rate_controllers[peer].report();item.peer=peer;item.route="Unknown"
+			var info=api.getConnectionInfo(int(packet.get_connection_handle()))
+			if info.has("info_flags"):item.route="Steam relay" if int(info.info_flags)&16 else "Direct"
+		result.append(item)
+	return result
 func invite_friends() -> Dictionary:
 	if state!="hosting" or lobby_id<=0:return {"ok":false,"error":"Host a Steam table first."}
 	api.activateGameOverlayInviteDialog(lobby_id)
@@ -223,6 +255,7 @@ func transfer_update(value: float,note: String) -> void:
 func connection_lost() -> void:
 	if not closing and lobby_id>0:_abort("The Steam connection ended. Ask the DM to keep the table open and join again.")
 func disconnect_table() -> void:
+	rate_controllers.clear()
 	closing=true
 	if is_instance_valid(session) and session.transport=="steam":session.stop_session()
 	if is_instance_valid(session) and session.local_role=="player" and session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer:session.configure(session.campaign)

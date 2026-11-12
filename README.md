@@ -4,7 +4,11 @@
 
 A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.17](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.17-beta)
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.18](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.18-beta)
+
+The 0.3.18 update corrects Steam send-rate configuration: the app now applies matched chosen rates to each connection and adjusts them using measured traffic, quality and latency. **Connections → Connection details** shows requested and effective rates, actual traffic and queues. The previous high-maximum-only setting did not establish real available throughput. Actual speed on the user’s two-PC route still requires a new report or live test.
+
+The DM now has one **Autosave** slot refreshed every five minutes during play. It saves a detached snapshot in the background, replaces the prior automatic slot after success and leaves manual named saves alone. A thin bottom bar reports progress without blocking actions; restore it through **Open saved tables**.
 
 The 0.3.17 update downloads every loaded map and its foreground images in the background. Partial files continue across DM tab switches and concealment, and cached destinations do not download again. Each player sees the map of their deployed owned token; a token in inventory has no board view. The DM can browse other maps without changing player views. Drawings, movement, pings and measurements use each token’s map. The map-edge bar shows ready map-file counts, bytes and measured MB/s.
 

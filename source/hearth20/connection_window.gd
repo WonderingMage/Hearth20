@@ -102,6 +102,7 @@ func _build_steam() -> void:
 	steam_progress=ProgressBar.new();steam_progress.show_percentage=true;steam_progress.custom_minimum_size.y=15;page.add_child(steam_progress)
 	var actions=HBoxContainer.new();actions.add_theme_constant_override("separation",12);page.add_child(actions)
 	steam_actions=actions
+	_button(page,"Connection details",func():Hearth20NetworkDetails.open(app))
 	connect_button=_button(actions,"Connect Steam",_prepare_steam)
 	steam_host=_button(actions,"Host private table",_host_steam)
 	open_steam_button=_button(actions,"Open Steam & continue",_open_steam)

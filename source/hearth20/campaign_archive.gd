@@ -1,5 +1,6 @@
 extends RefCounted
 class_name Hearth20CampaignArchive
+const AUTOSAVE_PATH=Hearth20Identity.SAVE_ROOT+"/autosave."+Hearth20Identity.SAVE_EXTENSION
 ## Named local saves. Index metadata is optional; legacy single-table saves remain readable.
 static func valid_path(path: String) -> bool:
 	return path.begins_with(Hearth20Identity.SAVE_ROOT+"/") and path.get_base_dir()==Hearth20Identity.SAVE_ROOT and not path.contains("..") and not path.contains("\\") and path.ends_with("."+Hearth20Identity.SAVE_EXTENSION)
@@ -44,7 +45,7 @@ static func list_tables() -> Array:
 			else:
 				record=describe(loaded.campaign,str(loaded.source_path))
 				if loaded.get("recovered",false):record.recovered=true;record.scene="Previous save copy · "+str(record.scene)
-		record.path=path;result.append(record)
+		record.path=path;record.autosave=path==AUTOSAVE_PATH;result.append(record)
 	result.sort_custom(func(a,b):return int(a.saved_at)>int(b.saved_at))
 	return result
 static func read_table(path: String) -> Dictionary:

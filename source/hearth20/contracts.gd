@@ -157,7 +157,7 @@ static func valid_scene(scene: Variant) -> bool:
 			return false
 	return true
 
-static func validate_campaign(campaign: Variant) -> Dictionary:
+static func validate_campaign(campaign: Variant,use_asset_cache=true) -> Dictionary:
 	var result := Hearth20Identity.validate_campaign(campaign)
 	if not result.ok:
 		return result
@@ -182,7 +182,8 @@ static func validate_campaign(campaign: Variant) -> Dictionary:
 		if encoded_asset_bytes > Hearth20Identity.MAX_SAVE_BYTES:
 			return {"ok": false, "errors": ["Campaign assets exceed the supported aggregate transfer size."]}
 	for asset_id in checked.assets:
-		if not Hearth20Assets.read_asset(checked, str(asset_id)).size() > 0:
+		var bytes=Hearth20Assets.read_asset(checked,str(asset_id)) if use_asset_cache else Hearth20Assets.read_asset_uncached(checked,str(asset_id))
+		if not bytes.size() > 0:
 			return {"ok": false, "errors": ["Campaign contains an invalid or corrupt image asset."]}
 	var scene_ids := {}
 	for scene in checked.scenes:

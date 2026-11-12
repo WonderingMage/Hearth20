@@ -93,11 +93,13 @@ static func read_asset(campaign: Dictionary, asset_id: String, expected_kind: St
 	cache_mutex.unlock()
 	return bytes
 
-static func _read_asset(campaign: Dictionary, asset_id: String, expected_kind: String) -> PackedByteArray:
+static func read_asset_uncached(campaign: Dictionary,asset_id: String,expected_kind: String="") -> PackedByteArray:
+	return _read_asset(campaign,asset_id,expected_kind,false)
+static func _read_asset(campaign: Dictionary, asset_id: String, expected_kind: String,use_cache=true) -> PackedByteArray:
 	var record: Variant = campaign.get("assets", {}).get(asset_id, null)
 	if not record is Dictionary or record.get("kind", "") not in ["map", "token"] or (not expected_kind.is_empty() and record.get("kind", "") != expected_kind):
 		return PackedByteArray()
-	if validated_cache.has(asset_id) and validated_cache[asset_id].record==record:
+	if use_cache and validated_cache.has(asset_id) and validated_cache[asset_id].record==record:
 		var cached=validated_cache[asset_id];validated_cache.erase(asset_id);validated_cache[asset_id]=cached
 		return cached.bytes.duplicate()
 	var kind := str(record.get("kind", ""))
@@ -121,6 +123,7 @@ static func _read_asset(campaign: Dictionary, asset_id: String, expected_kind: S
 		var image := decode_map(bytes)
 		if image==null or image.get_width() != dimensions.x or image.get_height() != dimensions.y:
 			return PackedByteArray()
+	if not use_cache:return bytes
 	if validated_cache.has(asset_id):validated_bytes-=validated_cache[asset_id].bytes.size();validated_cache.erase(asset_id)
 	while not validated_cache.is_empty() and (validated_cache.size()>=32 or validated_bytes+bytes.size()>CACHE_BUDGET):
 		var oldest=validated_cache.keys()[0];validated_bytes-=validated_cache[oldest].bytes.size();validated_cache.erase(oldest)

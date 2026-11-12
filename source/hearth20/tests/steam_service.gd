@@ -39,15 +39,18 @@ func run() -> void:
 	session.multiplayer.multiplayer_peer.ids[77]=76561198000000077
 	expect(not link.allows_peer(77),"another Spacewar user cannot reach campaign data")
 	expect(link.can_send(44),"low Steam send queue permits image chunks")
-	api.pending=200000;expect(not link.can_send(44),"large send queue pauses image chunks before overflow");api.pending=0
-	api.unacknowledged=600000;expect(not link.can_send(44),"unacknowledged data applies backpressure");api.unacknowledged=0
+	expect(api.configured_rates.get(10)==api.configured_rates.get(11) and api.send_rate==Hearth20SteamRate.START,"actual connection uses a matched chosen rate instead of a tiny initial estimate")
+	api.pending=1000000;expect(not link.can_send(44),"large send queue pauses image chunks before overflow");api.pending=0
+	api.unacknowledged=2000000;expect(not link.can_send(44),"unacknowledged data applies backpressure");api.unacknowledged=0
 	api.send_rate=16777216;api.pending=200000
 	expect(link.can_send(44),"a fast measured link receives a larger short send window")
 	api.pending=1000000;expect(link.can_send(44),"a fast link can keep one RTT of transfer data in flight")
 	api.pending=2000000;expect(not link.can_send(44),"a fast link still has bounded queue latency")
-	api.pending=0;api.send_rate=262144
-	expect(api.calls.has(["network-config",11,268435456]),"bulk transfers use the SDK maximum instead of an application bandwidth cap")
-	expect(api.calls.has(["network-config",9,8388608]),"native send buffer accommodates adaptive high-throughput windows")
+	api.pending=0;api.send_rate=Hearth20SteamRate.START
+	expect(api.calls.has(["network-config",10,Hearth20SteamRate.START]) and api.calls.has(["network-config",11,Hearth20SteamRate.START]),"both global rate controls are set, not just a maximum")
+	expect(api.calls.has(["network-config",9,Hearth20SteamRate.BUFFER]),"native send buffer accommodates adaptive high-throughput windows")
+	var diagnostic=link.transfer_diagnostics()[0]
+	expect(diagnostic.config_ok and diagnostic.effective_bps==Hearth20SteamRate.START and diagnostic.route=="Steam relay","diagnostics use real status fields and report the actual route")
 	expect(link.friends()[0].name=="Aurelia","friend list is sorted and independent of the overlay")
 	expect(link.invite_friend(76561198000000002).ok and api.calls.any(func(call):return call[0]=="invite"),"in-game friend invitation calls Steam's lobby invite API")
 	expect(not link.invite_friend(123).ok,"arbitrary IDs cannot bypass the friend picker")
