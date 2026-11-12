@@ -43,7 +43,8 @@ func run() -> void:
 	api.unacknowledged=600000;expect(not link.can_send(44),"unacknowledged data applies backpressure");api.unacknowledged=0
 	api.send_rate=16777216;api.pending=200000
 	expect(link.can_send(44),"a fast measured link receives a larger short send window")
-	api.pending=1000000;expect(not link.can_send(44),"a fast link still has bounded queue latency")
+	api.pending=1000000;expect(link.can_send(44),"a fast link can keep one RTT of transfer data in flight")
+	api.pending=2000000;expect(not link.can_send(44),"a fast link still has bounded queue latency")
 	api.pending=0;api.send_rate=262144
 	expect(api.calls.has(["network-config",11,268435456]),"bulk transfers use the SDK maximum instead of an application bandwidth cap")
 	expect(api.calls.has(["network-config",9,8388608]),"native send buffer accommodates adaptive high-throughput windows")

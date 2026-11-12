@@ -4,7 +4,9 @@
 
 A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.16](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.16-beta)
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.17](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.17-beta)
+
+The 0.3.17 update downloads every loaded map and its foreground images in the background. Partial files continue across DM tab switches and concealment, and cached destinations do not download again. Each player sees the map of their deployed owned token; a token in inventory has no board view. The DM can browse other maps without changing player views. Drawings, movement, pings and measurements use each token’s map. The map-edge bar shows ready map-file counts, bytes and measured MB/s.
 
 The 0.3.16 sidebar hotfix prevents Conceal/Reveal, Scene scrolling and routine refreshes from changing the selected page. Table → Help is replaced by a DM-only **Token Sheet** tab displaying **In development**. Creature imports and editable statistics remain future work. Player Chat and Journal selections stay selected during refreshes.
 
@@ -56,6 +58,8 @@ Personal refreshments include fifteen foods and six drinks. Food lasts two bites
 Display settings include window/fullscreen modes, resolution, monitor, VSync, frame limits and smoothing. Display changes use a timed confirmation. Audio settings separate master, effects, party, creature-showcase and wake-up volumes.
 
 Fresh installations use the ordinary **Beta releases** update channel. The title checks for updates and offers a verified download and restart. Existing Beta users can use **Settings → Updates → Check for updates**. Each download is checked against GitHub's SHA-256 digest and the Hearth20 edition manifest. The installer retains the previous EXE and supports rollback when startup confirmation fails.
+
+If Windows or antivirus software blocks or removes the downloaded EXE or restart helper, the updater reports that possibility and leaves the current game running. These portables and custom helper are currently unsigned. Hash verification is not an antivirus approval; distribution signing and vendor false-positive review are still separate steps.
 
 Use the same release on all participating PCs. Profiles, campaign saves and browser storage stay local. The optional combined update channel remains available in Settings for development test builds.
 

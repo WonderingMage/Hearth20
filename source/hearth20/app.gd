@@ -1888,7 +1888,7 @@ func _on_snapshot(value: Dictionary) -> void:
 		_on_status("Disconnected from the table. Join a host to load an authorized view.")
 		return
 	_track_unread(value.get("timeline", []))
-	player_session_note.text = "Your character is saved in the DM’s token inventory. The DM will place it and grant movement." if value.get("character_in_inventory",false) else "Connected to the table. Choose your assigned character in Sheet; rolls are validated by the host."
+	player_session_note.text = "Your character is saved in the DM’s token inventory. The DM will place it and grant movement." if value.get("character_in_inventory",false) else "Your map follows your placed token. The DM can browse other maps independently."
 	_refresh_token_inspector()
 	_refresh_sheet()
 	_refresh_chat()

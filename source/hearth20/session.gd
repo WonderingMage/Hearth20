@@ -53,6 +53,15 @@ var pending_table_commands: Array = []
 var steam_images=Hearth20SteamImages.new()
 var peer_steam_images={}
 var steam_peer_cursor=0
+var map_stream=Hearth20MapStream.new()
+var peer_map_downloads={}
+var pending_map_snapshot={}
+var background_mode=false
+var map_preparing=false
+var background_peer_cursor=0
+var map_rate_tick=0
+var map_rate_bytes=0
+var map_rate=0.0
 var map_transfer_state: Dictionary={"active":false,"progress":0.0,"received":0,"total":0,"phase":""}
 
 func _ready() -> void:
@@ -71,6 +80,7 @@ func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 func configure(campaign_data: Dictionary) -> void:
+	map_stream.clear();peer_map_downloads.clear();pending_map_snapshot.clear()
 	campaign = campaign_data
 	Hearth20MapLibrary.discard_empty_starter(campaign,str(campaign.get("active_scene","")))
 	if not campaign.has("map_covered"):
@@ -176,6 +186,7 @@ func stop_session() -> void:
 	if was_steam and is_instance_valid(steam_link) and not steam_link.closing:steam_link.disconnect_table()
 
 func _clear_client_view() -> void:
+	background_mode=false;map_preparing=false;pending_map_snapshot.clear();peer_map_downloads.clear();map_stream.clear()
 	_finish_map_download()
 	steam_images.clear()
 	var interrupted=pending_table_commands.duplicate();pending_table_commands.clear()
@@ -206,7 +217,7 @@ func send_handshake(identity: Dictionary, secret: String, nickname: String, publ
 	var nonce:=Crypto.new().generate_random_bytes(32)
 	var features: Array=identity.get("steam_features",[]) if identity.get("steam_features",[]) is Array else []
 	var image_version:=2 if "image-cache-v2" in features else 1 if transport=="steam" and "image-cache-v1" in features else 0
-	pending_proofs[peer_id]={"nonce":nonce,"public_key":public_pem,"nickname":nickname.strip_edges(),"expires":Time.get_ticks_msec()+15000,"image_cache":image_version}
+	pending_proofs[peer_id]={"nonce":nonce,"public_key":public_pem,"nickname":nickname.strip_edges(),"expires":Time.get_ticks_msec()+15000,"image_cache":image_version,"background_maps":"background-maps-v1" in features}
 	player_challenge.rpc_id(peer_id,nonce)
 
 @rpc("authority", "call_remote", "reliable")
@@ -238,6 +249,7 @@ func prove_player(signature: PackedByteArray) -> void:
 	peer_to_player[peer_id] = player_id
 	if int(pending.get("image_cache",0))>0:
 		peer_steam_images[peer_id]=Hearth20SteamImages.new();peer_steam_images[peer_id].protocol_version=int(pending.image_cache)
+	if pending.get("background_maps",false):peer_map_downloads[peer_id]={"active":"","offset":0,"acked":0,"queue":[],"done":{},"offered":{},"catalog":"","files":{}}
 	remote_players[player_id] = {"peer_id": peer_id, "nickname": nickname.strip_edges(), "joined_at": Time.get_unix_time_from_system()}
 	status_changed.emit("%s joined the table." % nickname.strip_edges())
 	connected_player.rpc_id(peer_id, player_id)
@@ -265,7 +277,7 @@ func request_move(actor_id: String, from: Vector2, to: Vector2, expected_revisio
 		status_changed.emit("Rejected a move request that did not name the sender's assigned hero.")
 		_send_peer_snapshot(peer_id, player_id)
 		return
-	var scene := Hearth20Contracts.find_scene(campaign, str(campaign.get("active_scene", "")))
+	var scene := Hearth20Contracts.find_scene(campaign, str(actor.get("scene_id", "")))
 	var cells := from.distance_to(to)
 	var measured_feet := cells * float(scene.get("feet_per_cell", 5.0))
 	var result := Hearth20Contracts.authorize_and_apply_move(campaign, player_id, "player", actor_id, from, to, measured_feet)
@@ -291,43 +303,71 @@ func receive_snapshot(snapshot: Dictionary) -> void:
 		if received.get("replayed",false):return
 		var fraction:=float(received.get("progress",0.))
 		if transport=="steam":steam_link.transfer_update(fraction,"Receiving the battlemap and campaign…")
-		map_transfer_state={"id":str(snapshot._h20_transfer.id),"active":true,"progress":fraction,"received":roundi(fraction*float(snapshot._h20_transfer.size)),"total":int(snapshot._h20_transfer.size),"phase":"Preparing map…" if received.complete else "Downloading map…"}
-		map_transfer_progress.emit(map_transfer_state.duplicate())
+		if not background_mode:
+			map_transfer_state={"id":str(snapshot._h20_transfer.id),"active":true,"progress":fraction,"received":roundi(fraction*float(snapshot._h20_transfer.size)),"total":int(snapshot._h20_transfer.size),"phase":"Preparing map…" if received.complete else "Downloading map…"}
+			map_transfer_progress.emit(map_transfer_state.duplicate())
 		if not received.complete:return
 		completed_transfer=str(snapshot._h20_transfer.id)
 		if not received.value is Dictionary:_steam_transfer_failed(1,"The table transfer was invalid.");return
 		snapshot=received.value
 	if multiplayer.get_remote_sender_id() != 1 or not Hearth20Identity.validate_network_identity(snapshot) or not snapshot.get("revision", null) is int or int(snapshot.revision) < 0 or not snapshot.get("scene") is Dictionary or not snapshot.get("actors") is Array or not snapshot.get("assets") is Dictionary:
 		return
+	_install_snapshot(snapshot,completed_transfer)
+
+func _resolve_background_view(snapshot: Dictionary) -> Dictionary:
+	var packet=snapshot.duplicate(true);var waiting=false
+	if snapshot.has("_h20_map_blob"):
+		var image=map_stream.resolve(snapshot._h20_map_blob)
+		if not image.ok:return image
+		if image.get("waiting",false):waiting=true
+		else:packet.map_png=image.bytes;packet.erase("_h20_map_blob");packet.erase("map_cached")
+	var blobs=snapshot.get("_h20_asset_blobs",{})
+	if not blobs is Dictionary or blobs.size()>Hearth20Contracts.MAX_ACTORS:return {"ok":false,"error":"Invalid foreground references."}
+	for id in blobs:
+		var info=blobs[id]
+		if not id is String or not info is Dictionary or not info.get("asset") is Dictionary or id!="sha256-"+str(info.asset.get("sha256","")) or info.get("map_sha256")!=info.asset.get("sha256"):return {"ok":false,"error":"Invalid foreground image reference."}
+		var image=map_stream.resolve(info)
+		if not image.ok:return image
+		if image.get("waiting",false):waiting=true;continue
+		var asset=info.asset.duplicate(true);asset.base64=Marshalls.raw_to_base64(image.bytes);packet.assets[id]=asset
+	packet.erase("_h20_asset_blobs")
+	return {"ok":true,"waiting":waiting,"snapshot":packet}
+
+func _install_snapshot(snapshot: Dictionary,completed_transfer="") -> void:
 	if int(snapshot.revision)<int(client_snapshot.get("revision",-1)):
 		if not completed_transfer.is_empty():_finish_map_download(completed_transfer)
 		return
+	if snapshot.has("_h20_map_blob") or snapshot.has("_h20_asset_blobs"):
+		background_mode=true
+		# Retain only authorized live metadata while file data arrives separately.
+		steam_images.remember(snapshot)
+		var resolved=_resolve_background_view(snapshot)
+		if not resolved.ok:_steam_transfer_failed(1,resolved.error);return
+		if resolved.get("waiting",false):
+			pending_map_snapshot=snapshot;client_snapshot=_map_loading_view(snapshot)
+			timeline_changed.emit(timeline_for_local());snapshot_received.emit(client_snapshot.duplicate(true));_background_map_progress();return
+		snapshot=resolved.snapshot;steam_images.remember(snapshot)
 	if snapshot.get("_h20_image_cache",false):
 		var decoded=steam_images.decode(snapshot)
 		if not decoded.ok:_steam_transfer_failed(1,decoded.error);return
 		snapshot=decoded.snapshot
-	if bool(snapshot.get("map_unchanged", false)):
-		if str(client_snapshot.get("map_sha256", "")) != str(snapshot.get("map_sha256", "")):
-			return
-		snapshot.map_png = client_snapshot.get("map_png", PackedByteArray())
-	if bool(snapshot.get("assets_unchanged", false)):
-		if client_snapshot.is_empty():
-			return
-		snapshot.assets = client_snapshot.get("assets", {})
+	if bool(snapshot.get("map_unchanged",false)):
+		if str(client_snapshot.get("map_sha256",""))!=str(snapshot.get("map_sha256","")):return
+		snapshot.map_png=client_snapshot.get("map_png",PackedByteArray())
+	if bool(snapshot.get("assets_unchanged",false)):
+		if client_snapshot.is_empty():return
+		snapshot.assets=client_snapshot.get("assets",{})
 	if bool(snapshot.get("light_unchanged",false)):
-		if client_snapshot.get("scene",{}).get("id","")!=snapshot.scene.get("id",""): return
+		if client_snapshot.get("scene",{}).get("id","")!=snapshot.scene.get("id",""):return
 		snapshot.scene.light_field=client_snapshot.get("scene",{}).get("light_field",{})
-	snapshot.erase("map_unchanged")
-	snapshot.erase("assets_unchanged")
-	snapshot.erase("light_unchanged")
-	steam_images.remember(snapshot)
-	client_snapshot = snapshot
-	timeline_changed.emit(timeline_for_local())
-	snapshot_received.emit(client_snapshot.duplicate(true))
-	if map_transfer_state.get("active",false):
-		_finish_map_download.call_deferred(completed_transfer if not completed_transfer.is_empty() else str(map_transfer_state.get("id","")))
+	for key in ["map_unchanged","assets_unchanged","light_unchanged"]:snapshot.erase(key)
+	steam_images.remember(snapshot);pending_map_snapshot={};client_snapshot=snapshot
+	timeline_changed.emit(timeline_for_local());snapshot_received.emit(client_snapshot.duplicate(true))
+	if background_mode:_background_map_progress()
+	elif map_transfer_state.get("active",false):_finish_map_download.call_deferred(completed_transfer if not completed_transfer.is_empty() else str(map_transfer_state.get("id","")))
 
 func _finish_map_download(expected_id: String="") -> void:
+	if background_mode:_background_map_progress();return
 	if not expected_id.is_empty() and str(map_transfer_state.get("id",""))!=expected_id:return
 	if not map_transfer_state.get("active",false):return
 	map_transfer_state.active=false;map_transfer_progress.emit(map_transfer_state.duplicate())
@@ -466,6 +506,21 @@ func _send_peer_snapshot(peer_id: int, player_id: String,map_override: Variant=n
 	if peer_id not in multiplayer.get_peers(): return
 	var snapshot := _project_for(player_id,map_override)
 	if not snapshot.is_empty():
+		if peer_map_downloads.has(peer_id):
+			var page=Hearth20PlayerMap.scene(campaign,player_id)
+			map_stream.scan(campaign,str(page.get("id","")))
+			if not str(page.get("map_asset","")).is_empty() and snapshot.scene.id!="blackout":
+				var record=map_stream.ready_for(page)
+				if record.is_empty() and map_stream.failure.is_empty():snapshot=_map_loading_view(snapshot)
+				elif not record.is_empty() and record.map_sha256==snapshot.map_sha256:
+					snapshot._h20_map_blob=Hearth20MapStream.descriptor(record);snapshot.map_png=PackedByteArray()
+			var art_blobs={}
+			for asset_id in snapshot.assets:
+				var art=map_stream.ready_asset(str(asset_id))
+				if art.is_empty():continue
+				var info=Hearth20MapStream.descriptor(art);info.asset=snapshot.assets[asset_id].duplicate(true);info.asset.erase("base64");art_blobs[asset_id]=info
+			if not art_blobs.is_empty():snapshot._h20_asset_blobs=art_blobs
+			_send_map_catalog(peer_id)
 		# Redacting a large map can outlast a peer's connection. ENet may have
 		# closed its channels before SceneMultiplayer emits disconnection.
 		if peer_id not in multiplayer.get_peers(): return
@@ -476,6 +531,8 @@ func _send_peer_snapshot(peer_id: int, player_id: String,map_override: Variant=n
 		# directly, bypassing the bulk snapshot queue. Old peers keep their v1 path.
 		if peer_steam_images.has(peer_id) and peer_steam_images[peer_id].protocol_version>=2:
 			var compact: Dictionary=peer_steam_images[peer_id].encode(snapshot)
+			if snapshot.has("_h20_map_blob"):compact.erase("map_cached")
+			for asset_id in snapshot.get("_h20_asset_blobs",{}):compact.assets.erase(asset_id)
 			if var_to_bytes(compact).size()<=65536:
 				if steam_outgoing.has(peer_id):
 					var active: Dictionary=steam_outgoing[peer_id].active
@@ -511,12 +568,9 @@ func _send_peer_snapshot(peer_id: int, player_id: String,map_override: Variant=n
 		receive_snapshot.rpc_id(peer_id, snapshot)
 
 func _broadcast_snapshots() -> void:
-	if local_role != "dm":
-		return
-	var scene=Hearth20Contracts.find_scene(campaign,str(campaign.get("active_scene","")))
-	var shared_map=Hearth20Assets.read_asset(campaign,str(scene.get("map_asset","")),"map") if not peer_to_player.is_empty() and not bool(campaign.get("map_covered",false)) and not bool(scene.get("blackout",false)) else PackedByteArray()
+	if local_role != "dm":return
 	for peer_variant in peer_to_player:
-		_send_peer_snapshot(int(peer_variant), str(peer_to_player[peer_variant]),shared_map)
+		_send_peer_snapshot(int(peer_variant),str(peer_to_player[peer_variant]))
 	_broadcast_dm_state()
 
 func _broadcast_dm_state() -> void:
@@ -524,7 +578,8 @@ func _broadcast_dm_state() -> void:
 	timeline_changed.emit(timeline_for_local())
 
 func _project_for(player_id: String,map_override: Variant=null) -> Dictionary:
-	var scene := Hearth20Contracts.find_scene(campaign, str(campaign.get("active_scene", "")))
+	var context=Hearth20PlayerMap.context(campaign,player_id)
+	var scene := Hearth20Contracts.find_scene(context,str(context.active_scene))
 	if not scene.is_empty():
 		var now := Time.get_ticks_usec()
 		scene.fx = scene.get("fx", []).filter(func(event: Dictionary) -> bool: return int(event.get("started_usec", now)) + int(event.get("travel_usec", 0)) + int(event.get("impact_duration_usec", 950000)) >= now)
@@ -534,13 +589,15 @@ func _project_for(player_id: String,map_override: Variant=null) -> Dictionary:
 	var previous: Dictionary = projection_cache.get(player_id, {})
 	var projected: Dictionary
 	var covered: bool=bool(campaign.get("map_covered",false)) or bool(scene.get("blackout",false))
-	if covered:
+	if scene.is_empty():
+		projected=Hearth20PlayerMap.waiting(campaign,player_id)
+	elif covered:
 		projected=Hearth20Contracts.covered_projection(campaign,player_id)
 	elif str(previous.get("key", "")) == visual_key and scene.get("fx", []).is_empty():
 		projected = previous.snapshot.duplicate(true)
 	else:
 		var map_bytes: PackedByteArray=map_override if map_override is PackedByteArray else Hearth20Assets.read_asset(campaign,str(scene.get("map_asset","")),"map") if not scene.is_empty() else PackedByteArray()
-		projected = Hearth20Contracts.project_for_player(campaign, player_id, map_bytes)
+		projected = Hearth20Contracts.project_for_player(context, player_id, map_bytes)
 		if not projected.is_empty():
 			projection_cache[player_id] = {"key": visual_key, "snapshot": projected.duplicate(true)}
 	if not projected.is_empty():
@@ -561,6 +618,7 @@ func _project_for(player_id: String,map_override: Variant=null) -> Dictionary:
 	return projected
 
 func _on_peer_disconnected(peer_id: int) -> void:
+	peer_map_downloads.erase(peer_id)
 	steam_chunks.clear_peer(peer_id);steam_outgoing.erase(peer_id)
 	peer_steam_images.erase(peer_id)
 	pending_proofs.erase(peer_id)
@@ -957,7 +1015,7 @@ func request_ping(point: Vector2) -> void:
 
 func _send_ping_for(point: Vector2, player_id: String) -> Dictionary:
 	if is_spectating(player_id):return {"ok":false,"error":"You are spectating during a blackout."}
-	var scene := Hearth20Contracts.find_scene(campaign, str(campaign.get("active_scene", "")))
+	var scene := Hearth20PlayerMap.scene(campaign, player_id)
 	if scene.is_empty() or not Hearth20Contracts.finite_point(point) or not Hearth20Contracts._point_inside_scene(point, scene):
 		return {"ok": false, "error": "Ping inside the map."}
 	var rate_key := "ping:" + player_id
@@ -967,16 +1025,17 @@ func _send_ping_for(point: Vector2, player_id: String) -> Dictionary:
 	if player_id != "dm-local" and not Hearth20Vision.visible(point, Hearth20Vision.build_view(campaign, player_id, scene)):
 		return {"ok": false, "error": "Ping a point your character can see."}
 	var event := {"point": point, "sender": "DM" if player_id == "dm-local" else str(remote_players.get(player_id, {}).get("nickname", "Player")).left(40)}
-	ping_received.emit(event)
+	if Hearth20PlayerMap.scene(campaign,"dm-local").get("id","")==scene.id:ping_received.emit(event)
 	for peer_id in peer_to_player:
 		var recipient := str(peer_to_player[peer_id])
-		if Hearth20Vision.visible(point, Hearth20Vision.build_view(campaign, recipient, scene)):
-			receive_ping.rpc_id(int(peer_id), event)
+		if Hearth20PlayerMap.scene(campaign,recipient).get("id","")==scene.id and Hearth20Vision.visible(point, Hearth20Vision.build_view(campaign, recipient, scene)):
+			var packet=event.duplicate(true);packet.scene_id=Hearth20Contracts._neutral_id(recipient,"scene:"+str(scene.id))
+			receive_ping.rpc_id(int(peer_id),packet)
 	return {"ok": true}
 
 @rpc("authority", "call_remote", "reliable")
 func receive_ping(event: Dictionary) -> void:
-	if local_role == "player" and multiplayer.get_remote_sender_id() == 1 and Hearth20Contracts.finite_point(event.get("point")):
+	if local_role == "player" and multiplayer.get_remote_sender_id() == 1 and Hearth20Contracts.finite_point(event.get("point")) and (not event.has("scene_id") or event.scene_id==client_snapshot.get("scene",{}).get("id","")):
 		ping_received.emit({"point": event.point, "sender": str(event.get("sender", "Player")).left(40)})
 
 func _new_invite_secret() -> String:
@@ -990,6 +1049,9 @@ func board_action(command: Dictionary) -> Dictionary:
 	command.request_id = "board-%d-%d" % [Time.get_ticks_usec(), randi()]
 	if local_role == "dm": return _apply_board_action(command, "dm-local")
 	if local_player_id.is_empty(): return {"ok":false, "error":"Join a table to use shared tools."}
+	var current_map=str(client_snapshot.get("scene",{}).get("id",""))
+	if current_map in ["","unplaced","blackout","map-loading","disconnected"]:return {"ok":false,"error":"Wait for the DM to place your token and reveal its map."}
+	command.view_scene_id=current_map
 	request_board_action.rpc_id(1, command)
 	return {"ok":true, "pending":true}
 
@@ -1014,8 +1076,11 @@ func _apply_board_action(command: Dictionary, player: String) -> Dictionary:
 	rate.count = int(rate.count) + 1
 	request_rates[rate_key] = rate
 	if int(rate.count) > 24: return {"ok":false, "error":"Please pause before editing again."}
-	var scene := Hearth20Contracts.find_scene(campaign, str(campaign.get("active_scene", "")))
+	var scene := Hearth20PlayerMap.scene(campaign, player)
 	if scene.is_empty(): return {"ok":false, "error":"No active map."}
+	if player!="dm-local":
+		if campaign.get("map_covered",false) or scene.get("blackout",false):return {"ok":false,"error":"The map is covered."}
+		if command.has("view_scene_id") and command.view_scene_id!=Hearth20Contracts._neutral_id(player,"scene:"+str(scene.id)):return {"ok":false,"error":"Your token changed maps. Try the action again."}
 	var objects: Array = scene.get("annotations", [])
 	var action := str(command.get("action", ""))
 	var undo: Dictionary = {}
@@ -1201,7 +1266,7 @@ func _sight_for(player: String, scene: Dictionary) -> Dictionary:
 
 func _relay_tool_preview(measure: Dictionary, player: String) -> void:
 	if is_spectating(player):return
-	var scene := Hearth20Contracts.find_scene(campaign, str(campaign.get("active_scene", "")))
+	var scene := Hearth20PlayerMap.scene(campaign, player)
 	if scene.is_empty() or var_to_bytes(measure).size() > 8192: return
 	if not measure.is_empty() and not Hearth20BoardTools.valid_measure(measure, scene): return
 	var now := Time.get_ticks_msec()
@@ -1210,18 +1275,20 @@ func _relay_tool_preview(measure: Dictionary, player: String) -> void:
 	request_rates[rate_key] = now
 	if player != "dm-local" and not measure.is_empty() and not Hearth20BoardTools.measure_visible(measure, _sight_for(player, scene)): return
 	var event := {"sender":player, "measure":measure, "name":"DM" if player == "dm-local" else str(remote_players.get(player, {}).get("nickname", "Player"))}
-	tool_preview_received.emit(event)
+	if Hearth20PlayerMap.scene(campaign,"dm-local").get("id","")==scene.id:tool_preview_received.emit(event)
 	for peer in peer_to_player:
 		var recipient := str(peer_to_player[peer])
+		if Hearth20PlayerMap.scene(campaign,recipient).get("id","")!=scene.id:continue
 		var clean := event.duplicate(true)
 		clean.sender = Hearth20Contracts._neutral_id(recipient, "ruler:" + player)
 		clean.own = recipient == player
+		clean.scene_id=Hearth20Contracts._neutral_id(recipient,"scene:"+str(scene.id))
 		if not measure.is_empty() and not Hearth20BoardTools.measure_visible(measure, _sight_for(recipient, scene)): clean.measure = {}
 		receive_tool_preview.rpc_id(int(peer), clean)
 
 @rpc("authority", "call_remote", "unreliable_ordered", 1)
 func receive_tool_preview(event: Dictionary) -> void:
-	if local_role == "player" and multiplayer.get_remote_sender_id() == 1:
+	if local_role == "player" and multiplayer.get_remote_sender_id() == 1 and (not event.has("scene_id") or event.scene_id==client_snapshot.get("scene",{}).get("id","")):
 		tool_preview_received.emit(event)
 
 func make_effect(settings: Dictionary, start: Vector2, end: Vector2) -> Dictionary:
@@ -1233,7 +1300,7 @@ func make_effect(settings: Dictionary, start: Vector2, end: Vector2) -> Dictiona
 func _on_connected_to_server() -> void:
 	if local_role == "player":
 		var identity=Hearth20Identity.network_identity()
-		identity.steam_features=["image-cache-v1","image-cache-v2"]
+		identity.steam_features=["image-cache-v1","image-cache-v2","background-maps-v1"]
 		send_handshake.rpc_id(1, identity, invite_secret, pending_nickname,Hearth20PlayerProfile.public_key())
 
 func _notification(what: int) -> void:
@@ -1280,7 +1347,8 @@ func request_view_actor(actor_id: String) -> void:
 	var now:=Time.get_ticks_msec();var rate_key:="view:"+player
 	if now-int(request_rates.get(rate_key,-1000))<100:return
 	request_rates[rate_key]=now
-	var scene:=Hearth20Contracts.find_scene(campaign,campaign.active_scene);var eligible:=Hearth20Vision.view_actors(campaign,player,scene)
+	var candidate=Hearth20Contracts.find_actor(campaign,actor_id)
+	var scene:=Hearth20Contracts.find_scene(campaign,str(candidate.get("scene_id","")));var eligible:=Hearth20Vision.view_actors(campaign,player,scene)
 	if not eligible.any(func(actor):return str(actor.id)==actor_id):table_action_result.rpc_id(peer,false,"Choose one of your assigned, placed tokens on this map.");return
 	if not campaign.get("viewpoints") is Dictionary:campaign.viewpoints={}
 	campaign.viewpoints[player]=actor_id;_inventory_changed()
@@ -1397,10 +1465,116 @@ func receive_refreshment_event(event: Dictionary) -> void:
 @rpc("authority","call_remote","reliable")
 func receive_refreshment_result(result: Dictionary) -> void:
 	if local_role=="player" and multiplayer.get_remote_sender_id()==1:refreshment_action_result.emit(result)
+static func _map_loading_view(snapshot: Dictionary) -> Dictionary:
+	var result=snapshot.duplicate(true)
+	result.scene={"id":"map-loading","title":"Preparing your map","width_cells":24,"height_cells":16,"cell_pixels":64.,"feet_per_cell":5.,"grid_visible":false,"walls":[],"doors":[],"props":[]}
+	result.actors=[];result.fx=[];result.assets={};result.map_png=PackedByteArray();result.map_sha256=Hearth20Contracts.sha256(PackedByteArray());result.vision_mask={}
+	result.erase("_h20_map_blob");result.erase("_h20_asset_blobs");return result
+
+func _send_map_catalog(peer: int) -> void:
+	if not peer_map_downloads.has(peer) or peer not in multiplayer.get_peers():return
+	var slot: Dictionary=peer_map_downloads[peer];var offers=map_stream.offers()
+	for info in offers:
+		if slot.offered.has(info.id):continue
+		slot.offered[info.id]=info;slot.queue.append(info.id)
+	var page=Hearth20PlayerMap.scene(campaign,str(peer_to_player.get(peer,"")))
+	var wanted=str(map_stream.ready_for(page).get("id",""))
+	if not wanted.is_empty() and slot.offered.has(wanted) and not slot.done.has(wanted) and wanted!=slot.active and int(slot.files.get(wanted,{}).get("offset",0))<int(slot.offered[wanted].size):
+		if not slot.active.is_empty():
+			slot.files[slot.active]={"offset":slot.offset,"acked":slot.acked}
+			if not slot.queue.has(slot.active):slot.queue.push_front(slot.active)
+			slot.active=""
+	if not wanted.is_empty() and wanted in slot.queue:
+		slot.queue.erase(wanted);slot.queue.push_front(wanted)
+	var preparing=map_stream.worker!=null or not map_stream.queue.is_empty()
+	var signature=Hearth20Contracts.sha256(var_to_bytes([offers,preparing,map_stream.failure]))
+	if signature==slot.catalog:return
+	slot.catalog=signature
+	receive_map_catalog.rpc_id(peer,offers,preparing,map_stream.failure)
+
+@rpc("authority","call_remote","reliable",2)
+func receive_map_catalog(offers: Array,preparing: bool,note: String="") -> void:
+	if local_role!="player" or multiplayer.get_remote_sender_id()!=1:return
+	if not map_stream.offer(offers):_steam_transfer_failed(1,"Invalid background map catalog.");return
+	background_mode=true;map_preparing=preparing
+	if not note.is_empty():status_changed.emit(note.left(200))
+	_background_map_progress()
+
+@rpc("authority","call_remote","reliable",2)
+func receive_map_asset(packet: Dictionary) -> void:
+	if local_role!="player" or multiplayer.get_remote_sender_id()!=1:return
+	var result=map_stream.accept(packet)
+	if not result.ok:_steam_transfer_failed(1,result.error);return
+	var state: Dictionary=map_stream.received[result.id]
+	if result.complete or int(state.offset)%262144==0:acknowledge_map_asset.rpc_id(1,str(result.id),int(state.offset))
+	_background_map_progress()
+	if result.complete and not pending_map_snapshot.is_empty():
+		_install_snapshot(pending_map_snapshot)
+
+@rpc("any_peer","call_remote","reliable")
+func acknowledge_map_asset(id: String,offset: int) -> void:
+	if local_role!="dm":return
+	var peer=multiplayer.get_remote_sender_id()
+	if not peer_map_downloads.has(peer):return
+	var slot: Dictionary=peer_map_downloads[peer]
+	if not slot.offered.has(id) or offset<0 or offset>int(slot.offered[id].size):return
+	if slot.active==id and offset<=int(slot.offset):slot.acked=maxi(int(slot.acked),offset)
+	elif slot.files.has(id) and offset<=int(slot.files[id].offset):slot.files[id].acked=maxi(int(slot.files[id].acked),offset)
+	if offset==int(slot.offered[id].size):slot.done[id]=true
+
+func _background_map_progress() -> void:
+	var state=map_stream.progress();state.id="background-maps"
+	var now=Time.get_ticks_msec()
+	if now-map_rate_tick>=500:
+		map_rate=maxf(0.,float(state.received-map_rate_bytes)*1000./maxi(1,now-map_rate_tick));map_rate_tick=now;map_rate_bytes=state.received
+	state.rate_bps=map_rate
+	if map_preparing:
+		state.active=true
+		if state.received==state.total:state.phase="Preparing background maps…"
+	if not pending_map_snapshot.is_empty():state.phase="Downloading your map…"
+	map_transfer_state=state;map_transfer_progress.emit(state.duplicate())
+
+func _pump_background_maps() -> void:
+	if transport=="steam" and (not is_instance_valid(steam_link) or not steam_link.initialized):return
+	var peers=peer_map_downloads.keys()
+	if peers.is_empty():return
+	var began=Time.get_ticks_usec();var dry=0
+	# One chunk per turn keeps peers fair. Bounds are time/queue based, not a
+	# fixed low byte rate. Interactive snapshots are on a separate channel.
+	while Time.get_ticks_usec()-began<2000 and dry<peers.size():
+		var peer=peers[background_peer_cursor%peers.size()];background_peer_cursor+=1
+		if peer not in multiplayer.get_peers():dry+=1;continue
+		var slot: Dictionary=peer_map_downloads[peer]
+		if slot.active.is_empty():
+			if slot.queue.is_empty():dry+=1;continue
+			slot.active=slot.queue.pop_front();var resumed: Dictionary=slot.files.get(slot.active,{})
+			slot.offset=int(resumed.get("offset",0));slot.acked=int(resumed.get("acked",0))
+		if int(slot.offset)-int(slot.acked)>=4*1024*1024 or (transport=="steam" and not steam_link.can_send(peer)):dry+=1;continue
+		var record={}
+		for candidate in map_stream.records.values():
+			if candidate.id==slot.active:record=candidate;break
+		if record.is_empty():dry+=1;continue
+		var file=FileAccess.open(record.path,FileAccess.READ)
+		if file==null:status_changed.emit("A cached map file is unavailable. Reopen the campaign to prepare it again.");dry+=1;continue
+		file.seek(int(slot.offset));var bytes=file.get_buffer(mini(Hearth20MapStream.CHUNK,int(record.size)-int(slot.offset)));file.close()
+		if bytes.is_empty():dry+=1;continue
+		var error=rpc_id(peer,"receive_map_asset",{"id":slot.active,"offset":int(slot.offset),"bytes":bytes})
+		if error!=OK:dry+=1;continue
+		dry=0;slot.offset+=bytes.size()
+		if slot.offset==int(record.size):
+			slot.files[slot.active]={"offset":slot.offset,"acked":slot.acked};slot.active=""
+
+func _exit_tree() -> void:
+	map_stream.clear()
+
 func _process(delta: float) -> void:
 	if transport=="steam" or not steam_outgoing.is_empty():
-		steam_transfer_tick+=delta
-		if steam_transfer_tick>=1./60.:steam_transfer_tick=0.;_pump_steam_transfers()
+		_pump_steam_transfers()
+	if local_role=="dm" and not peer_map_downloads.is_empty():
+		if map_stream.tick(campaign):
+			for peer in peer_map_downloads:
+				_send_map_catalog(peer);_send_peer_snapshot(peer,str(peer_to_player.get(peer,"")))
+		_pump_background_maps()
 	if local_role!="dm" or campaign.is_empty():return
 	refreshment_tick+=delta
 	if refreshment_tick<.25:return
@@ -1410,6 +1584,8 @@ func _process(delta: float) -> void:
 func _make_steam_snapshot_job(peer: int,snapshot: Dictionary) -> Dictionary:
 	var cached=peer_steam_images.has(peer)
 	var packet=peer_steam_images[peer].encode(snapshot) if cached else snapshot.duplicate(true)
+	if snapshot.has("_h20_map_blob"):packet.erase("map_cached")
+	for asset_id in snapshot.get("_h20_asset_blobs",{}):packet.assets.erase(asset_id)
 	var state={"map":str(packet.get("map_sha256","")),"assets":"" if cached else Hearth20Contracts.sha256(var_to_bytes(packet.assets)),"light":Hearth20Contracts.sha256(var_to_bytes(snapshot.scene.get("light_field",{}))),"scene":str(packet.scene.get("id","")),"actors":snapshot.actors.map(func(actor):return str(actor.id))}
 	var previous: Dictionary=peer_asset_state.get(peer,{})
 	if cached:state.image_snapshot=snapshot

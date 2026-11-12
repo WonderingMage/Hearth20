@@ -342,8 +342,9 @@ static func template_visible(template: Dictionary, context: Dictionary) -> bool:
 
 static func view_actors(campaign: Dictionary, player: String, scene: Dictionary) -> Array:
 	return campaign.get("actors",[]).filter(func(actor):return actor is Dictionary and actor.get("owner_player_id","")==player and actor.get("scene_id","")==scene.get("id","") and not actor.get("in_inventory",false) and not actor.get("decorative",false) and actor.get("layer","tokens")=="tokens" and actor.get("vision",{}).get("enabled",true))
-static func view_actor_id(_campaign: Dictionary, _player: String, _scene: Dictionary) -> String:
-	return ""
+static func view_actor_id(campaign: Dictionary, player: String, scene: Dictionary) -> String:
+	var pawn=Hearth20PlayerMap.actor(campaign,player)
+	return str(pawn.get("id","")) if not pawn.get("in_inventory",false) and pawn.get("scene_id","")==scene.get("id","") else ""
 
 static func observer_level(observer: Dictionary, distance: float, illumination: int) -> int:
 	if float(observer.get("blindsight",0))>0 and distance<=float(observer.blindsight):return maxi(1,illumination)

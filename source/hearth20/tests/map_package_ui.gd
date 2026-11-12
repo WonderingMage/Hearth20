@@ -27,7 +27,7 @@ func run() -> void:
 	await screenshot("complete-map-package")
 	app._on_map_selected(fixture.path_join("lantern-larch.hearth20map"));await settle()
 	expect(app.campaign.scenes.size()==2 and app.map_tabs.tabs.get_child_count()==2,"duplicate imports get independent campaign tabs")
-	var hero=Hearth20TokenInventory.new_actor("Tab traveler",true,app.board.current_scene(),Vector2(15.5,16.5));hero.in_inventory=true;app.campaign.actors.append(hero)
+	var hero=Hearth20TokenInventory.new_actor("Tab traveler",true,app.board.current_scene(),Vector2(15.5,16.5));hero.owner_player_id="tab-player";hero.in_inventory=true;app.campaign.actors.append(hero)
 	app.session.set_blackout(true);await settle()
 	var tab: Button
 	for button in app.map_tabs.tabs.get_children():

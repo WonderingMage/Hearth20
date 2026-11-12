@@ -145,7 +145,7 @@ func download() -> void:
 	if request.request(release.metadata.browser_download_url,["User-Agent: Hearth20-Beta"])!=OK:_fail("The release information could not be downloaded.")
 func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByteArray) -> void:
 	if result!=HTTPRequest.RESULT_SUCCESS or code!=200:
-		_fail("No Hearth20 Beta release is published yet." if stage=="check" and code==404 else "The update could not be fetched (HTTP %d). Your game is unchanged."%code);return
+		_fail("No Hearth20 Beta release is published yet." if stage=="check" and code==404 else "Windows could not save the update. Check free space, folder access and antivirus protection history. Your current game is unchanged." if result==HTTPRequest.RESULT_DOWNLOAD_FILE_WRITE_ERROR else "The update could not be fetched (HTTP %d). Your game is unchanged."%code);return
 	if stage=="check":
 		var records=JSON.parse_string(body.get_string_from_utf8())
 		if not records is Array:_fail("GitHub returned unreadable release information. Try checking again.");return
@@ -194,6 +194,9 @@ func install() -> void:
 	install_requested=false;changed.emit()
 func _install_verified() -> void:
 	if not verified:return
+	# A previously verified file can be quarantined before Restart is clicked.
+	if not FileAccess.file_exists(staged_path) or FileAccess.get_sha256(staged_path)!=manifest.get("sha256",""):
+		verified=false;_notify("The downloaded update is no longer available or has changed. Security software may have blocked or quarantined it. Check its protection history and the official GitHub release. Your current game is unchanged.");return
 	if not is_instance_valid(app):app=null
 	if OS.has_feature("editor"):_notify("Restart updates are available in the portable edition.");return
 	if app!=null and not (app.session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer):_notify("Leave the multiplayer session before restarting for an update.");return
@@ -207,20 +210,21 @@ func _install_verified() -> void:
 	var folder=ProjectSettings.globalize_path(Hearth20Identity.UPDATE_ROOT)
 	if DirAccess.make_dir_recursive_absolute(folder)!=OK:_notify("The update folder could not be prepared. Check that it is writable.");return
 	var helper=folder.path_join("Hearth20UpdateHost.exe");var data=FileAccess.get_file_as_bytes("res://hearth20/updater/Hearth20UpdateHost.exe");var file=FileAccess.open(helper,FileAccess.WRITE)
-	if file==null:_notify("The update helper could not be prepared.");return
+	if file==null:_notify("Windows could not prepare the restart helper. Check folder access and antivirus protection history. Your current game is unchanged.");return
 	file.store_buffer(data);file.flush();var helper_error=file.get_error();file.close()
 	if helper_error!=OK:_notify("The update helper could not be written. Check free space and folder access.");return
+	if not FileAccess.file_exists(helper) or FileAccess.get_sha256(helper)!=Hearth20Contracts.sha256(data):_notify("The restart helper was blocked, removed or changed. Check antivirus protection history. Your current game is unchanged.");return
 	var plan={"edition":Hearth20Identity.EDITION,"version":release.version,"target":OS.get_executable_path(),"staged":staged_path,"sha256":manifest.sha256,"pid":OS.get_process_id()}
 	var path=folder.path_join("install-plan.json")
 	if not _write_json(path,plan):_notify("The update plan could not be written. Check free space and folder access, then try again.");return
 	for suffix in [".ready",".confirmed",".result"]:
 		if DirAccess.dir_exists_absolute(path+suffix) or (FileAccess.file_exists(path+suffix) and DirAccess.remove_absolute(path+suffix)!=OK):_notify("The previous update markers could not be cleared. Check folder access, then try again.");return
-	if OS.create_process(helper,[path])<0:_notify("Windows could not start the updater. Your game is unchanged.");return
+	if OS.create_process(helper,[path])<0:_notify("Windows could not start the restart helper. Check antivirus protection history for a blocked Hearth20UpdateHost.exe. Your game is unchanged.");return
 	busy=true;stage="install";_notify("Preparing your replacement portable and backup. Hearth20 will restart when ready…")
 	var deadline=Time.get_ticks_msec()+60000
 	while is_inside_tree() and not FileAccess.file_exists(path+".ready") and not FileAccess.file_exists(path+".result") and Time.get_ticks_msec()<deadline:await get_tree().create_timer(.15).timeout
 	if FileAccess.file_exists(path+".ready"):get_tree().quit()
-	else:_fail("The replacement could not be prepared. The current game is unchanged; check that the portable’s folder is writable and has enough free space.")
+	else:_fail("The replacement could not be prepared. Your current game is unchanged. Check free space, folder access and antivirus protection history for the update or restart helper.")
 static func _write_json(path: String,value: Dictionary) -> bool:
 	var file=FileAccess.open(path,FileAccess.WRITE)
 	if file==null:return false

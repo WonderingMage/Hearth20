@@ -554,9 +554,10 @@ func _draw_lighting(scene: Dictionary, cell_px: float, map_rect: Rect2) -> void:
 		Hearth20Lighting.draw_mesh(self,mesh,cell_px*camera_zoom,camera_pan*camera_zoom)
 
 func _draw_player_vision(cell_px: float) -> void:
-	if snapshot.get("scene", {}).get("id", "") == "blackout":
+	if snapshot.get("scene", {}).get("id", "") in ["blackout","unplaced","map-loading"]:
 		draw_rect(Rect2(Vector2.ZERO, get_rect().size), Color("#0b1015"))
-		_draw_empty_state("The table is covered", "Your character sheet and chat are still available.", "The DM will reveal the map when it is ready")
+		var id=str(snapshot.get("scene",{}).get("id",""))
+		_draw_empty_state("Waiting for your character" if id=="unplaced" else "Preparing your map" if id=="map-loading" else "The table is covered", "Your character sheet and chat are still available.", "The DM will place your token on a map" if id=="unplaced" else "Map files continue downloading in the background" if id=="map-loading" else "The DM will reveal the map when it is ready")
 		return
 	var mask: Dictionary = snapshot.get("vision_mask", {})
 	if mask.is_empty():

@@ -260,6 +260,7 @@ func _update_labels() -> void:
 	layer_button.text={"tokens":"Tokens","gm":"DM layer","map":"Map","foreground":"Foreground","light":"Light"}.get(app.board.active_layer,"Tokens")
 	zoom_value.text="%d%%" % roundi(app.board.camera_zoom*100)
 	map_detail.text="%d tokens  ·  %s" % [app.board.current_actors().size(),"Snap on" if scene.get("snap_to_grid",true) else "Free placement"]
+	map_detail.visible=not download_meter.visible
 	app.inspector_toggle.text=""
 	app.inspector_toggle.button_pressed=app.inspector_tabs.visible
 	app.chat_shortcut_button.text="Chat"+(" · %d"%app.unread_chat_count if app.unread_chat_count>0 else "")
@@ -272,13 +273,16 @@ func _update_labels() -> void:
 	search_button.custom_minimum_size.x=74 if compact else 160
 	app.toolbox.refresh_density(size.y<720)
 	var waiting: bool=is_player and (scene.is_empty() or scene.get("id","")=="disconnected")
+	var gate: String=str(scene.get("id","")) if is_player else ""
+	var gated: bool=gate in ["unplaced","map-loading","blackout"]
 	var empty: bool=not is_player and str(scene.get("map_asset","")).is_empty() and app.board.current_actors().is_empty()
 	for collection in ["annotations","walls","doors","props","fog_rects"]:
 		if not scene.get(collection,[]).is_empty(): empty=false
-	welcome_card.visible=waiting or empty
-	welcome_title.text="Your seat is ready." if waiting else "Set the scene."
-	welcome_copy.text="Connect to your GM's table to receive your character and the scene." if waiting else "Bring your battle map, gather your party, and make the table your own."
+	welcome_card.visible=waiting or empty or gated
+	welcome_title.text="Waiting for your hero." if gate=="unplaced" else "Preparing your map." if gate=="map-loading" else "The table is covered." if gate=="blackout" else "Your seat is ready." if waiting else "Set the scene."
+	welcome_copy.text="The DM will place your character from the token inventory. Your sheet and chat are still available, and map downloads continue in the background." if gate=="unplaced" else "Your token's map is downloading. Other maps continue preparing in the background, ready for your next destination." if gate=="map-loading" else "The DM will reveal the map when it is ready. Your sheet and chat are still available." if gate=="blackout" else "Connect to your GM's table to receive your character and the scene." if waiting else "Bring your battle map, gather your party, and make the table your own."
 	welcome_import.text="Connect to a table" if waiting else "Import a map"
+	welcome_import.visible=not gated
 	welcome_open.visible=not is_player
 	var board_width: float=app.board.size.x
 	welcome_card.offset_left=-minf(218,board_width*0.5-24)

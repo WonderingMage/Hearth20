@@ -178,7 +178,9 @@ func can_send(peer_id: int) -> bool:
 	if int(status.get("response",0))!=1:return false
 	var details: Dictionary=status.get("connection_status",{})
 	var rate=maxi(65536,int(details.get("send_rate",262144)))
-	var pending_limit=clampi(int(float(rate)*.025)+32768,65536,4194304)
+	# A 25 ms-only window starves long-distance links between callbacks. Allow
+	# roughly one RTT of useful work while retaining a bounded native queue.
+	var pending_limit=clampi(int(float(rate)*(.025+float(details.get("ping",50))/1000.))+65536,131072,4194304)
 	var unacknowledged_limit=clampi(int(float(rate)*(.1+2.*float(details.get("ping",50))/1000.)),524288,8388608)
 	return int(details.get("pending_reliable",99999999))<pending_limit and int(details.get("sent_unacknowledged_reliable",99999999))<unacknowledged_limit
 func invite_friends() -> Dictionary:

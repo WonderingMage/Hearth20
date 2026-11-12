@@ -338,7 +338,8 @@ static func authorize_and_apply_move(campaign: Dictionary, authenticated_player:
 	if not finite_point(expected_from) or not finite_point(destination) or not is_finite(measured_distance_feet) or measured_distance_feet < 0.0 or measured_distance_feet > 1_000_000.0:
 		return {"ok": false, "reason": "invalid_move"}
 	var actor := find_actor(campaign, actor_id)
-	if actor.is_empty() or actor.get("in_inventory",false) or str(actor.get("scene_id", "")) != str(campaign.get("active_scene", "")):
+	var permitted_scene: Dictionary = find_scene(campaign,str(campaign.get("active_scene",""))) if actor_role=="dm" else Hearth20PlayerMap.scene(campaign,authenticated_player)
+	if actor.is_empty() or actor.get("in_inventory",false) or str(actor.get("scene_id", "")) != str(permitted_scene.get("id","")):
 		return {"ok": false, "reason": "unknown_or_inactive_actor"}
 	if actor.get("position") != expected_from:
 		return {"ok": false, "reason": "stale_origin"}
@@ -356,6 +357,7 @@ static func authorize_and_apply_move(campaign: Dictionary, authenticated_player:
 		actor.position = destination
 		campaign.revision = int(campaign.get("revision", 0)) + 1
 		return {"ok": true, "reason": "dm_override", "position": destination}
+	if bool(campaign.get("map_covered",false)) or bool(scene.get("blackout",false)):return {"ok":false,"reason":"map_covered"}
 	if actor.get("layer","tokens") != "tokens": return {"ok":false,"reason":"token_layer_required"}
 	var route=path if not path.is_empty() else [expected_from,destination]
 	for index in range(1,route.size()):
@@ -385,7 +387,7 @@ static func authorize_and_apply_move(campaign: Dictionary, authenticated_player:
 	elif mode == "grant":
 		if policy.get("expiry") == "turn" and str(campaign.get("turn_id", "")) != str(policy.get("expiry_id", "")):
 			return {"ok": false, "reason": "grant_expired"}
-		if policy.get("expiry") == "scene" and str(campaign.get("active_scene", "")) != str(policy.get("expiry_id", "")):
+		if policy.get("expiry") == "scene" and str(scene.id) != str(policy.get("expiry_id", "")):
 			return {"ok": false, "reason": "grant_expired"}
 		if measured_distance_feet > float(policy.get("remaining_feet", 0.0)):
 			return {"ok": false, "reason": "insufficient_grant"}

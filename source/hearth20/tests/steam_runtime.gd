@@ -10,6 +10,8 @@ func run() -> void:
 	expect(not link.initialized and not Engine.has_singleton("Steam"),"native Steam is lazy at startup")
 	var loaded=Hearth20SteamRuntime.load_native();expect(loaded.ok,"pinned extension extracts, verifies and loads in the real engine")
 	expect(Engine.has_singleton("Steam") and ClassDB.class_exists("SteamMultiplayerPeer"),"native lobby and peer APIs are both registered")
+	var peer=ClassDB.instantiate("SteamMultiplayerPeer");peer.transfer_channel=2
+	expect(peer.transfer_channel==2,"native peer accepts the dedicated background-map channel without signing in")
 	var native=Engine.get_singleton("Steam")
 	for name_value in ["steamInitEx","run_callbacks","createLobby","joinLobby","leaveLobby","getLobbyData","setLobbyData","inviteUserToLobby","getConnectionRealTimeStatus","setGlobalConfigValueInt32"]:expect(native.has_method(name_value),"native API is present: "+name_value)
 	for name_value in ["lobby_created","lobby_joined","join_requested","lobby_data_update","steam_shutdown"]:expect(native.has_signal(name_value),"native signal is present: "+name_value)

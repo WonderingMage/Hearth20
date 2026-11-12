@@ -65,6 +65,7 @@ func run() -> void:
 	expect(not chunks.cancel(1,"invalid"),"cancellation accepts only bounded transfer IDs")
 	var session=Hearth20Session.new();root.add_child(session);session.configure(Hearth20Identity.new_campaign("Real inn image reuse"))
 	expect(session.load_sample_map("lantern-larch-inn",false).ok,"real sample inn loads into the data-only fixture")
+	var viewer=Hearth20TokenInventory.new_actor("Image viewer",true,Hearth20Contracts.find_scene(session.campaign,session.campaign.active_scene),Vector2(4.5,5.5));viewer.owner_player_id="image-reuse-player";session.campaign.actors.append(viewer)
 	var original=session._project_for("image-reuse-player");var known=Hearth20SteamImages.new();known.remember(original,true)
 	session.set_blackout(true);known.remember(session._project_for("image-reuse-player"),true)
 	var began=Time.get_ticks_usec();session.set_blackout(false);var unmasked=session._project_for("image-reuse-player");var elapsed=Time.get_ticks_usec()-began
