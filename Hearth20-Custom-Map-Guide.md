@@ -251,6 +251,8 @@ Importing the package adds a map to the current campaign and moves the currently
 
 The host sees loaded maps as horizontal tabs. Left-click opens a map. Right-click a particular tab and choose **Bring all heroes here** to gather heroes, including stored heroes, onto that specific map. This action is host-only. Map names and editor controls are not shown to players while the map is covered.
 
+From Beta 0.3.14, a successful import removes the unused default **New scene** tab. Stored tokens survive that cleanup. A starter board containing tokens, drawings or a custom name is retained as authored campaign content. The map context menu closes before changing scenes, and Escape or a click outside dismisses it.
+
 ## 10. Import, concealment and delivery behavior
 
 The user imports the single `.hearth20map` through **+ Map** or the map-file picker. It installs the correct grid immediately, along with editable geometry, source-aware lights and foreground actors. It does not open the manual width-calibration prompt. Save the campaign afterward to persist all embedded assets and placements. Saving/reopening does not require the authoring folder to remain on disk.

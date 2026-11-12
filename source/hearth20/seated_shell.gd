@@ -261,6 +261,9 @@ func _input(event: InputEvent) -> void:
 				if absf(crossing.x)<.46 and crossing.z>.73 and crossing.z<1.4:focus_sheet();get_viewport().set_input_as_handled()
 				elif absf(crossing.x)<1.36 and absf(crossing.z+.13)<.95:focus_map();get_viewport().set_input_as_handled()
 func _unhandled_key_input(event: InputEvent) -> void:
+	if is_instance_valid(app.map_tabs) and app.map_tabs.menu.visible:
+		app.map_tabs.menu.handle_key(event)
+		get_viewport().set_input_as_handled();return
 	if has_modal():return
 	if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE and focus_state!="table":leave_focus();get_viewport().set_input_as_handled()
 func has_modal() -> bool:

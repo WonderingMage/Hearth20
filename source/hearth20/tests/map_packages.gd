@@ -22,7 +22,7 @@ func run() -> void:
 	var hero=Hearth20TokenInventory.new_actor("Owned hero",true,campaign.scenes[0],Vector2(2.5,2.5));hero.owner_player_id="pilot";hero.movement_policy=Hearth20Contracts.default_movement_policy("free_until_revoked",["pilot"]);campaign.actors.append(hero)
 	session.set_blackout(true)
 	var result=session.import_map_package(valid)
-	expect(result.ok and campaign.scenes.size()==2,"import adds a new scene and retains the current campaign")
+	expect(result.ok and campaign.scenes.size()==1 and Hearth20Contracts.find_scene(campaign,"scene-start").is_empty(),"import replaces the empty starter without leaving a New scene tab")
 	var scene=Hearth20Contracts.find_scene(campaign,campaign.active_scene)
 	expect(scene.blackout and campaign.map_covered,"an imported map stays concealed while the table cover is on")
 	expect(Hearth20Contracts.find_actor(campaign,hero.id).scene_id==scene.id and Hearth20Contracts.find_actor(campaign,hero.id).movement_policy.controllers==["pilot"],"party placement keeps identity and control grants")
@@ -41,7 +41,7 @@ func run() -> void:
 	var saved=Hearth20Identity.SAVE_ROOT.path_join("map-package-test.h20scampaign")
 	expect(Hearth20Identity.save_campaign(campaign,saved).ok,"self-contained imported map saves")
 	var loaded=Hearth20Identity.load_campaign(saved)
-	expect(loaded.ok and loaded.campaign.scenes.size()==2 and loaded.campaign.actors.filter(func(a):return a.get("decorative",false))[0].rotation_degrees==18.,"saved walls, lights, foreground and geometry round-trip")
+	expect(loaded.ok and loaded.campaign.scenes.size()==1 and loaded.campaign.actors.filter(func(a):return a.get("decorative",false))[0].rotation_degrees==18.,"saved walls, lights, foreground and geometry round-trip")
 	var prior=var_to_bytes(campaign)
 	for name in ["bad-sha","bad-grid","bad-wall","bad-light","bad-window-id","bad-foreground","bad-id","bad-entry","unknown-field","path-traversal","unreferenced","compressed","duplicate","truncated","bad-directory"]:
 		var failed=session.import_map_package(fixture.path_join(name+".hearth20map"))

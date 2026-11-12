@@ -72,6 +72,7 @@ func _ready() -> void:
 
 func configure(campaign_data: Dictionary) -> void:
 	campaign = campaign_data
+	Hearth20MapLibrary.discard_empty_starter(campaign,str(campaign.get("active_scene","")))
 	if not campaign.has("map_covered"):
 		campaign.map_covered=bool(Hearth20Contracts.find_scene(campaign,str(campaign.get("active_scene",""))).get("blackout",false))
 	_sync_map_cover()

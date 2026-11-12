@@ -21,12 +21,12 @@ func run() -> void:
 	var fixture=OS.get_environment("H20_MAP_FIXTURES")
 	if fixture.is_empty():fixture=ProjectSettings.globalize_path("res://../qa/map-packages/fixtures")
 	app._on_map_selected(fixture.path_join("lantern-larch.hearth20map"));await settle()
-	expect(app.campaign.scenes.size()==2 and not is_instance_valid(shell.get_node_or_null("GridCalibration")),"actual import callback installs the complete package without a scale popup")
-	expect(app.map_tabs.tabs.get_child_count()==2 and app.map_tabs.visible,"DM sees browser-like tabs for loaded maps")
+	expect(app.campaign.scenes.size()==1 and not is_instance_valid(shell.get_node_or_null("GridCalibration")),"actual import installs the package without a starter tab or scale popup")
+	expect(app.map_tabs.tabs.get_child_count()==1 and app.map_tabs.visible,"DM sees tabs for actual loaded maps")
 	var first_id: String=app.campaign.active_scene
 	await screenshot("complete-map-package")
 	app._on_map_selected(fixture.path_join("lantern-larch.hearth20map"));await settle()
-	expect(app.campaign.scenes.size()==3 and app.map_tabs.tabs.get_child_count()==3,"duplicate imports get independent campaign tabs")
+	expect(app.campaign.scenes.size()==2 and app.map_tabs.tabs.get_child_count()==2,"duplicate imports get independent campaign tabs")
 	var hero=Hearth20TokenInventory.new_actor("Tab traveler",true,app.board.current_scene(),Vector2(15.5,16.5));hero.in_inventory=true;app.campaign.actors.append(hero)
 	app.session.set_blackout(true);await settle()
 	var tab: Button
@@ -48,7 +48,7 @@ func run() -> void:
 	for i in 20:
 		var extra=app.board.current_scene().duplicate(true);extra.id="overflow-tab-"+str(i);extra.title="An extremely long map title to test horizontal overflow "+str(i);app.campaign.scenes.append(extra)
 	app.map_tabs.refresh();await settle()
-	expect(app.map_tabs.tabs.get_child_count()==23 and app.map_tabs.size.x<=app.size.x,"many long map names scroll inside the strip instead of widening the interface")
+	expect(app.map_tabs.tabs.get_child_count()==22 and app.map_tabs.size.x<=app.size.x,"many long map names scroll inside the strip instead of widening the interface")
 	await screenshot("map-tabs-overflow")
 	app.campaign.scenes=original_scenes;app.map_tabs.refresh();await settle()
 	var link=root.get_node("SteamLink");var api=Fakes.Api.new();root.add_child(api);link.api=api;link.fake_backend=true;link.peer_factory=func():return Fakes.Peer.new()

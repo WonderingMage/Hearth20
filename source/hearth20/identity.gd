@@ -6,7 +6,7 @@ class_name Hearth20Identity
 const PRODUCT_ID := "com.wonderingmage.hearth20.seated"
 const PRODUCT_NAME := "Hearth20 Beta"
 const EDITION := "hearth20-seated"
-const VERSION := "0.3.13-beta"
+const VERSION := "0.3.14-beta"
 const UPDATE_CHANNEL_DEFAULT := "beta"
 const SCHEMA_ID := "hearth20.seated.campaign.v1"
 const SCHEMA_VERSION := 1

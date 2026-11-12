@@ -179,6 +179,7 @@ static func import_into(campaign: Dictionary, path: String, move_party: bool=tru
 			if actor.get("is_hero",false) and not actor.get("in_inventory",false) and actor.get("scene_id","")==old_scene:
 				actor.scene_id=scene.id;actor.position=places[index];index+=1
 	proposed.revision=int(proposed.get("revision",0))+1
+	Hearth20MapLibrary.discard_empty_starter(proposed,scene.id)
 	var checked:=Hearth20Contracts.validate_campaign(proposed)
 	if not checked.ok:return _fail("Import rejected: "+"; ".join(checked.errors))
 	if JSON.stringify(Hearth20Identity._encode_variant(proposed)).to_utf8_buffer().size()>Hearth20Identity.MAX_SAVE_BYTES:return _fail("Adding this map would exceed the 64 MiB campaign save budget.")

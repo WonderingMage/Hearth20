@@ -87,6 +87,10 @@ func run() -> void:
 	var studio=app.open_fx_studio();await capture("effects-atelier-1000",studio);studio.queue_free();await settle()
 	var library=app._open_map_library();await capture("map-library-1000",library);library.queue_free();await settle();shell.leave_focus()
 	await inspect_route(shell);shell.leave_focus()
+	if "--map-only" in OS.get_cmdline_user_args():
+		shell.queue_free();await create_timer(.6).timeout
+		FileAccess.open(output.path_join("layout.json"),FileAccess.WRITE).store_string(JSON.stringify(records,"  "))
+		print("Map-only layout audit: %d screens"%records.size());quit();return
 	app.session.set_table_mode("casino")
 	while shell.current_mode!="casino" or shell.switching:await process_frame
 	for dimensions in [Vector2i(1280,720),Vector2i(1000,650),Vector2i(1920,1080)]:

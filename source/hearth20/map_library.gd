@@ -6,6 +6,22 @@ const SCENERY := {"lantern-larch-inn":[{"asset":"brass-chandelier","position":Ve
 static var _catalog: Array=[]
 static var _textures: Dictionary={}
 
+static func discard_empty_starter(campaign: Dictionary, destination_id: String) -> void:
+	if destination_id=="scene-start" or Hearth20Contracts.find_scene(campaign,destination_id).is_empty():return
+	var starter:=Hearth20Contracts.find_scene(campaign,"scene-start")
+	if starter.is_empty() or starter.get("title","")!="New scene" or not str(starter.get("map_asset","")).is_empty():return
+	for field in ["walls","doors","props","annotations","fx","fog_rects","notes","description","gm_notes","map_description"]:
+		if not is_empty_value(starter.get(field)):return
+	for actor in campaign.get("actors",[]):
+		if actor.get("scene_id","")=="scene-start" and not actor.get("in_inventory",false):return
+	# Stored pawns are campaign inventory, not contents of the empty board.
+	for actor in campaign.get("actors",[]):
+		if actor.get("scene_id","")=="scene-start":actor.scene_id=destination_id
+	campaign.scenes=campaign.scenes.filter(func(scene):return scene.id!="scene-start")
+
+static func is_empty_value(value: Variant) -> bool:
+	return value==null or (value is Array and value.is_empty()) or (value is String and value.is_empty())
+
 static func catalog() -> Array:
 	if _catalog.is_empty():
 		var parsed: Variant=JSON.parse_string(FileAccess.get_file_as_string(ROOT+"catalog.json"))
@@ -76,6 +92,7 @@ static func add_to_campaign(campaign: Dictionary, map_id: String, move_party: bo
 			actor.position=Hearth20TokenInventory.snap_position(prepared,Vector2(float(entry.x),float(entry.y)))
 			index+=1
 	proposed.revision=int(proposed.get("revision",0))+1
+	discard_empty_starter(proposed,prepared.id)
 	var checked:=Hearth20Contracts.validate_campaign(proposed)
 	if not checked.ok: return {"ok":false,"error":"; ".join(checked.errors)}
 	if JSON.stringify(Hearth20Identity._encode_variant(proposed)).to_utf8_buffer().size()>Hearth20Identity.MAX_SAVE_BYTES: return {"ok":false,"error":"Adding this map would exceed the campaign save size limit."}

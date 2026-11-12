@@ -930,6 +930,8 @@ func _set_dynamic_lighting(enabled: bool) -> void:
 		_on_status(str(result.get("error", "Lighting could not be updated.")))
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if is_instance_valid(map_tabs) and map_tabs.menu.visible:
+		map_tabs.menu.handle_key(event);get_viewport().set_input_as_handled();return
 	if casino_portal!=null and casino_portal.phase!="closed":
 		if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
 			var table=casino_portal.scene

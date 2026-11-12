@@ -714,10 +714,12 @@ func import_map(path: String) -> Dictionary:
 	scene.width_cells = target_cells
 	scene.height_cells = maxi(1, ceili(float(inspected.height) / float(scene.cell_pixels)))
 	scene.map_asset = asset_id
+	if scene.get("title","")=="New scene":scene.title=path.get_file().get_basename().strip_edges().left(96)
 	scene.map_width = int(inspected.width)
 	scene.map_height = int(inspected.height)
 	scene.calibration_width_cells = target_cells
 	if not grid.is_empty():scene.feet_per_cell=float(grid.feet_per_cell)
+	Hearth20MapLibrary.discard_empty_starter(campaign,str(scene.id))
 	campaign.revision = int(campaign.get("revision", 0)) + 1
 	actor_image_cache.clear()
 	map_texture_cache = null
