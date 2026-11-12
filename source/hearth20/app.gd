@@ -69,7 +69,8 @@ var grid_state_label: Label
 var sheet_page: ScrollContainer
 var chat_page: ScrollContainer
 var journal_page: ScrollContainer
-var help_page: ScrollContainer
+var token_sheet_page: ScrollContainer
+var sidebar_role := ""
 var sheet_summary: Label
 var sheet_actions: VBoxContainer
 var chat_feed: RichTextLabel
@@ -441,25 +442,24 @@ func _build_player_pages() -> void:
 	_add_button(journal, "New handout", _new_handout)
 	handout_save_button = _add_button(journal, "Save handout", _save_handout)
 	_refresh_handouts()
-	help_page = ScrollContainer.new()
-	help_page.name = "Help"
-	inspector_tabs.add_child(help_page)
-	var help := VBoxContainer.new()
-	help.custom_minimum_size.x = 310
-	help_page.add_child(help)
-	_add_header(help, "QUICK CONTROLS")
-	var help_text := Label.new()
-	help_text.text = "Use Sheet for D&D Beyond. Use Dice for a manual dice expression and modifier; choose the roll audience there. S opens Sheet, C opens Chat, J opens Journal, M toggles the ruler, 1–4 pick map tools, F fits the map, Shift-click pings, Space + drag pans, and Esc cancels the current action."
-	help_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	help.add_child(help_text)
-	_add_header(help, "VISION")
-	var vision_note := Label.new()
-	vision_note.text = "Everyone shares the DM’s environmental lighting. Character senses stay on D&D Beyond. The DM can cover the map or mask specific areas to keep them private."
-	vision_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	help.add_child(vision_note)
+	token_sheet_page = ScrollContainer.new()
+	token_sheet_page.name = "Token Sheet"
+	token_sheet_page.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	inspector_tabs.add_child(token_sheet_page)
+	var token_sheet := VBoxContainer.new()
+	token_sheet.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	token_sheet.add_theme_constant_override("separation",16)
+	token_sheet_page.add_child(token_sheet)
+	_add_header(token_sheet, "TOKEN SHEET")
+	var development := Label.new()
+	development.text = "In development"
+	development.add_theme_font_size_override("font_size",20)
+	development.add_theme_color_override("font_color",Hearth20Design.MUTED)
+	development.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	token_sheet.add_child(development)
 	workspace_tabs = TabContainer.new()
 	workspace_tabs.name = "Workspace"
-	for page in [scene_page, token_page, session_page, author_page, help_page]:
+	for page in [scene_page, token_page, session_page, author_page, token_sheet_page]:
 		inspector_tabs.remove_child(page)
 		workspace_tabs.add_child(page)
 	inspector_tabs.add_child(workspace_tabs)
@@ -1908,15 +1908,18 @@ func _on_host_state(value: Dictionary) -> void:
 	_refresh_vision_controls()
 
 func _update_session_ui() -> void:
-	var previous_tab: int = inspector_tabs.current_tab
+	var previous_page: Control = inspector_tabs.get_current_tab_control()
+	var previous_workspace: Control = workspace_tabs.get_current_tab_control()
 	var player_mode: bool = session.local_role == "player"
+	var role_changed: bool = sidebar_role != session.local_role
+	sidebar_role = session.local_role
 	var session_active: bool = not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer)
 	dm_rail.visible = true
 	if toolbox != null: toolbox.refresh_role()
-	for page in [scene_page, token_page, author_page]:
+	for page in [scene_page, token_page, author_page, token_sheet_page]:
 		var page_index: int = workspace_tabs.get_tab_idx_from_control(page)
 		if page_index >= 0:
-			workspace_tabs.set_tab_hidden(page_index, player_mode)
+			if workspace_tabs.is_tab_hidden(page_index)!=player_mode:workspace_tabs.set_tab_hidden(page_index, player_mode)
 	if player_mode:
 		var active_workspace_page: int = workspace_tabs.current_tab
 		if active_workspace_page >= 0 and workspace_tabs.is_tab_hidden(active_workspace_page):
@@ -1928,21 +1931,21 @@ func _update_session_ui() -> void:
 	network_controls.visible = not player_mode and not session_active
 	player_session_note.visible = player_mode or session_active
 	leave_session_button.visible = session_active
-	if sheet_page != null:
-		sheet_page.visible = true
-		chat_page.visible = true
-		journal_page.visible = true
-		help_page.visible = true
+	# TabContainer owns each page's visibility. Calling show() on an inactive
+	# page selects it, so data refreshes must only update tab permissions.
 	if player_mode:
 		player_session_note.text = "Connecting as a player. The DM controls the scene, vision and outcomes."
 		leave_session_button.text = "Leave table"
 	elif session_active:
 		player_session_note.text = "Hosting Hearth20. The DM retains scene authority. Campaign loading and another session are disabled until hosting ends."
 		leave_session_button.text = "End hosted table"
-	if player_mode:
+	if player_mode and role_changed:
 		inspector_tabs.current_tab = inspector_tabs.get_tab_idx_from_control(sheet_page)
 	else:
-		inspector_tabs.current_tab = previous_tab
+		if is_instance_valid(previous_page):inspector_tabs.current_tab = inspector_tabs.get_tab_idx_from_control(previous_page)
+	if is_instance_valid(previous_workspace):
+		var workspace_index := workspace_tabs.get_tab_idx_from_control(previous_workspace)
+		if workspace_index>=0 and not workspace_tabs.is_tab_hidden(workspace_index):workspace_tabs.current_tab=workspace_index
 	if dm_notes_editor != null:
 		dm_notes_editor.visible = not player_mode
 		dm_notes_save_button.visible = not player_mode
