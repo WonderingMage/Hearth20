@@ -4,7 +4,9 @@
 
 A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.18](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.18-beta)
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.19](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.19-beta)
+
+The 0.3.19 update enables **View saved tables** beside Save during a hosted game. Browse saves without disconnecting; restoration is available after the session ends, with a clear explanation while hosting.
 
 The 0.3.18 update corrects Steam send-rate configuration: the app now applies matched chosen rates to each connection and adjusts them using measured traffic, quality and latency. **Connections → Connection details** shows requested and effective rates, actual traffic and queues. The previous high-maximum-only setting did not establish real available throughput. Actual speed on the user’s two-PC route still requires a new report or live test.
 

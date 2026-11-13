@@ -95,7 +95,7 @@ func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer,
 	app.save_button.custom_minimum_size.y=36
 	app.save_button.size_flags_vertical=Control.SIZE_SHRINK_CENTER
 	toolbar.add_child(app.save_button)
-	for item in [[app.load_button,"open","Open a saved table"],[app.inspector_toggle,"panel","Show or hide the inspector"]]:
+	for item in [[app.load_button,"open","View saved tables"],[app.inspector_toggle,"panel","Show or hide the inspector"]]:
 		var button: Button=item[0]
 		button.text=""
 		button.icon=Hearth20Design.icon(str(item[1]),19)

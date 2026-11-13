@@ -1757,9 +1757,6 @@ func _load_campaign() -> void:
 	if board.role != "dm":
 		_on_status("Only the DM can load the campaign.")
 		return
-	if not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer) or not session.remote_players.is_empty():
-		_on_status("Disconnect the active table before loading another campaign.")
-		return
 	Hearth20CampaignVault.open(seated_shell if seated_shell!=null else self,self,"open")
 
 func install_loaded_campaign(loaded_campaign: Dictionary,source_path="") -> Dictionary:
@@ -1932,7 +1929,8 @@ func _update_session_ui() -> void:
 			workspace_tabs.current_tab = workspace_tabs.get_tab_idx_from_control(session_page)
 	save_button.visible = not player_mode
 	load_button.visible = not player_mode
-	load_button.disabled = session_active
+	load_button.disabled = false
+	load_button.tooltip_text = "View saved tables · end the session before restoring" if session_active else "View saved tables"
 	host_button.disabled = session_active
 	network_controls.visible = not player_mode and not session_active
 	player_session_note.visible = player_mode or session_active

@@ -10,6 +10,8 @@ var details: Label
 var preview: TextureRect
 var name_field: LineEdit
 var primary: Button
+var restore_note: Label
+var last_restore_allowed=true
 var selected_path=""
 static func open(owner: Node,owner_app: Hearth20App=null,mode="open",callback: Callable=Callable()) -> Hearth20CampaignVault:
 	for child in owner.get_children():
@@ -36,12 +38,14 @@ func setup() -> void:
 	name_field=LineEdit.new();name_field.placeholder_text="Campaign name";name_field.max_length=96;name_field.custom_minimum_size.y=44;name_field.visible=action=="save";right.add_child(name_field)
 	if app!=null:name_field.text=str(app.campaign.get("title","New table"))
 	name_field.text_changed.connect(func(_text):refresh_primary())
+	restore_note=label(right,"End the active session before restoring a saved table. You can browse saves and return to your game here.",14);restore_note.visible=false
 	var footer=HBoxContainer.new();footer.add_theme_constant_override("separation",12);column.add_child(footer)
 	button(footer,"Open AppData save folder",func():DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(Hearth20Identity.SAVE_ROOT));OS.shell_open(ProjectSettings.globalize_path(Hearth20Identity.SAVE_ROOT)))
 	var spacer=Control.new();spacer.size_flags_horizontal=Control.SIZE_EXPAND_FILL;footer.add_child(spacer);button(footer,"Back",queue_free)
 	primary=button(footer,"Save new table" if action=="save" else "Open selected table",confirm);primary.custom_minimum_size.x=190
 	listing=Hearth20CampaignJob.new();listing.list_tables();refresh_primary();Hearth20Design.popup_window(self)
 func _process(_delta: float) -> void:
+	if action=="open" and last_restore_allowed!=can_restore():refresh_primary()
 	if listing==null or not listing.done():return
 	var records: Array=listing.finish();listing=null
 	if action=="save":records=records.filter(func(record):return not record.get("autosave",false))
@@ -70,8 +74,13 @@ func select_record(record: Dictionary) -> void:
 	refresh_primary()
 func refresh_primary() -> void:
 	if not is_instance_valid(primary):return
+	last_restore_allowed=can_restore()
+	if is_instance_valid(restore_note):restore_note.visible=action=="open" and not last_restore_allowed
 	primary.text=("Save new table" if selected_path.is_empty() else "Save selected table") if action=="save" else "Open selected table"
-	primary.disabled=name_field.text.strip_edges().is_empty() if action=="save" else selected_path.is_empty()
+	primary.disabled=name_field.text.strip_edges().is_empty() if action=="save" else selected_path.is_empty() or not last_restore_allowed
+	primary.tooltip_text="End the active session before restoring a saved table" if action=="open" and not last_restore_allowed else ""
+func can_restore() -> bool:
+	return app==null or (app.session.local_role=="dm" and app.session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer and app.session.remote_players.is_empty())
 func confirm() -> void:
 	if action=="save":
 		if app==null or name_field.text.strip_edges().is_empty():return
@@ -79,7 +88,7 @@ func confirm() -> void:
 		hide();app.begin_campaign_save(target,name_field.text.strip_edges());queue_free()
 	elif not selected_path.is_empty():
 		if app!=null:
-			if not app.session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer:status.text="Leave the active table before opening a different campaign.";return
+			if not can_restore():refresh_primary();return
 			hide();Hearth20CampaignProgress.open(app,"load",selected_path);queue_free()
 		elif choose_callback.is_valid():hide();choose_callback.call(selected_path);queue_free()
 func _exit_tree() -> void:

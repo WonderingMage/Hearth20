@@ -8,6 +8,8 @@ The main thread detaches campaign dictionaries/arrays and captures the notes edi
 
 The bottom-edge gold indicator ignores mouse input and appears over map/table views without an exclusive window or pause. Completion briefly says Autosaved. Saving never installs a campaign, clears tokens, changes the revision, moves the camera, selects a sidebar tab or redirects the manual-save path. The autosave is labeled in Open saved tables; the automatic slot is excluded from manual Save targets.
 
+Since 0.3.19, the folder button beside Save opens **View saved tables** during an active hosted session. Browsing and closing this vault do not disconnect anyone or replace the current campaign. The restore action stays disabled with an explanation until the session ends, and checks the session again when confirmed. If the session ends while the vault is open, its restore controls update automatically. Player clients do not get this DM control.
+
 ## Correction to the 0.3.17 bandwidth claim
 
 The user confirmed both devices run 0.3.17 and sustain 300+ Mbps speed tests, but Hearth20 receives about 0.1 MB/s. Those units differ: 300 Mbps is 37.5 decimal MB/s before overhead. This discrepancy should not have been explained primarily as ordinary upload sharing without examining the effective Steam rate.
