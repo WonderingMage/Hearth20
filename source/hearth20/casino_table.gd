@@ -63,9 +63,12 @@ func setup(textures: Dictionary) -> void:
 	var key=DirectionalLight3D.new();key.rotation_degrees=Vector3(-58,-24,0);key.light_color=Color("#ffd298");key.light_energy=.75;key.shadow_enabled=true;key.directional_shadow_max_distance=15;world.add_child(key)
 	bronze=_surface(2,.72,.38);wood=_surface(0,.04,.83);felt=_surface(1,0,.97)
 	room=Hearth20TavernRoom.new();world.add_child(room);room.setup(self)
-	_lathe(world,Vector3.ZERO,[[.0,.65],[1.0,.65],[1.0,.75],[.98,.8],[.94,.83],[0.,.83]],2.42,1.53,wood,64)
-	_lathe(world,Vector3.ZERO,[[1.,.838],[.0,.838]],2.17,1.29,felt,64)
-	for band in [[2.38,1.49,.77],[2.20,1.32,.835]]:_ring(Vector3(0,band[2],0),band[0],band[1],.012,bronze)
+	var crafted_table=Hearth20GeneratedModels.make("table",Vector3(4.84,.84,3.06))
+	if crafted_table!=null:world.add_child(crafted_table)
+	else:
+		_lathe(world,Vector3.ZERO,[[.0,.65],[1.0,.65],[1.0,.75],[.98,.8],[.94,.83],[0.,.83]],2.42,1.53,wood,64)
+		_lathe(world,Vector3.ZERO,[[1.,.838],[.0,.838]],2.17,1.29,felt,64)
+		for band in [[2.38,1.49,.77],[2.20,1.32,.835]]:_ring(Vector3(0,band[2],0),band[0],band[1],.012,bronze)
 	for x in [-1.87,1.87]:_candle(Vector3(x,.84,-.1))
 	_goblet(Vector3(-1.65,.84,.78));_pouch(Vector3(1.7,.84,.62))
 	book=Hearth20CasinoBook.new();world.add_child(book);book.setup(self,textures);book.opened_changed.connect(_book_state)
@@ -121,23 +124,32 @@ func _bevel(dim: Vector3, bevel: float, mat: Material) -> MeshInstance3D:
 	st.generate_normals();var node=MeshInstance3D.new();node.mesh=st.commit();node.material_override=mat;return node
 func _coin(at: Vector3, radius: float, parent: Node3D=null) -> void:
 	var owner_node=parent if parent!=null else world
+	var crafted=Hearth20GeneratedModels.make("dragon_coin",Vector3(radius*2,.014,radius*2))
+	if crafted!=null:crafted.position=at;owner_node.add_child(crafted);return
 	_lathe(owner_node,at,[[0.,0],[radius,0],[radius,.009],[radius*.94,.014],[0.,.014]],1,1,bronze,16)
 	var text=_letters("✧",.07,.001,Color("#d7b45c"));text.position=at+Vector3(0,.016,0);text.rotation.x=-PI/2;owner_node.add_child(text)
 func _letters(text: String, height: float, depth: float, color: Color) -> MeshInstance3D:
 	var mesh=TextMesh.new();mesh.font=Hearth20Design.font(true);mesh.font_size=40;mesh.pixel_size=height/40.;mesh.depth=depth;mesh.text=text
 	var node=MeshInstance3D.new();node.mesh=mesh;var mat=StandardMaterial3D.new();mat.albedo_color=color;mat.roughness=.64;mat.metallic=.24;node.material_override=mat;return node
 func _candle(at: Vector3) -> void:
-	_lathe(world,at,[[0.,0],[.16,0],[.17,.025],[.11,.05],[.055,.10],[.035,.22],[.065,.26],[.10,.28],[.10,.3],[0.,.3]],1,1,bronze,24)
-	var wax=StandardMaterial3D.new();wax.albedo_color=Color("#ccaf7b");wax.roughness=.94
-	_lathe(world,at,[[.055,.3],[.06,.32],[.052,.5],[.048,.53],[.04,.52],[0.,.52]],1,1,wax,16)
+	var crafted=Hearth20GeneratedModels.make("candle",Vector3(.22,.53,.22))
+	if crafted!=null:crafted.position=at;world.add_child(crafted)
+	else:
+		_lathe(world,at,[[0.,0],[.16,0],[.17,.025],[.11,.05],[.055,.10],[.035,.22],[.065,.26],[.10,.28],[.10,.3],[0.,.3]],1,1,bronze,24)
+		var wax=StandardMaterial3D.new();wax.albedo_color=Color("#ccaf7b");wax.roughness=.94
+		_lathe(world,at,[[.055,.3],[.06,.32],[.052,.5],[.048,.53],[.04,.52],[0.,.52]],1,1,wax,16)
 	var flame=MeshInstance3D.new();var mesh=QuadMesh.new();mesh.size=Vector2(.10,.20);flame.mesh=mesh;flame.position=at+Vector3(0,.62,0)
 	var shader=Shader.new();shader.code="""shader_type spatial;render_mode unshaded,cull_disabled,depth_draw_never;void vertex(){VERTEX.x+=sin(TIME*9.+UV.y*7.)*.01*UV.y;}void fragment(){vec2 p=(UV-.5)*vec2(2.,1.3);float a=pow(max(0.,1.-length(p*vec2(1.+UV.y,1.))),2.);ALBEDO=mix(vec3(1.,.20,.01),vec3(1.,.9,.50),a);EMISSION=ALBEDO*2.;ALPHA=a;}"""
 	var mat=ShaderMaterial.new();mat.shader=shader;flame.material_override=mat;flame.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;world.add_child(flame)
 	var light=OmniLight3D.new();light.position=at+Vector3(0,.65,0);light.light_color=Color("#ffc277");light.light_energy=2.;light.omni_range=4.5;light.shadow_enabled=true;world.add_child(light);candles.append(light)
 func _goblet(at: Vector3) -> void:
+	var crafted=Hearth20GeneratedModels.make("goblet",Vector3(.32,.40,.32))
+	if crafted!=null:crafted.position=at;world.add_child(crafted);return
 	_lathe(world,at,[[0.,0],[.15,.0],[.15,.025],[.055,.05],[.025,.17],[.035,.23],[.13,.27],[.18,.4],[.18,.43],[.16,.43],[.15,.4],[.12,.3],[0.,.28]],1,1,bronze,24)
 	var wine=StandardMaterial3D.new();wine.albedo_color=Color("#270b12");wine.roughness=.12;wine.metallic=.3;_lathe(world,at,[[.155,.38],[0.,.38]],1,1,wine,24)
 func _pouch(at: Vector3) -> void:
+	var crafted=Hearth20GeneratedModels.make("purse_bag",Vector3(.35,.31,.30))
+	if crafted!=null:crafted.position=at;world.add_child(crafted);return
 	var leather=StandardMaterial3D.new();leather.albedo_color=Color("#33251b");leather.roughness=.92;_lathe(world,at,[[0.,0],[.17,0],[.20,.06],[.19,.19],[.11,.25],[.07,.28],[.09,.31],[.04,.31]],1,1,leather,18)
 func _dust() -> void:
 	var node=GPUParticles3D.new();node.amount=64;node.lifetime=12;node.position=Vector3(0,2,-3.5);node.visibility_aabb=AABB(Vector3(-5,-2,-5),Vector3(10,5,10))

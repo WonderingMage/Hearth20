@@ -95,8 +95,11 @@ func _ord() -> void:
 		else:
 			for k in int(s.dice_count):
 				var at=Vector3((k-(int(s.dice_count)-1)*.5)*.19,.85,.80).rotated(Vector3.UP,angle)
-				table._lathe(dynamic_root,at,[[0.,0],[.085,0],[.085,.015],[.065,.025],[.075,.14],[.055,.18],[0.,.18]],1,1,_color(Color("#151219"),.25,.4),24)
-				table._lathe(dynamic_root,at,[[.085,.012],[.085,.023],[.075,.023],[.075,.012]],1,1,table.bronze,24)
+				var cup=Hearth20GeneratedModels.make("dice_cup",Vector3(.17,.18,.17))
+				if cup!=null:cup.position=at;dynamic_root.add_child(cup)
+				else:
+					table._lathe(dynamic_root,at,[[0.,0],[.085,0],[.085,.015],[.065,.025],[.075,.14],[.055,.18],[0.,.18]],1,1,_color(Color("#151219"),.25,.4),24)
+					table._lathe(dynamic_root,at,[[.085,.012],[.085,.023],[.075,.023],[.075,.012]],1,1,table.bronze,24)
 		if not own:_word(s.name+"\n"+("Folded" if s.folded else str(s.dice_count)+(" hidden die" if int(s.dice_count)==1 else " hidden dice") if not open else str(Hearth20CasinoGamesUI._sum(s.get("dice",[])))),Vector3(sin(angle)*1.12,1.15,cos(angle)*.80-.12),.062,Color("#e2c58c"),true,dynamic_root)
 	_retain_dice(wanted);_chip_pot()
 	if fresh:animating=true;motion_left=Hearth20SoulReveal.ROLL_SECONDS+Hearth20SoulReveal.DURATION
@@ -105,9 +108,14 @@ func _chip_pot() -> void:
 	var stacks=mini(7,maxi(0,ceili(float(game.pot)/10.)))
 	for i in stacks:
 		for k in mini(5,maxi(1,int(game.pot)/maxi(1,stacks))):
-			table._lathe(dynamic_root,Vector3((i%3-1)*.115,.852+k*.015,-.12+(i/3)*.12),[[0.,0],[.047,0],[.047,.012],[0.,.012]],1,1,table.bronze,20)
+			var at=Vector3((i%3-1)*.115,.852+k*.015,-.12+(i/3)*.12);var coin=Hearth20GeneratedModels.make("wood_coin",Vector3(.094,.012,.094))
+			if coin!=null:coin.position=at;dynamic_root.add_child(coin)
+			else:table._lathe(dynamic_root,at,[[0.,0],[.047,0],[.047,.012],[0.,.012]],1,1,table.bronze,20)
 func _race_board() -> void:
-	var base=table._bevel(Vector3(2.62,.045,1.26),.035,table.wood);base.position=Vector3(0,.861,-.38);world_root.add_child(base)
+	var crafted=Hearth20GeneratedModels.make("lizard_table",Vector3(2.62,.045,1.26))
+	if crafted!=null:crafted.position=Vector3(0,.8385,-.38);world_root.add_child(crafted)
+	else:
+		var base=table._bevel(Vector3(2.62,.045,1.26),.035,table.wood);base.position=Vector3(0,.861,-.38);world_root.add_child(base)
 	var gold=table.bronze
 	for i in 6:
 		var rail=table._bevel(Vector3(2.51,.012,.009),.003,gold);rail.position=Vector3(0,.89,-.98+i*.24);world_root.add_child(rail)

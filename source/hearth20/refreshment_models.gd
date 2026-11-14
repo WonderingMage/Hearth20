@@ -26,7 +26,14 @@ static func make(id: String,packed: PackedScene) -> Node3D:
 	else:size_value=(.29 if id=="sausage_big" else .24)/maxf(.0001,maxf(bounds.size.y,maxf(bounds.size.x,bounds.size.z)))
 	var offset=Vector3(bounds.get_center().x,bounds.position.y,bounds.get_center().z)
 	content.transform=Transform3D(Basis.IDENTITY.scaled(Vector3.ONE*size_value),-offset*size_value)*content.transform
-	holder.set_meta("item_id",id);holder.set_meta("bounds",_bounds(content,Transform3D.IDENTITY));return holder
+	var fitted=_bounds(content,Transform3D.IDENTITY)
+	holder.set_meta("item_id",id);holder.set_meta("bounds",fitted)
+	if Hearth20RefreshmentCatalog.DRINKS.has(id):
+		# A contact point on the near lip, rather than the base/pivot of the cup.
+		# Beer includes its handle in the bounds, so its lip is a little inboard.
+		var lip=fitted.get_center();lip.y=fitted.end.y-.005;lip.z+=fitted.size.z*.30
+		holder.set_meta("drink_lip",lip)
+	return holder
 static func _bounds(node: Node3D,parent: Transform3D) -> AABB:
 	var transform=parent*node.transform;var box=AABB();var started=false
 	if node is MeshInstance3D and node.mesh!=null:box=transform*node.mesh.get_aabb();started=true

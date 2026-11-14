@@ -4,7 +4,9 @@ class_name Hearth20SeatedPulls
 var handles={}
 var cords={}
 var rest_y=2.83
+var ceiling_y=4.72
 func setup(table: Hearth20CasinoTable) -> void:
+	ceiling_y=table.room.ceiling_height-.12
 	var steel=StandardMaterial3D.new();steel.albedo_color=Color("#6c7379");steel.metallic=.94;steel.roughness=.29
 	var black=StandardMaterial3D.new();black.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;black.albedo_color=Color.BLACK
 	var rope=StandardMaterial3D.new();rope.albedo_color=Color("#8d7046");rope.roughness=.96
@@ -24,15 +26,19 @@ void fragment(){
 	var reading_light=OmniLight3D.new();reading_light.position=Vector3(0,3.15,.75);reading_light.omni_range=1.25;reading_light.light_energy=1.1;reading_light.light_color=Color("#ffe4bc");add_child(reading_light)
 	for mode in ["map","casino"]:
 		var x=-.24 if mode=="map" else .24
-		var hole=MeshInstance3D.new();var disk=CylinderMesh.new();disk.top_radius=.13;disk.bottom_radius=.13;disk.height=.035;disk.radial_segments=48;hole.mesh=disk;hole.material_override=black;hole.position=Vector3(x,4.765,0);add_child(hole)
-		var ring=MeshInstance3D.new();var torus=TorusMesh.new();torus.inner_radius=.12;torus.outer_radius=.155;torus.rings=40;torus.ring_segments=12;ring.mesh=torus;ring.material_override=steel;ring.position=Vector3(x,4.744,0);add_child(ring)
-		var throat=MeshInstance3D.new();var tube=CylinderMesh.new();tube.top_radius=.122;tube.bottom_radius=.122;tube.height=.30;tube.radial_segments=32;throat.mesh=tube;throat.material_override=black;throat.position=Vector3(x,4.90,0);add_child(throat)
-		for i in 4:
-			var bolt=table._bevel(Vector3(.016,.01,.016),.004,steel);bolt.position=Vector3(x+sin(i*TAU/4)*.144,4.725,cos(i*TAU/4)*.144);add_child(bolt)
-		var cord=MeshInstance3D.new();cord.mesh=_braid(4.72-rest_y);cord.material_override=rope;cord.position=Vector3(x,4.72,0);add_child(cord);cords[mode]=cord
+		var hole=MeshInstance3D.new();var disk=CylinderMesh.new();disk.top_radius=.13;disk.bottom_radius=.13;disk.height=.035;disk.radial_segments=48;hole.mesh=disk;hole.material_override=black;hole.position=Vector3(x,ceiling_y+.045,0);add_child(hole)
+		var mount=Hearth20GeneratedModels.make("ceiling_hole",Vector3(.31,.065,.31),true)
+		if mount!=null:mount.position=Vector3(x,ceiling_y+.024,0);mount.rotation.z=PI;add_child(mount)
+		else:
+			var ring=MeshInstance3D.new();var torus=TorusMesh.new();torus.inner_radius=.12;torus.outer_radius=.155;torus.rings=40;torus.ring_segments=12;ring.mesh=torus;ring.material_override=steel;ring.position=Vector3(x,ceiling_y+.024,0);add_child(ring)
+		var throat=MeshInstance3D.new();var tube=CylinderMesh.new();tube.top_radius=.122;tube.bottom_radius=.122;tube.height=.30;tube.radial_segments=32;throat.mesh=tube;throat.material_override=black;throat.position=Vector3(x,ceiling_y+.18,0);add_child(throat)
+		var cord=MeshInstance3D.new();cord.mesh=_braid(ceiling_y-rest_y);cord.material_override=rope;cord.position=Vector3(x,ceiling_y,0);add_child(cord);cords[mode]=cord
 		var grip=Node3D.new();grip.position=Vector3(x,rest_y,0);add_child(grip);handles[mode]=grip
-		var rod=MeshInstance3D.new();rod.name="TurnedCarpentersGrip";rod.mesh=_turned_grip();rod.material_override=handle_wood;grip.add_child(rod)
-		var ferrule=MeshInstance3D.new();var collar=CylinderMesh.new();collar.top_radius=.027;collar.bottom_radius=.030;collar.height=.033;collar.radial_segments=32;ferrule.mesh=collar;ferrule.material_override=table.bronze;ferrule.position.y=.183;grip.add_child(ferrule)
+		var crafted=Hearth20GeneratedModels.make("map_handle" if mode=="map" else "casino_handle",Vector3(.14,.40,.13),true)
+		if crafted!=null:grip.add_child(crafted)
+		else:
+			var rod=MeshInstance3D.new();rod.name="TurnedCarpentersGrip";rod.mesh=_turned_grip();rod.material_override=handle_wood;grip.add_child(rod)
+			var ferrule=MeshInstance3D.new();var collar=CylinderMesh.new();collar.top_radius=.027;collar.bottom_radius=.030;collar.height=.033;collar.radial_segments=32;ferrule.mesh=collar;ferrule.material_override=table.bronze;ferrule.position.y=.183;grip.add_child(ferrule)
 		var words=TextMesh.new();words.text="MAP" if mode=="map" else "CASINO";words.font=Hearth20Design.font(true);words.font_size=64;words.pixel_size=.00047 if mode=="map" else .00028;words.depth=.001;words.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;words.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
 		var label=MeshInstance3D.new();label.mesh=words;label.material_override=engraving;label.position=Vector3(0,-.079,.074)-words.get_aabb().get_center();grip.add_child(label)
 		# Inlaid board grid / fanned cards give each wooden pull a distinct engraving.
@@ -62,7 +68,7 @@ func _braid(length_value: float) -> ArrayMesh:
 	return st.commit()
 func pull(mode: String, amount: float) -> void:
 	if not handles.has(mode):return
-	amount=clampf(amount,0,.38);handles[mode].position.y=rest_y-amount;cords[mode].scale.y=(4.72-rest_y+amount)/(4.72-rest_y)
+	amount=clampf(amount,0,.38);handles[mode].position.y=rest_y-amount;cords[mode].scale.y=(ceiling_y-rest_y+amount)/(ceiling_y-rest_y)
 func hit(camera: Camera3D, screen: Vector2) -> String:
 	for mode in handles:
 		if camera.is_position_behind(handles[mode].global_position):continue

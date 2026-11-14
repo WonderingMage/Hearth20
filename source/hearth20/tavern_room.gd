@@ -11,9 +11,12 @@ var materials={}
 var batches={}
 var batch_materials={}
 var effects: Array=[]
+var ceiling_height=CEILING
 func setup(owner_table: Hearth20CasinoTable) -> void:
 	table=owner_table;name="EnclosedTavern"
 	materials={"wood":table.wood,"brass":table.bronze,"velvet":table.felt,"stone":_stone(),"mortar":_solid(Color("#302b25")),"iron":_solid(Color("#242326"),.72,.47),"green":_solid(Color("#26483b"),.06,.3),"amber":_solid(Color("#5b3422"),.08,.28),"wine":_solid(Color("#4a2630"),.05,.35),"paper":_solid(Color("#a28c66")),"glass":_window_glass(),"crest":_crest()}
+	if Hearth20GeneratedModels.available("room"):
+		_generated_room();return
 	# All six room boundaries and the front fireplace/bar are modeled geometry.
 	_boundary("Floor",Vector3(0,-.12,.5),Vector3(16.5,.24,15.5),"wood")
 	_boundary("Ceiling",Vector3(0,CEILING+.10,.5),Vector3(16.5,.20,15.5),"wood")
@@ -28,6 +31,119 @@ func setup(owner_table: Hearth20CasinoTable) -> void:
 	var fill=OmniLight3D.new();fill.position=Vector3(0,3.9,2.2);fill.light_color=Color("#d4ac7a");fill.light_energy=.40;fill.omni_range=11.;fill.shadow_enabled=false;add_child(fill)
 	set_meta("fully_enclosed",true)
 	set_meta("modeled_front",true)
+func _prop(id: String,at: Vector3,dimensions: Vector3,yaw=0.) -> Node3D:
+	var model=Hearth20GeneratedModels.make(id,dimensions)
+	if model==null:return null
+	model.position=at;model.rotation.y=yaw;add_child(model);Hearth20GeneratedModels.shadows(model,false);return model
+func _rest_on(id: String,support: Node3D,at: Vector3,dimensions: Vector3) -> Node3D:
+	# Seat decorations on the actual reconstructed counter, not its bounding-box
+	# maximum (which may belong to a raised rim or carved corner).
+	var height=-INF
+	if support!=null:
+		var world_origin=to_global(Vector3(at.x,ceiling_height+2.,at.z))
+		for mesh in support.find_children("*","MeshInstance3D",true,false):
+			var inverse=mesh.global_transform.affine_inverse();var origin=inverse*world_origin;var direction=(inverse.basis*Vector3.DOWN).normalized()
+			for surface in mesh.mesh.get_surface_count():
+				var arrays=mesh.mesh.surface_get_arrays(surface);var vertices=arrays[Mesh.ARRAY_VERTEX];var indices=arrays[Mesh.ARRAY_INDEX]
+				for i in range(0,indices.size(),3):
+					var hit=Geometry3D.ray_intersects_triangle(origin,direction,vertices[indices[i]],vertices[indices[i+1]],vertices[indices[i+2]])
+					if hit!=null:height=maxf(height,to_local(mesh.to_global(hit)).y)
+	if is_finite(height):at.y=height+.001
+	var result=_prop(id,at,dimensions)
+	if result!=null:result.set_meta("rests_on_surface",is_finite(height))
+	return result
+func _generated_room() -> void:
+	# The supplied room is a camera-space front reconstruction. Preserve its
+	# projection and close the unseen bays with matching ordinary geometry.
+	ceiling_height=6.05
+	var flooring=Hearth20GeneratedModels.surface("kit_floor")
+	var stone=Hearth20GeneratedModels.surface("kit_stone")
+	materials.floor=_projected_fill(flooring.albedo_texture if flooring!=null else null,Color(.75,.78,.80),Vector2(6,7),true)
+	materials.floor.set_shader_parameter("saturation",.45);materials.floor.set_shader_parameter("base_rect",Vector4(.20,.01,.65,.98))
+	materials.stone=_projected_fill(stone.albedo_texture if stone!=null else null,Color(.78,.72,.63),Vector2(5.5,2.0))
+	materials.stone.set_shader_parameter("base_rect",Vector4(.53,.53,.45,.45))
+	var stone_material=_projected_fill(stone.albedo_texture if stone!=null else null,Color(.78,.72,.63),Vector2.ONE)
+	_boundary("Floor",Vector3(0,-.10,-3),Vector3(16.5,.20,22.5),"floor")
+	_boundary("Ceiling",Vector3(0,ceiling_height+.10,-3),Vector3(16.5,.20,22.5),"wood")
+	for side in [-1,1]:_boundary("WestWall" if side<0 else "EastWall",Vector3(side*8.12,ceiling_height*.5,-3),Vector3(.25,ceiling_height+.2,22.5),"stone")
+	_boundary("RearWall",Vector3(0,ceiling_height*.5,8.12),Vector3(16.5,ceiling_height+.2,.25),"stone")
+	_boundary("FrontWall",Vector3(0,ceiling_height*.5,-14.12),Vector3(16.5,ceiling_height+.2,.25),"stone")
+	# Kit textures are UV atlases, not tiling wall images. Instance the actual
+	# module mesh so each stone keeps the atlas coordinates authored for it.
+	for row in 2:
+		for column in 4:_stone_module(Vector3(-6.+column*4.,row*3.,7.98),Vector3(4.0,3.0,.20),PI,stone_material)
+		for side in [-1,1]:
+			for column in 6:_stone_module(Vector3(side*8.00,row*3.,-12.+column*4.),Vector3(4.,3.0,.20),-side*PI/2,stone_material)
+	var backdrop=Hearth20GeneratedModels.raw("room");backdrop.name="ReconstructedTavernFront";backdrop.scale=Vector3.ONE*1.8;backdrop.position=Vector3(0,1.954,2.45);add_child(backdrop);Hearth20GeneratedModels.shadows(backdrop,false)
+	for side in [-1,1]:
+		for z in [-11.,-6.,-1.,4.,7.7]:_prop("kit_beam",Vector3(side*7.93,0,z),Vector3(.24,ceiling_height,.24))
+		_box(Vector3(side*7.88,.33,-3),Vector3(.26,.66,22.1),"wood")
+		_box(Vector3(side*7.88,ceiling_height-.26,-3),Vector3(.32,.30,22.1),"wood")
+	for z in [-11.,-6.,-1.,4.,7.7]:_box(Vector3(0,ceiling_height-.20,z),Vector3(16,.24,.28),"wood")
+	for x in [-5.3,-2.7,0.,2.7,5.3]:_box(Vector3(x,ceiling_height-.04,-3),Vector3(.16,.16,22.2),"wood")
+	for y in [.30,ceiling_height-.25]:_box(Vector3(0,y,7.90),Vector3(16,.28,.25),"wood")
+	_prop("door",Vector3(0,0,7.86),Vector3(1.65,2.9,.27),PI)
+	_box(Vector3(0,.07,7.78),Vector3(1.60,.14,.30),"wood")
+	_prop("bench",Vector3(-4.6,0,7.18),Vector3(3.4,1.35,.68),PI)
+	_prop("small_bar_table",Vector3(-4.6,0,5.55),Vector3(1.45,.87,1.45))
+	for at in [Vector3(-5.8,0,5.4),Vector3(-3.4,0,5.4)]:_prop("bar_stool",at,Vector3(.58,.73,.58))
+	_prop("fireplace",Vector3(4.7,0,7.64),Vector3(2.9,3.0,1.1),PI)
+	_fire_particles(Vector3(4.7,.38,7.10),false);_fire_particles(Vector3(4.7,1.05,7.15),true)
+	var firelight=OmniLight3D.new();firelight.position=Vector3(4.7,1.2,6.8);firelight.light_color=Color("#ffc17b");firelight.light_energy=1.8;firelight.omni_range=6;add_child(firelight)
+	var bar=_prop("bar",Vector3(-7.47,0,1.5),Vector3(3.0,1.10,.65),PI/2)
+	_prop("wood_shelve",Vector3(-7.79,1.15,1.5),Vector3(2.7,2.2,.34),PI/2)
+	for z in [.55,2.45]:_prop("bar_stool",Vector3(-6.3,0,z),Vector3(.55,.74,.55))
+	for z in [1.15,1.80,2.1,2.4]:_rest_on("bottle",bar,Vector3(-7.4,1.1,z),Vector3(.13,.40,.13))
+	_rest_on("bowl",bar,Vector3(-7.36,1.11,1.5),Vector3(.30,.13,.30))
+	for side in [-1,1]:
+		var cabinet=_prop("cabinet",Vector3(side*7.4,0,5.0),Vector3(2.0,.95,.52),-side*PI/2)
+		_prop("large_window",Vector3(side*7.92,1.50,4.55),Vector3(2.0,1.85,.15),-side*PI/2)
+		_prop("small_window",Vector3(side*7.93,1.1,-.8),Vector3(1.4,2.6,.15),-side*PI/2)
+		for z in [1.5,6.6]:_generated_sconce(Vector3(side*7.80,2.4,z),-side*PI/2)
+		_prop("shield",Vector3(side*2.3,3.65,7.93),Vector3(.72,1.0,.12),PI)
+		for z in [4.45,5.0,5.55]:_rest_on("bottle",cabinet,Vector3(side*7.4,.95,z),Vector3(.12,.36,.12))
+	var fill=OmniLight3D.new();fill.position=Vector3(0,4.0,3.8);fill.light_color=Color("#edc395");fill.light_energy=.65;fill.omni_range=13.;add_child(fill)
+	_finish_batches();set_meta("fully_enclosed",true);set_meta("modeled_front",true);set_meta("uses_generated_backdrop",true)
+func _stone_module(at: Vector3,dimensions: Vector3,yaw: float,mat: Material) -> void:
+	var model=Hearth20GeneratedModels.part("kit_stone",dimensions)
+	if model==null:return
+	model.position=at;model.rotation.y=yaw
+	for mesh in model.find_children("*","MeshInstance3D",true,false):mesh.material_override=mat;mesh.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(model)
+func _projected_fill(base: Texture2D,tint: Color,tiling: Vector2,swap=false) -> ShaderMaterial:
+	var shader=Shader.new();shader.code="""
+shader_type spatial;
+render_mode cull_disabled;
+uniform sampler2D photo:source_color,filter_linear_mipmap;
+uniform sampler2D base_texture:source_color,repeat_enable,filter_linear_mipmap_anisotropic;
+uniform bool textured=false;
+uniform bool swap_uv=false;
+uniform vec4 tint:source_color=vec4(1.);
+uniform vec2 tiling=vec2(1.);
+uniform vec4 base_rect=vec4(0.,0.,1.,1.);
+uniform float saturation=1.;
+uniform vec4 projection=vec4(.55638,-.997295,.5,.5);
+varying vec3 world_point;
+void vertex(){world_point=(MODEL_MATRIX*vec4(VERTEX,1.)).xyz;}
+void fragment(){
+ vec3 p=(world_point-vec3(0.,1.954,2.45))/1.8;float depth=-p.z;
+ vec2 puv=vec2(projection.x*p.x/max(.001,depth)+projection.z,projection.y*p.y/max(.001,depth)+projection.w);
+ float coverage=step(.01,depth)*smoothstep(0.,.025,puv.x)*smoothstep(0.,.025,1.-puv.x)*smoothstep(0.,.025,puv.y)*smoothstep(0.,.025,1.-puv.y);
+ vec2 uv=base_rect.xy+fract((swap_uv?UV.yx:UV)*tiling)*base_rect.zw;
+ vec3 albedo=textured?texture(base_texture,uv).rgb:vec3(1.);
+ albedo=mix(vec3(dot(albedo,vec3(.2126,.7152,.0722))),albedo,saturation)*tint.rgb;
+ ALBEDO=albedo*(1.-coverage);EMISSION=texture(photo,clamp(puv,vec2(0.),vec2(1.))).rgb*coverage;
+ ROUGHNESS=.97;SPECULAR=.08;
+}
+"""
+	var mat=ShaderMaterial.new();mat.shader=shader;mat.set_shader_parameter("photo",Hearth20GeneratedModels.surface("room").albedo_texture);mat.set_shader_parameter("base_texture",base);mat.set_shader_parameter("textured",base!=null);mat.set_shader_parameter("tint",tint);mat.set_shader_parameter("tiling",tiling);mat.set_shader_parameter("swap_uv",swap)
+	var projection=Hearth20GeneratedModels.catalog.room.get("projection",[.55638,-.997295,.5,.5]);mat.set_shader_parameter("projection",Vector4(projection[0],projection[1],projection[2],projection[3]));return mat
+func _generated_sconce(at: Vector3,yaw: float) -> void:
+	_prop("wall_candle",at,Vector3(.24,.70,.26),yaw)
+	var flame=MeshInstance3D.new();var quad=QuadMesh.new();quad.size=Vector2(.09,.17);flame.mesh=quad;flame.position=at+Vector3(0,.54,0);add_child(flame)
+	var shader=Shader.new();shader.code="shader_type spatial;render_mode unshaded,cull_disabled,depth_draw_never;void vertex(){VERTEX.x+=sin(TIME*8.+UV.y*5.)*.005*UV.y;}void fragment(){vec2 p=(UV-.5)*vec2(2.,1.3);float a=pow(max(0.,1.-length(p)),2.);ALBEDO=mix(vec3(1.,.22,.02),vec3(1.,.9,.55),a);EMISSION=ALBEDO*1.4;ALPHA=a;}"
+	var mat=ShaderMaterial.new();mat.shader=shader;flame.material_override=mat;flame.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var light=OmniLight3D.new();light.position=at+Vector3(0,.6,0);light.light_color=Color("#ffd19a");light.light_energy=.9;light.omni_range=5.0;add_child(light)
 func _solid(color: Color,metal=0.,rough=.88) -> StandardMaterial3D:
 	var material_value=StandardMaterial3D.new();material_value.albedo_color=color;material_value.metallic=metal;material_value.roughness=rough;return material_value
 func _stone() -> ShaderMaterial:
@@ -254,5 +370,6 @@ func set_active(active: bool) -> void:
 func _finish_batches() -> void:
 	for key in batches:
 		batches[key].index()
+		if materials[batch_materials[key]] is StandardMaterial3D and materials[batch_materials[key]].normal_enabled:batches[key].generate_tangents()
 		var node=MeshInstance3D.new();node.name="Room_"+key.replace(":","_");node.mesh=batches[key].commit();node.material_override=materials[batch_materials[key]];node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;add_child(node)
 	set_meta("spatial_batches",batches.size());batches.clear();batch_materials.clear()

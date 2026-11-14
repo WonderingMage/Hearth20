@@ -29,11 +29,15 @@ func run() -> void:
 	var app=shell.app;app._load_sample_map("lantern-larch-inn",false);await create_timer(1).timeout
 	expect(shell.focus_state=="table" and shell.home_row.visible,"offline host/join options at table")
 	expect(shell.table.camera_override and shell.pulls.handles.size()==2,"one shared table and two physical pulls")
-	expect(shell.papyrus.get_node("CurledPapyrusSheet").mesh.get_aabb().size.y>.02,"character sheet is a curled papyrus mesh")
-	expect(shell.pulls.handles.map.has_node("TurnedCarpentersGrip"),"turned wooden tool handle replaces rectangular grip")
+	expect(not shell.papyrus.has_node("Generated_map_paper") and shell.papyrus.get_node("CurledPapyrusSheet").visible and shell.papyrus.get_node("CurledPapyrusSheet").mesh.get_aabb().size.y>.02,"character sheet uses the original curled parchment and excludes the rejected paper model")
+	expect(shell.pulls.handles.map.has_node("Generated_map_handle") or shell.pulls.handles.map.has_node("TurnedCarpentersGrip"),"physical wooden tool handle is present")
 	await capture("seated-map")
 	expect(shell.table.room.get_meta("fully_enclosed",false),"table uses a complete tavern enclosure")
-	expect(int(shell.table.room.get_meta("spatial_batches",0))>12 and shell.table.room.get_children().filter(func(n):return n is MeshInstance3D).size()<=110,"room uses bounded spatial batches so unseen bays can be culled")
+	expect(int(shell.table.room.get_meta("spatial_batches",0))>0 and shell.table.room.get_children().filter(func(n):return n is MeshInstance3D).size()<=110,"room has bounded spatial batches and camera-culled static models")
+	expect(shell.table.room.get_meta("uses_generated_backdrop",false) and shell.table.world.has_node("Generated_table"),"supplied room backdrop and optimized main table are actually in use")
+	var supported=shell.table.room.get_children().filter(func(n):return n.has_meta("rests_on_surface"))
+	var missing=supported.filter(func(n):return not n.get_meta("rests_on_surface",false)).map(func(n):return str(n.get_meta("generated_model",""))+str(n.position))
+	expect(supported.size()==11 and missing.is_empty(),"all counter bottles and bowl rest on measured mesh surfaces: "+str(missing))
 	await physics_frame
 	var space=shell.table.camera.get_world_3d().direct_space_state
 	for yaw in range(0,360,15):

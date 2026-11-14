@@ -6,26 +6,26 @@ var markings: Node3D
 func setup() -> void:
 	var parchment=ShaderMaterial.new();var shader=Shader.new();shader.code="""
 shader_type spatial;
-render_mode cull_disabled;
+render_mode unshaded,cull_disabled;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void fragment(){
  vec2 p=UV;float fiber=sin(p.x*1900.+sin(p.y*160.)*2.)*.018+sin(p.y*2400.+p.x*12.)*.014;
  float flecks=hash(floor(p*vec2(1000.,700.)))*.06;
  float edge=pow(abs(p.x*2.-1.),12.)+pow(abs(p.y*2.-1.),12.);
  float stain=sin(p.x*16.+p.y*7.)*sin(p.y*19.-p.x*8.)*.028;
- ALBEDO=mix(vec3(.72,.51,.25),vec3(.89,.76,.50),clamp(.89-edge*.40+fiber+flecks+stain,0.,1.));
-	 EMISSION=ALBEDO*.22;ROUGHNESS=.98;METALLIC=0.;
+ ALBEDO=mix(vec3(.66,.49,.29),vec3(.92,.85,.70),clamp(.89-edge*.40+fiber+flecks+stain,0.,1.));
+	 ROUGHNESS=.98;METALLIC=0.;
 }
 """;parchment.shader=shader
 	var paper=MeshInstance3D.new();paper.name="CurledPapyrusSheet";paper.mesh=_sheet(false);paper.material_override=parchment;add_child(paper)
 	for z in [-.268,.268]:
 		var curl=MeshInstance3D.new();var roll=CylinderMesh.new();roll.top_radius=.012;roll.bottom_radius=.012;roll.height=.805;roll.radial_segments=24;curl.mesh=roll;curl.material_override=parchment;curl.rotation.z=PI/2;curl.position=Vector3(0,.020,z);add_child(curl)
 	preview=MeshInstance3D.new();preview.mesh=_sheet(true);preview.position.y=.0018;add_child(preview);preview.hide()
-	markings=Node3D.new();add_child(markings)
+	markings=Node3D.new();markings.position.y=.008;add_child(markings)
 	_text("ADVENTURER’S RECORD",.030,Vector3(0,.011,-.17))
 	_text("Your character · Your story",.013,Vector3(0,.012,-.126))
 	_text("Open your D&D Beyond sheet",.015,Vector3(.06,.013,.19))
-	var ink=StandardMaterial3D.new();ink.albedo_color=Color("#62482d");ink.roughness=1.
+	var ink=StandardMaterial3D.new();ink.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;ink.albedo_color=Color("#62482d");ink.roughness=1.
 	# Fine writing rules and a portrait outline belong to this sheet alone.
 	for i in 8:
 		var line=MeshInstance3D.new();var box=BoxMesh.new();box.size=Vector3(.43 if i<5 else .60,.0005,.0008);line.mesh=box;line.material_override=ink;line.position=Vector3(.055 if i<5 else 0,.011,-.075+i*.029);markings.add_child(line)

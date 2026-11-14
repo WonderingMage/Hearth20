@@ -37,13 +37,18 @@ var wake_player: AudioStreamPlayer
 func setup(owner_shell: Hearth20SeatedShell) -> void:
 	shell=owner_shell;table=shell.table;session=shell.app.session
 	stool=Node3D.new();stool.name="PersonalRefreshmentTable";stool.position=Vector3(1.20,0,2.39);table.world.add_child(stool)
-	table._lathe(stool,Vector3.ZERO,[[0.,.965],[1.,.965],[1.,.995],[.98,1.006],[0.,1.006]],.38,.38,table.wood,48)
-	table._lathe(stool,Vector3.ZERO,[[.75,.03],[.9,.06],[.8,.1],[.32,.15],[.22,.23],[.24,.48],[.20,.70],[.30,.89],[.82,.95]],.23,.23,table.wood,32)
-	table._lathe(stool,Vector3.ZERO,[[.99,.978],[1.01,.978],[1.01,.986],[.99,.986]],.38,.38,table.bronze,48)
+	var crafted=Hearth20GeneratedModels.make("side_table",Vector3(.76,1.006,.76))
+	if crafted!=null:stool.add_child(crafted)
+	else:
+		table._lathe(stool,Vector3.ZERO,[[0.,.965],[1.,.965],[1.,.995],[.98,1.006],[0.,1.006]],.38,.38,table.wood,48)
+		table._lathe(stool,Vector3.ZERO,[[.75,.03],[.9,.06],[.8,.1],[.32,.15],[.22,.23],[.24,.48],[.20,.70],[.30,.89],[.82,.95]],.23,.23,table.wood,32)
+		table._lathe(stool,Vector3.ZERO,[[.99,.978],[1.01,.978],[1.01,.986],[.99,.986]],.38,.38,table.bronze,48)
 	serving=Node3D.new();stool.add_child(serving);_physical_menu();_screen_ui()
 	session.refreshment_event.connect(_event);session.refreshment_action_result.connect(_result)
 func _physical_menu() -> void:
 	menu_model=Node3D.new();menu_model.name="PhysicalRefreshmentMenu";menu_model.position=Vector3(0,1.16,0);menu_model.basis=Basis.looking_at(Vector3(-.9,.4,0),Vector3.UP,true);stool.add_child(menu_model)
+	var crafted=Hearth20GeneratedModels.make("menu",Vector3(.31,.43,.045),true)
+	if crafted!=null:menu_model.add_child(crafted);return
 	var leather=StandardMaterial3D.new();leather.albedo_color=Color("#301812");leather.roughness=.9
 	var board=table._bevel(Vector3(.31,.025,.43),.025,leather);board.rotation.x=PI/2;menu_model.add_child(board)
 	for side in [-1.,1.]:
@@ -132,7 +137,9 @@ func _load_serving(order: Dictionary,token: int) -> void:
 		food_model=Hearth20RefreshmentModels.make(order.food,food_pack);serving.add_child(food_model);food_model.position=food_at
 		if Hearth20RefreshmentCatalog.FOODS[order.food].plate:
 			var porcelain=StandardMaterial3D.new();porcelain.albedo_color=Color("#e5d8b8");porcelain.roughness=.24
-			plate=table._lathe(serving,food_at-Vector3(0,.005,0),[[0.,0],[.75,0],[.95,.006],[1.,.014],[.97,.018],[.80,.008],[0.,.008]],.17,.17,porcelain,40)
+			plate=Hearth20GeneratedModels.make("plate",Vector3(.34,.018,.34))
+			if plate!=null:plate.position=food_at-Vector3(0,.005,0);serving.add_child(plate)
+			else:plate=table._lathe(serving,food_at-Vector3(0,.005,0),[[0.,0],[.75,0],[.95,.006],[1.,.014],[.97,.018],[.80,.008],[0.,.008]],.17,.17,porcelain,40)
 	if int(value.get("drink_sips",0))<3:drink_model=Hearth20RefreshmentModels.make(order.drink,drink_pack);serving.add_child(drink_model);drink_model.position=drink_at
 	if now()-float(order.arrived_at)<15.:_smoke()
 func _smoke() -> void:
@@ -145,7 +152,10 @@ func _make_piece(food: String) -> void:
 	var mat=StandardMaterial3D.new();mat.albedo_color=Color("#e6b85e") if food in ["chips","fries"] else Color("#e5bb89") if food=="icecream_jar" else Color("#7c3521");mat.roughness=.83
 	swallow_piece=Node3D.new();serving.add_child(swallow_piece)
 	for i in (3 if food=="chips" else 1):
-		var mesh=table._bevel(Vector3(.035,.005,.045) if food=="chips" else Vector3(.013,.012,.07) if food=="fries" else Vector3(.026,.023,.034),.006,mat);mesh.position=Vector3(i*.017,0,0);mesh.rotation=Vector3(.3*i,.8*i,.2);swallow_piece.add_child(mesh)
+		var dimensions=Vector3(.035,.005,.045) if food=="chips" else Vector3(.013,.012,.07) if food=="fries" else Vector3(.026,.023,.034)
+		var mesh=Hearth20GeneratedModels.make("potato_chip" if food=="chips" else "potato_fry" if food=="fries" else "food",dimensions,true)
+		if mesh==null:mesh=table._bevel(dimensions,.006,mat)
+		mesh.position=Vector3(i*.017,0,0);mesh.rotation=Vector3(.3*i,.8*i,.2);swallow_piece.add_child(mesh)
 func _animate() -> void:
 	if value.is_empty():return
 	var pending=value.get("pending",{})
@@ -154,13 +164,15 @@ func _animate() -> void:
 	if pending.is_empty():
 		if is_instance_valid(swallow_piece):swallow_piece.queue_free();swallow_piece=null
 		return
-	var duration=float(pending.ends_at)-float(pending.started_at);var t=clampf((now()-float(pending.started_at))/duration,0.,1.);var lift=smoothstep(0.,.19,t)*(1.-smoothstep(.82,1.,t))
+	var duration=maxf(.01,float(pending.ends_at)-float(pending.started_at));var t=clampf((now()-float(pending.started_at))/duration,0.,1.);var lift=smoothstep(0.,.19,t)*(1.-smoothstep(.82,1.,t))
 	var node=drink_model if pending.action=="sip" else swallow_piece if is_instance_valid(swallow_piece) else food_model
 	if not is_instance_valid(node):return
+	if pending.action=="sip":
+		_drink_pose(node,t)
+		return
 	var start=drink_at if pending.action=="sip" else food_at
 	var mouth=serving.to_local(table.camera.to_global(Vector3(.11,-.19,-.32)))
 	node.position=start.lerp(mouth,lift);node.rotation=Vector3(-.9*lift if pending.action=="sip" else .2*lift,-PI/2,.12*sin(t*TAU)*lift)
-	if pending.action=="sip" and int(value.get("drink_sips",0))==2 and t>.82:node.scale=Vector3.ONE*(1.-smoothstep(.82,1.,t))
 	if pending.action=="bite" and t>.25 and t<.82:
 		node.position.y-=.25*smoothstep(.25,.4,t)
 		if is_instance_valid(swallow_piece):node.scale=Vector3.ONE*(1.-smoothstep(.25,.40,t))
@@ -168,6 +180,21 @@ func _animate() -> void:
 	if pending.action=="bite" and node==food_model and int(value.get("food_bites",0))==1 and t>=.4:node.scale=Vector3.ZERO
 	if pending.action=="bite" and value.order.food=="chips" and is_instance_valid(food_model):
 		var rustle=sin(clampf(t/.25,0.,1.)*PI);food_model.position.y+=rustle*.07;food_model.rotation.z=sin(t*75.)*.03*rustle
+func _drink_pose(node: Node3D,t: float) -> void:
+	var reach=smoothstep(0.,.24,t)*(1.-smoothstep(.78,1.,t))
+	var tip=smoothstep(.24,.43,t)*(1.-smoothstep(.64,.80,t))
+	var rest=Basis(Vector3.UP,-PI/2.)
+	var camera_basis=serving.global_basis.inverse()*table.camera.global_basis
+	# Tip the base AWAY from the face around the camera's right axis. The old
+	# negative world-X rotation pushed the mug through the camera when looking right.
+	var drinking=camera_basis*Basis(Vector3.RIGHT,1.15*tip)*rest
+	var rotation_value=Quaternion(rest).slerp(Quaternion(drinking.orthonormalized()),reach)
+	var lip: Vector3=node.get_meta("drink_lip",Vector3(0,.23,0))
+	var mouth=serving.to_local(table.camera.to_global(Vector3(.08,-.15,-.28)))
+	var start_lip=drink_at+rest*lip
+	var path=start_lip.lerp(mouth,reach)
+	path.y+=sin(reach*PI)*.035
+	node.quaternion=rotation_value;node.position=path-node.basis*lip
 func hit(screen: Vector2) -> bool:
 	if menu.visible or session.is_spectating():return false
 	var origin=table.camera.project_ray_origin(screen);var ray=table.camera.project_ray_normal(screen);var inverse=stool.global_transform.affine_inverse();var a=inverse*origin;var b=inverse*(origin+ray*8.)

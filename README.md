@@ -4,7 +4,9 @@
 
 A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.19](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.19-beta)
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.20](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.20-beta)
+
+**0.3.20** adds the supplied textured tavern and tabletop props with reduced geometry, compressed textures, level bases and properly seated counter decorations. The original curled parchment is restored. Drinking now guides the rim to the mouth, tilts away from the camera and returns smoothly to the side table for beer, four sodas and water, across all three sips.
 
 The 0.3.19 update enables **View saved tables** beside Save during a hosted game. Browse saves without disconnecting; restoration is available after the session ends, with a clear explanation while hosting.
 

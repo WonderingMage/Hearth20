@@ -39,6 +39,8 @@ var papyrus: Hearth20SeatedPapyrus
 var preview_stamp=0
 var refreshments: Hearth20RefreshmentTray
 var sheet_poll=0.
+var loading_status: Label
+var loading_bar: ProgressBar
 func _ready() -> void:
 	name="SeatedTable";set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);theme=Hearth20Design.theme();process_priority=100
 	get_window().focus_entered.connect(_focus_entered);get_window().focus_exited.connect(_focus_exited)
@@ -60,6 +62,8 @@ func _prepare_table() -> void:
 		for key in paths:
 			if not assets.has(key) and ResourceLoader.load_threaded_get_status(paths[key])==ResourceLoader.THREAD_LOAD_LOADED:assets[key]=ResourceLoader.load_threaded_get(paths[key])
 		await get_tree().process_frame
+	await Hearth20GeneratedModels.prepare(get_tree(),func(done,total):
+		if is_instance_valid(loading_status):loading_status.text="Preparing the tavern and setting your table…";loading_bar.value=15.+float(done)/total*65.)
 	table=Hearth20CasinoTable.new();table_home.add_child(table);table.setup(assets);table.camera_override=true;table.casino_active=false;table.book.hide();table.stock_deck.hide();table.center_props.hide()
 	table.book.process_mode=Node.PROCESS_MODE_DISABLED
 	pulls=Hearth20SeatedPulls.new();table.world.add_child(pulls);pulls.setup(table)
@@ -67,6 +71,7 @@ func _prepare_table() -> void:
 	_build_map();_camera(1.);map_viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
 	# Compile each room-facing material/light combination behind the loading screen.
 	for direction in 8:
+		if is_instance_valid(loading_bar):loading_bar.value=80.+direction*2.
 		var angle=float(direction)*TAU/8.;table.camera.look_at(Vector3(sin(angle)*3.,1.85,2.45-cos(angle)*3.),Vector3.UP)
 		for _frame in 2:await get_tree().process_frame
 	_camera(1.)
@@ -76,7 +81,8 @@ func _loading() -> void:
 	loader=ColorRect.new();loader.color=Color("#100d08");loader.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);loader.z_index=1500;add_child(loader)
 	var center=CenterContainer.new();center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);loader.add_child(center)
 	var box=VBoxContainer.new();box.add_theme_constant_override("separation",20);center.add_child(box)
-	_label(box,"✧  TAKING YOUR SEAT  ✧",30);_label(box,"Lighting the tavern and preparing your table…",17)
+	_label(box,"✧  TAKING YOUR SEAT  ✧",30);loading_status=_label(box,"Lighting the tavern and preparing your table…",17)
+	loading_bar=ProgressBar.new();loading_bar.custom_minimum_size=Vector2(430,14);loading_bar.show_percentage=false;box.add_child(loading_bar)
 func _label(parent: Node, text: String, points=14) -> Label:
 	var l=Label.new();l.text=text;l.add_theme_font_size_override("font_size",points);l.add_theme_color_override("font_color",Color("#e5cfaa"));parent.add_child(l);return l
 func _focus_entered() -> void:Hearth20Preferences.apply_focus(true)
@@ -102,7 +108,10 @@ func toggle_pulls() -> void:
 	look_up=not look_up;look=Vector2.ZERO
 func _build_map() -> void:
 	map_items=Node3D.new();map_items.name="BattlemapTableItems";table.world.add_child(map_items)
-	var frame=table._bevel(Vector3(2.72,.045,1.88),.035,table.bronze);frame.position=Vector3(0,.865,-.13);map_items.add_child(frame)
+	var crafted_frame=Hearth20GeneratedModels.make("map_frame",Vector3(3.0,.045,2.10))
+	if crafted_frame!=null:crafted_frame.position=Vector3(0,.842,-.13);map_items.add_child(crafted_frame)
+	else:
+		var frame=table._bevel(Vector3(2.72,.045,1.88),.035,table.bronze);frame.position=Vector3(0,.865,-.13);map_items.add_child(frame)
 	map_plate=MeshInstance3D.new();var plane=PlaneMesh.new();plane.size=Vector2(2.62,1.78);map_plate.mesh=plane;map_plate.position=Vector3(0,.892,-.13);map_items.add_child(map_plate)
 	var shader=Shader.new();shader.code="shader_type spatial;render_mode unshaded,cull_disabled;uniform sampler2D board:source_color,filter_linear;uniform vec4 crop=vec4(0,0,1,1);void fragment(){ALBEDO=texture(board,crop.xy+UV*crop.zw).rgb;}"
 	var material_value=ShaderMaterial.new();material_value.shader=shader;material_value.set_shader_parameter("board",map_viewport.get_texture());map_plate.material_override=material_value

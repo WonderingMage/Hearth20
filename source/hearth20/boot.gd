@@ -106,13 +106,14 @@ func _unhandled_key_input(_event: InputEvent) -> void:
 
 func _show_scene_credits() -> void:
 	var dialog=AcceptDialog.new()
-	dialog.title="Hearth20 · Menu artwork"
+	dialog.title="Hearth20 · Artwork and scene credits"
 	dialog.theme=theme
 	dialog.size=Vector2i(620,410)
 	dialog.ok_button_text="Return to the menu"
 	var label=RichTextLabel.new()
 	label.custom_minimum_size=Vector2(560,310)
 	label.text="Revised party illustration supplied by the Hearth20 creator.\n\nThe 2752 × 1536 image is preserved at full resolution. A separate AI-generated crimson mist/glow layer adds rage around the two axe-wielding warriors. Their original faces and physical artwork are retained.\n\nThe menu opens directly into Join, Host or saved campaigns."
+	label.text+="\n\nStatic tavern and tabletop models supplied by the Hearth20 creator. Optimized runtime copies retain their original textures and UVs.\n\nAdditional room kits (CC BY 4.0):\n• Stylized Low-poly Wooden beam — Rocco Giandomenico\n• Stylized Modular Stonewalls — @blue.blender.print\n• Tileable Stylized Wooden Floor Texture — JennyB\n\nFull source links, licenses and modifications:\n"+FileAccess.get_file_as_string("res://hearth20/generated_models/CREDITS.md")
 	dialog.add_child(label)
 	dialog.confirmed.connect(dialog.queue_free)
 	dialog.canceled.connect(dialog.queue_free)

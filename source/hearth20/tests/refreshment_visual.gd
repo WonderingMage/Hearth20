@@ -22,7 +22,7 @@ func run() -> void:
 	root.size=Vector2i(1600,1000);shell=Hearth20SeatedShell.new();root.add_child(shell);await until(func():return shell.ready_to_show,"table ready")
 	var tray=shell.refreshments;await create_timer(.3).timeout;tray.glance();await create_timer(.7).timeout
 	expect(tray.menu_model.visible and tray.stool.position.x>0.,"physical menu on right-hand stool")
-	expect(tray.stool.get_child(0).material_override==shell.table.wood,"stool shares game table wood")
+	expect(tray.stool.has_node("Generated_side_table") or (tray.stool.get_child(0) is MeshInstance3D and tray.stool.get_child(0).material_override==shell.table.wood),"stool uses the supplied wooden side table or matching wooden fallback")
 	await capture("refreshment-stool-menu")
 	var screen=shell.table.camera.unproject_position(tray.menu_model.global_position);expect(tray.hit(screen) and tray.menu.visible,"click physical menu opens provisions")
 	expect(tray.menu.choices.size()==21,"all 15 foods and six drinks selectable")
@@ -66,5 +66,9 @@ func run() -> void:
 	var wake_id=tray.wake_player.get_instance_id();tray._sync();tray._sync();expect(tray.wake_player.get_instance_id()==wake_id,"wake sound plays once per blackout")
 	await create_timer(2.7).timeout;expect(not tray.effect.visible,"view clears completely after wake fade")
 	await capture("finally-awake")
+	# The wake recording can outlast the fixture. Drain playback before destroying
+	# the audio tree so decoder work is not left alive at engine shutdown.
+	for player in tray.find_children("*","AudioStreamPlayer",true,false):player.stop()
+	await create_timer(.2).timeout
 	shell.queue_free();await create_timer(.6).timeout;Hearth20RefreshmentModels.cache.clear();await process_frame
 	print("Refreshment visuals: %d checks, %d failures"%[checks,errors.size()]);quit.call_deferred(0 if errors.is_empty() else 1)

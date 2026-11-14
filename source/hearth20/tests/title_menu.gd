@@ -102,7 +102,7 @@ func run() -> void:
 	expect(Hearth20Identity.save_campaign(app.campaign,save_path).ok,"the calibrated map can be saved")
 	var saved=Hearth20Identity.load_campaign(save_path)
 	expect(saved.ok and saved.campaign.scenes[0].width_cells==32 and saved.campaign.scenes[0].feet_per_cell==10,"grid scale survives a campaign round trip")
-	shell.queue_free();await settle()
+	shell.queue_free();await create_timer(.6).timeout
 	print("Title menu and calibration: %d checks, %d failures"%[checks,errors.size()])
 	FileAccess.open(output.path_join("result.json"),FileAccess.WRITE).store_string(JSON.stringify({"checks":checks,"errors":errors,"ok":errors.is_empty()}))
 	quit.call_deferred(0 if errors.is_empty() else 1)
