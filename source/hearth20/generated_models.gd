@@ -2,7 +2,7 @@ extends RefCounted
 class_name Hearth20GeneratedModels
 ## Trusted bundled static scenes, prepared offline from the user's originals.
 const MANIFEST="res://hearth20/generated_models/manifest.json"
-const ACTIVE=["room","table","side_table","menu","map_handle","casino_handle","ceiling_hole","map_frame","candle","goblet","purse_bag","dragon_coin","wood_coin","dice_cup","lizard_table","plate","potato_chip","potato_fry","food","bar","bar_stool","bench","bottle","bowl","cabinet","door","fireplace","large_window","small_window","small_bar_table","wall_candle","wood_shelve","shield","kit_floor","kit_stone","kit_beam"]
+const ACTIVE=["room","table","side_table","menu","map_handle","casino_handle","ceiling_hole","map_frame","candle","goblet","purse_bag","dragon_coin","wood_coin","dice_cup","lizard_table","plate","potato_chip","potato_fry","food","bar","bar_stool","bench","bottle","bowl","cabinet","door","fireplace","large_window","small_window","small_bar_table","wall_candle","wood_shelve","shield","kit_floor","kit_stone","kit_beam","wizard_body","wizard_hat","dm_d20_pendant"]
 static var catalog={}
 static var cache={}
 static var material_cache={}

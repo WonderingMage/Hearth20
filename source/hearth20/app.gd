@@ -69,7 +69,7 @@ var grid_state_label: Label
 var sheet_page: ScrollContainer
 var chat_page: ScrollContainer
 var journal_page: ScrollContainer
-var token_sheet_page: ScrollContainer
+var personal_journal: Hearth20PersonalJournal
 var sidebar_role := ""
 var sheet_summary: Label
 var sheet_actions: VBoxContainer
@@ -413,9 +413,10 @@ func _build_player_pages() -> void:
 	journal_page.add_child(journal)
 	_add_header(journal, "TABLE JOURNAL")
 	var journal_note := Label.new()
-	journal_note.text = "Campaign notes and scene journals will appear here. DM notes stay in the host campaign; player journals will be shared deliberately by the DM."
+	journal_note.text = "Personal notes and item inventories are stored in the DM's campaign and restored when the same player rejoins. Other players cannot read your notes."
 	journal_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	journal.add_child(journal_note)
+	personal_journal=Hearth20PersonalJournal.new();journal.add_child(personal_journal);personal_journal.setup(self)
 	dm_notes_editor = TextEdit.new()
 	dm_notes_editor.placeholder_text = "Private DM session notes…"
 	dm_notes_editor.custom_minimum_size.y = 150
@@ -447,24 +448,9 @@ func _build_player_pages() -> void:
 	_add_button(journal, "New handout", _new_handout)
 	handout_save_button = _add_button(journal, "Save handout", _save_handout)
 	_refresh_handouts()
-	token_sheet_page = ScrollContainer.new()
-	token_sheet_page.name = "Token Sheet"
-	token_sheet_page.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	inspector_tabs.add_child(token_sheet_page)
-	var token_sheet := VBoxContainer.new()
-	token_sheet.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	token_sheet.add_theme_constant_override("separation",16)
-	token_sheet_page.add_child(token_sheet)
-	_add_header(token_sheet, "TOKEN SHEET")
-	var development := Label.new()
-	development.text = "In development"
-	development.add_theme_font_size_override("font_size",20)
-	development.add_theme_color_override("font_color",Hearth20Design.MUTED)
-	development.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	token_sheet.add_child(development)
 	workspace_tabs = TabContainer.new()
 	workspace_tabs.name = "Workspace"
-	for page in [scene_page, token_page, session_page, author_page, token_sheet_page]:
+	for page in [scene_page, token_page, session_page, author_page]:
 		inspector_tabs.remove_child(page)
 		workspace_tabs.add_child(page)
 	inspector_tabs.add_child(workspace_tabs)
@@ -1774,6 +1760,7 @@ func install_loaded_campaign(loaded_campaign: Dictionary,source_path="") -> Dict
 	session.configure(campaign)
 	board.set_campaign(campaign, session, "dm")
 	if autosave!=null:autosave.reset_clock()
+	personal_journal.refresh(true)
 	_update_session_ui()
 	_on_status("Hearth20 campaign loaded from the separate Hearth20 save root.")
 	return {"ok":true}
@@ -1911,6 +1898,7 @@ func _on_host_state(value: Dictionary) -> void:
 	_refresh_vision_controls()
 
 func _update_session_ui() -> void:
+	if is_instance_valid(personal_journal):personal_journal.refresh()
 	var previous_page: Control = inspector_tabs.get_current_tab_control()
 	var previous_workspace: Control = workspace_tabs.get_current_tab_control()
 	var player_mode: bool = session.local_role == "player"
@@ -1919,7 +1907,7 @@ func _update_session_ui() -> void:
 	var session_active: bool = not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer)
 	dm_rail.visible = true
 	if toolbox != null: toolbox.refresh_role()
-	for page in [scene_page, token_page, author_page, token_sheet_page]:
+	for page in [scene_page, token_page, author_page]:
 		var page_index: int = workspace_tabs.get_tab_idx_from_control(page)
 		if page_index >= 0:
 			if workspace_tabs.is_tab_hidden(page_index)!=player_mode:workspace_tabs.set_tab_hidden(page_index, player_mode)

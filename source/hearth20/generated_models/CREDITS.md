@@ -2,6 +2,10 @@
 
 The reconstructed room and generated props were supplied by the Hearth20 creator. Original GLBs are retained outside the runtime project in `Hearth20 Development/generated models`.
 
+The separate `wizard_body.glb` and `wizard_hat.glb` were supplied by the creator on November 14, 2026, from the Hearth20 wizard reference workflow. Runtime copies retain their painted cloth, embroidery, gloves and normal maps, with mesh reduction and compressed 2K textures. The originals are unmodified. Chains and facial marks are generated in code; the original procedural pendant is superseded by the supplied replacement below.
+
+The replacement D20 pendant was supplied as `ComfyUI_00080.glb` on November 15, 2026. Its original is retained as `generated models/dm_d20_pendant.glb`. The fused rear projection is trimmed and the opening capped; the original front geometry and embedded textures are preserved. A reduced runtime copy replaces the previous procedural charm, using its own engraved number and bail. Gold/silver appearance is handled in a material shader. The model remains host-exclusive.
+
 These additional kits were supplied in the same folder:
 
 - "Stylized Low-poly Wooden beam" by Rocco Giandomenico: https://sketchfab.com/3d-models/stylized-low-poly-wooden-beam-01b16abea26646c8ba334c905374f83e — author: https://sketchfab.com/Rocco.Giandomenico

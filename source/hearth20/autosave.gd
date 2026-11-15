@@ -42,6 +42,7 @@ func start(now=-1) -> bool:
 	if now<0:now=Time.get_ticks_msec()
 	if active or worker!=null or not eligible():return false
 	# Dictionaries/arrays are detached here; strings and byte buffers use COW.
+	if "personal_journal" in app and is_instance_valid(app.personal_journal):app.personal_journal.flush()
 	if app.lite_bridge!=null:app.lite_bridge.sync_to_campaign()
 	var snapshot=app.campaign.duplicate(true)
 	if is_instance_valid(app.dm_notes_editor):snapshot.dm_notes=app.dm_notes_editor.text

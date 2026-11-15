@@ -16,6 +16,9 @@ signal character_submission_result(result: Dictionary)
 signal casino_action_result(result: Dictionary)
 signal refreshment_event(event: Dictionary)
 signal refreshment_action_result(result: Dictionary)
+signal table_presence_changed(roster: Array)
+signal avatar_result(result: Dictionary)
+signal belongings_result(result: Dictionary)
 
 const MAX_CLIENTS := 8
 const MAX_PORT := 65535
@@ -29,6 +32,8 @@ var invite_secret := ""
 var listening_port := 0
 var pending_nickname := "Player"
 var remote_players: Dictionary = {}
+var table_roster: Array = []
+var avatar_submitted=false
 var peer_to_player: Dictionary = {}
 var token_owner: Dictionary = {}
 var current_turn_id := "turn-0"
@@ -186,6 +191,8 @@ func stop_session() -> void:
 	if was_steam and is_instance_valid(steam_link) and not steam_link.closing:steam_link.disconnect_table()
 
 func _clear_client_view() -> void:
+	table_roster.clear();table_presence_changed.emit([])
+	avatar_submitted=false
 	background_mode=false;map_preparing=false;pending_map_snapshot.clear();peer_map_downloads.clear();map_stream.clear()
 	_finish_map_download()
 	steam_images.clear()
@@ -217,7 +224,7 @@ func send_handshake(identity: Dictionary, secret: String, nickname: String, publ
 	var nonce:=Crypto.new().generate_random_bytes(32)
 	var features: Array=identity.get("steam_features",[]) if identity.get("steam_features",[]) is Array else []
 	var image_version:=2 if "image-cache-v2" in features else 1 if transport=="steam" and "image-cache-v1" in features else 0
-	pending_proofs[peer_id]={"nonce":nonce,"public_key":public_pem,"nickname":nickname.strip_edges(),"expires":Time.get_ticks_msec()+15000,"image_cache":image_version,"background_maps":"background-maps-v1" in features}
+	pending_proofs[peer_id]={"nonce":nonce,"public_key":public_pem,"nickname":nickname.strip_edges(),"expires":Time.get_ticks_msec()+15000,"image_cache":image_version,"background_maps":"background-maps-v1" in features,"avatar_presence":identity.get("avatar_presence",false)==true}
 	player_challenge.rpc_id(peer_id,nonce)
 
 @rpc("authority", "call_remote", "reliable")
@@ -250,10 +257,11 @@ func prove_player(signature: PackedByteArray) -> void:
 	if int(pending.get("image_cache",0))>0:
 		peer_steam_images[peer_id]=Hearth20SteamImages.new();peer_steam_images[peer_id].protocol_version=int(pending.image_cache)
 	if pending.get("background_maps",false):peer_map_downloads[peer_id]={"active":"","offset":0,"acked":0,"queue":[],"done":{},"offered":{},"catalog":"","files":{}}
-	remote_players[player_id] = {"peer_id": peer_id, "nickname": nickname.strip_edges(), "joined_at": Time.get_unix_time_from_system()}
+	remote_players[player_id] = {"peer_id": peer_id, "nickname": nickname.strip_edges(), "joined_at": Time.get_unix_time_from_system(),"avatar_presence":pending.get("avatar_presence",false)}
 	status_changed.emit("%s joined the table." % nickname.strip_edges())
 	connected_player.rpc_id(peer_id, player_id)
 	_send_peer_snapshot(peer_id, player_id)
+	_broadcast_presence()
 	_broadcast_dm_state()
 
 func _reject_peer(peer_id: int) -> void:
@@ -334,6 +342,8 @@ func _resolve_background_view(snapshot: Dictionary) -> Dictionary:
 	return {"ok":true,"waiting":waiting,"snapshot":packet}
 
 func _install_snapshot(snapshot: Dictionary,completed_transfer="") -> void:
+	if not avatar_submitted and snapshot.get("avatar_presence",false)==true and not local_player_id.is_empty():
+		avatar_submitted=true;request_avatar.rpc_id(1,Hearth20AvatarStyle.remembered(false))
 	if int(snapshot.revision)<int(client_snapshot.get("revision",-1)):
 		if not completed_transfer.is_empty():_finish_map_download(completed_transfer)
 		return
@@ -609,6 +619,11 @@ func _project_for(player_id: String,map_override: Variant=null) -> Dictionary:
 		projected.character_in_inventory = bool(Hearth20JoinCharacter.current(campaign,player_id).get("in_inventory",false))
 		projected.join_character_id = str(Hearth20JoinCharacter.current(campaign,player_id).get("id",""))
 		projected.table_mode=str(campaign.get("table_mode","map"))
+		projected.avatar_presence=true
+		projected.belongings_supported=true
+		var personal=Hearth20Belongings.project(campaign,player_id)
+		projected.personal_notes=personal.notes;projected.item_inventory=personal.inventory;projected.board_items=personal.board
+		projected.assets.merge(personal.assets,true)
 		projected.casino = Hearth20TavernGames.project(campaign,player_id)
 		projected.casino_receipts = Hearth20CasinoWallet.pending(campaign,player_id)
 		projected.refreshments=Hearth20Refreshments.view(campaign,player_id,Time.get_unix_time_from_system())
@@ -630,8 +645,95 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	peer_asset_state.erase(peer_id)
 	projection_cache.erase(player_id)
 	request_rates.erase(player_id)
+	_broadcast_presence()
 	_broadcast_dm_state()
 
+func presence_for(viewer: String) -> Array:
+	var result=[{"id":Hearth20Contracts._neutral_id(viewer,"dm-local"),"name":"Game Master","host":true,"mine":viewer=="dm-local","style":Hearth20AvatarStyle.clean(campaign.get("host_avatar",Hearth20AvatarStyle.remembered(true)),true)}]
+	# Join order stays stable; saved, disconnected participants never occupy seats.
+	for id in remote_players:
+		var participant=campaign.get("participants",{}).get(id,{})
+		result.append({"id":Hearth20Contracts._neutral_id(viewer,id),"name":str(remote_players[id].get("nickname","Player")).left(40),"host":false,"mine":viewer==id,"style":Hearth20AvatarStyle.clean(participant.get("avatar",{}),false)})
+	return result
+
+func _broadcast_presence() -> void:
+	if local_role!="dm":return
+	table_roster=presence_for("dm-local");table_presence_changed.emit(table_roster.duplicate(true))
+	for peer in peer_to_player:
+		var player=str(peer_to_player[peer])
+		if remote_players.get(player,{}).get("avatar_presence",false):receive_presence.rpc_id(int(peer),presence_for(player))
+
+@rpc("authority","call_remote","reliable")
+func receive_presence(roster: Array) -> void:
+	if local_role!="player" or multiplayer.get_remote_sender_id()!=1 or roster.size()>MAX_CLIENTS+1 or var_to_bytes(roster).size()>8192:return
+	var ids={};var hosts=0;var mine=0
+	for entry in roster:
+		if not entry is Dictionary or entry.size()!=5 or not entry.get("id") is String or not entry.get("name") is String or not entry.get("host") is bool or not entry.get("mine") is bool:return
+		if not Hearth20Contracts.valid_identifier(entry.id) or ids.has(entry.id) or entry.name.length()>40 or not Hearth20AvatarStyle.valid(entry.get("style"),entry.host):return
+		ids[entry.id]=true;hosts+=int(entry.host);mine+=int(entry.mine)
+	if hosts!=1 or mine!=1:return
+	table_roster=roster.duplicate(true);table_presence_changed.emit(table_roster.duplicate(true))
+
+func set_avatar(value: Dictionary) -> Dictionary:
+	if not Hearth20AvatarStyle.valid(value,local_role=="dm"):return {"ok":false,"error":"The D20 pendant belongs to the Game Master. Choose a supported wizard appearance."}
+	if local_role=="dm":return _apply_avatar_as("dm-local",value)
+	if multiplayer.multiplayer_peer is OfflineMultiplayerPeer or local_player_id.is_empty():return {"ok":false,"error":"Join a table before updating its avatar."}
+	if not client_snapshot.get("avatar_presence",false):return {"ok":false,"error":"The host needs an updated Hearth20 build to show wizard avatars."}
+	request_avatar.rpc_id(1,value);return {"ok":true,"pending":true}
+
+func _apply_avatar_as(player: String,value: Dictionary) -> Dictionary:
+	if local_role!="dm" or (player!="dm-local" and (not remote_players.has(player) or not campaign.get("participants",{}).has(player))):return {"ok":false,"error":"Not admitted."}
+	var is_host=player=="dm-local"
+	if not Hearth20AvatarStyle.valid(value,is_host):return {"ok":false,"error":"Only the Game Master may equip the D20 pendant."}
+	if is_host:campaign.host_avatar=Hearth20AvatarStyle.clean(value,true)
+	else:campaign.participants[player].avatar=Hearth20AvatarStyle.clean(value,false)
+	_broadcast_presence();_broadcast_dm_state();return {"ok":true}
+
+@rpc("any_peer","call_remote","reliable")
+func request_avatar(value: Dictionary) -> void:
+	if local_role!="dm" or not multiplayer.is_server():return
+	var peer=multiplayer.get_remote_sender_id();var player=str(peer_to_player.get(peer,""))
+	if player.is_empty() or var_to_bytes(value).size()>512:return
+	var key="avatar:"+player;var now=Time.get_ticks_msec()
+	if now-int(request_rates.get(key,-1000))<250:return
+	request_rates[key]=now;receive_avatar_result.rpc_id(peer,_apply_avatar_as(player,value))
+
+@rpc("authority","call_remote","reliable")
+func receive_avatar_result(result: Dictionary) -> void:
+	if local_role=="player" and multiplayer.get_remote_sender_id()==1:avatar_result.emit(result)
+
+func create_custom_item(name_value: String,description: String,png: PackedByteArray) -> Dictionary:
+	if local_role!="dm":return {"ok":false,"error":"Only the DM creates custom items."}
+	var result=Hearth20Belongings.create(campaign,name_value,description,png)
+	if result.ok:campaign.revision=int(campaign.get("revision",0))+1;_broadcast_snapshots()
+	belongings_result.emit(result);return result
+func belongings_action(command: Dictionary) -> Dictionary:
+	if local_role=="dm":
+		var result=_belongings_as("dm-local",command);belongings_result.emit(result);return result
+	if local_player_id.is_empty() or not client_snapshot.get("belongings_supported",false):return {"ok":false,"error":"Connect to a host running the new items-and-journals Beta."}
+	if command.size()>4 or var_to_bytes(command).size()>90000:return {"ok":false,"error":"Item or journal request is too large."}
+	request_belongings.rpc_id(1,command);return {"ok":true,"pending":true}
+func _belongings_as(player: String,command: Dictionary) -> Dictionary:
+	if player!="dm-local" and not remote_players.has(player):return {"ok":false,"error":"Join the table first."}
+	if command.size()>4 or var_to_bytes(command).size()>90000:return {"ok":false,"error":"Item or journal request is too large."}
+	if command.get("action")=="pickup" and is_spectating(player):return {"ok":false,"error":"You cannot pick up items while spectating."}
+	var result=Hearth20Belongings.apply(campaign,player,command)
+	result.action=command.get("action","")
+	if result.ok:campaign.revision=int(campaign.get("revision",0))+1;_broadcast_snapshots()
+	return result
+@rpc("any_peer","call_remote","reliable")
+func request_belongings(command: Dictionary) -> void:
+	if local_role!="dm" or not multiplayer.is_server():return
+	var peer=multiplayer.get_remote_sender_id();var player=str(peer_to_player.get(peer,""))
+	if player.is_empty():return
+	var key="belongings:"+player;var now=Time.get_ticks_msec();var rate=request_rates.get(key,{"start":now,"count":0})
+	if now-int(rate.start)>2000:rate={"start":now,"count":0}
+	rate.count+=1;request_rates[key]=rate
+	var result={"ok":false,"error":"Please pause before making more item or journal changes."} if rate.count>20 else _belongings_as(player,command)
+	receive_belongings_result.rpc_id(peer,result)
+@rpc("authority","call_remote","reliable")
+func receive_belongings_result(result: Dictionary) -> void:
+	if local_role=="player":belongings_result.emit(result)
 func timeline_for_local() -> Array:
 	return client_snapshot.get("timeline", []).duplicate(true) if local_role == "player" else _timeline_for("dm-local")
 
@@ -1300,6 +1402,7 @@ func make_effect(settings: Dictionary, start: Vector2, end: Vector2) -> Dictiona
 func _on_connected_to_server() -> void:
 	if local_role == "player":
 		var identity=Hearth20Identity.network_identity()
+		identity.avatar_presence=true
 		identity.steam_features=["image-cache-v1","image-cache-v2","background-maps-v1"]
 		send_handshake.rpc_id(1, identity, invite_secret, pending_nickname,Hearth20PlayerProfile.public_key())
 
@@ -1466,9 +1569,12 @@ func receive_refreshment_event(event: Dictionary) -> void:
 func receive_refreshment_result(result: Dictionary) -> void:
 	if local_role=="player" and multiplayer.get_remote_sender_id()==1:refreshment_action_result.emit(result)
 static func _map_loading_view(snapshot: Dictionary) -> Dictionary:
+	snapshot=snapshot.duplicate();snapshot.board_items=[]
 	var result=snapshot.duplicate(true)
 	result.scene={"id":"map-loading","title":"Preparing your map","width_cells":24,"height_cells":16,"cell_pixels":64.,"feet_per_cell":5.,"grid_visible":false,"walls":[],"doors":[],"props":[]}
 	result.actors=[];result.fx=[];result.assets={};result.map_png=PackedByteArray();result.map_sha256=Hearth20Contracts.sha256(PackedByteArray());result.vision_mask={}
+	for item in result.get("item_inventory",[]):
+		if snapshot.assets.has(item.asset_id):result.assets[item.asset_id]=snapshot.assets[item.asset_id]
 	result.erase("_h20_map_blob");result.erase("_h20_asset_blobs");return result
 
 func _send_map_catalog(peer: int) -> void:

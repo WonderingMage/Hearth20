@@ -36,7 +36,7 @@ func run() -> void:
 	expect(app.workspace_tabs.get_current_tab_control()==app.scene_page,"Scene scrolling and refresh keep Scene selected")
 	var scroll_offset=app.scene_page.scroll_vertical;app.session._broadcast_snapshots();await settle()
 	expect(app.scene_page.scroll_vertical==scroll_offset,"refresh preserves the Scene scroll position")
-	for page in [app.scene_page,app.token_page,app.session_page,app.author_page,app.token_sheet_page,app.chat_page,app.journal_page,app.sheet_page]:
+	for page in [app.scene_page,app.token_page,app.session_page,app.author_page,app.chat_page,app.journal_page,app.sheet_page]:
 		app._show_sidebar_page(page);await settle()
 		for i in 3:app._update_session_ui()
 		await settle()
@@ -44,20 +44,15 @@ func run() -> void:
 		if page.get_parent()==app.workspace_tabs:expect(app.workspace_tabs.get_current_tab_control()==page,"refresh preserves workspace tab "+page.name)
 	var titles=[]
 	for i in app.workspace_tabs.get_tab_count():titles.append(app.workspace_tabs.get_tab_title(i))
-	expect(not "Help" in titles and "Token Sheet" in titles,"Help is replaced by Token Sheet")
-	expect(app.token_sheet_page.find_children("*","Label",true,false).any(func(label):return label.text=="In development"),"the Token Sheet placeholder has the requested text")
+	expect(not "Help" in titles and not "Token Sheet" in titles,"unused Help and Token Sheet tabs are removed")
 	app._show_sidebar_page(app.scene_page);await settle()
-	var bar=app.workspace_tabs.get_tab_bar();var index=app.workspace_tabs.get_tab_idx_from_control(app.token_sheet_page)
 	for dimensions in [Vector2i(1000,650),Vector2i(1280,800),Vector2i(1920,1080)]:
 		root.size=dimensions;await settle()
-		var position=bar.get_global_position()+bar.get_tab_rect(index).get_center()
-		for pressed in [true,false]:pointer(position,MOUSE_BUTTON_LEFT,pressed);await settle()
-		expect(app.workspace_tabs.get_current_tab_control()==app.token_sheet_page,"Token Sheet is clickable at "+str(dimensions))
-		await RenderingServer.frame_post_draw;root.get_texture().get_image().save_png(output.path_join("token-sheet-"+str(dimensions.x)+".png"))
+		await click(app.workspace_tabs.get_tab_bar())
+		expect(app.workspace_tabs.get_tab_count()==4,"only the four working workspace tabs remain at "+str(dimensions))
 	app.session.local_role="player";app._update_session_ui();app._show_sidebar_page(app.chat_page);app._update_session_ui();await settle()
-	expect(app.workspace_tabs.is_tab_hidden(index),"the future creature sheet stays DM-only")
-	expect(app.inspector_tabs.get_current_tab_control()==app.chat_page,"player refresh preserves Chat instead of forcing Sheet")
-	app.session.local_role="dm";app._update_session_ui();await settle();expect(not app.workspace_tabs.is_tab_hidden(index),"DM role restores access to Token Sheet")
+	expect(app.inspector_tabs.get_current_tab_control()==app.chat_page,"player refresh preserves Chat")
+	app.session.local_role="dm";app._update_session_ui();await settle()
 	await RenderingServer.frame_post_draw;root.get_texture().get_image().save_png(output.path_join("sidebar-stability.png"))
 	app.session.stop_session();shell.queue_free();await create_timer(.5).timeout
 	print("Sidebar stability: %d checks, %d failures"%[checks,errors.size()]);quit(0 if errors.is_empty() else 1)

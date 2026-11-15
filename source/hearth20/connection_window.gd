@@ -68,6 +68,9 @@ func setup(owner_app: Hearth20App,action: String) -> void:
 	var guidance=_label(help_row,"We’ll guide you through connecting your party.",13);guidance.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;guidance.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	role_button=_button(help_row,"Host instead" if intent=="join" else "Join instead",func():_set_intent("host" if intent=="join" else "join"))
 	_button(help_row,"Illustrated guide",func():Hearth20PartyGuide.open(self,"direct" if tabs.current_tab==1 else intent))
+	_button(help_row,"Your wizard…",func():
+		var online=not app.session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer
+		Hearth20AvatarWardrobe.open(self,app.session,app.session.local_role=="dm" if online else intent!="join"))
 	var name_row=HBoxContainer.new();column.add_child(name_row);_label(name_row,"YOUR DISPLAY NAME",12)
 	display_name_row=name_row
 	nickname=LineEdit.new();nickname.placeholder_text="What should the party call you?";nickname.max_length=40;nickname.size_flags_horizontal=Control.SIZE_EXPAND_FILL;nickname.text=Hearth20PlayerProfile.preferences().display_name;name_row.add_child(nickname)

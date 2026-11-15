@@ -41,6 +41,7 @@ var refreshments: Hearth20RefreshmentTray
 var sheet_poll=0.
 var loading_status: Label
 var loading_bar: ProgressBar
+var company: Hearth20TableCompany
 func _ready() -> void:
 	name="SeatedTable";set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);theme=Hearth20Design.theme();process_priority=100
 	get_window().focus_entered.connect(_focus_entered);get_window().focus_exited.connect(_focus_exited)
@@ -69,6 +70,7 @@ func _prepare_table() -> void:
 	pulls=Hearth20SeatedPulls.new();table.world.add_child(pulls);pulls.setup(table)
 	refreshments=Hearth20RefreshmentTray.new();add_child(refreshments);refreshments.setup(self)
 	_build_map();_camera(1.);map_viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
+	company=Hearth20TableCompany.new();table.world.add_child(company);company.setup(app.session)
 	# Compile each room-facing material/light combination behind the loading screen.
 	for direction in 8:
 		if is_instance_valid(loading_bar):loading_bar.value=80.+direction*2.

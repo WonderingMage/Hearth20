@@ -45,6 +45,7 @@ var tool_settings := {"kind":"freehand", "layer":"tokens", "color":"#d4b477", "f
 var ruler_settings := {"shape":"line", "origin":"center", "snap":"center", "distance":"grid", "angle":60, "round":true, "beam_width":5, "linger":false, "color":"#76e0ca"}
 var fx_settings := {"effect":"breath", "color":"#ff682b", "size":1.0, "duration":2.0, "density":48}
 var pending_token: Dictionary={}
+var pending_item_id=""
 var selected_object_id := ""
 var draft: Dictionary = {}
 var tool_drag := false
@@ -182,6 +183,9 @@ func current_assets() -> Dictionary:
 	return snapshot.get("assets", {}) if role == "player" else campaign.get("assets", {})
 
 func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT and event.pressed and not read_only_preview and not dragging_actor and not tool_drag and tool_name=="select":
+		var item=item_at(event.position)
+		if not item.is_empty():Hearth20ItemsWindow.board_context(self,item,event.position);accept_event();return
 	if _tool_input(event):
 		queue_redraw()
 		accept_event()
@@ -431,6 +435,7 @@ func _draw() -> void:
 	if role == "player":
 		_draw_player_vision(cell_px)
 	_draw_actors(scene, cell_px)
+	_draw_items(cell_px)
 	_draw_objects("tokens", cell_px)
 	_draw_actors(scene, cell_px, "foreground")
 	_draw_objects("foreground", cell_px)
@@ -662,6 +667,23 @@ func _actor_texture(asset_id: String) -> Texture2D:
 	actor_image_cache[asset_id] = texture
 	return texture
 
+func current_items() -> Array:
+	return snapshot.get("board_items",[]) if role=="player" else campaign.get("custom_items",[]).filter(func(item):return item.holder.is_empty() and item.scene_id==campaign.get("active_scene",""))
+func item_at(screen: Vector2) -> Dictionary:
+	var point=_screen_to_world(screen)
+	for item in current_items().duplicate():
+		if point.distance_to(item.position)<=.48:return item
+	return {}
+func _draw_items(cell_px: float) -> void:
+	for item in current_items():
+		var center=_world_to_screen(item.position,cell_px);var diameter=maxf(24.,cell_px*camera_zoom*.85);var rect=Rect2(center-Vector2.ONE*diameter*.5,Vector2.ONE*diameter)
+		if not rect.grow(30).intersects(Rect2(Vector2.ZERO,size)):continue
+		var tint=Color(1,1,1,.45) if item.get("hidden",false) else Color.WHITE
+		var texture=_actor_texture(str(item.get("png_asset_id",item.get("asset_id",""))))
+		draw_rect(rect.grow(3),Color("#201b12"));draw_rect(rect.grow(3),Color("#d4b477"),false,2.)
+		if texture:draw_texture_rect(texture,rect,false,tint)
+		var caption=("Hidden · " if item.get("hidden",false) else "")+item.name
+		draw_string(ThemeDB.fallback_font,center+Vector2(-75,diameter*.5+16),caption,HORIZONTAL_ALIGNMENT_CENTER,150,12,Color("#edd8ab"))
 func _map_image() -> Image:
 	if role == "player":
 		var bytes: PackedByteArray = snapshot.get("map_png", PackedByteArray())
@@ -1062,6 +1084,7 @@ func activate_tool(value: String, dismiss_ruler: bool = false) -> void:
 		local_ruler.clear()
 	draft.clear()
 	pending_token.clear()
+	pending_item_id=""
 	polygon_points.clear()
 	tool_drag = false
 	moving_object = false
@@ -1123,6 +1146,11 @@ func _tool_input(event: InputEvent) -> bool:
 			if local_ruler.points.size() < 64: local_ruler.points.append(local_ruler.points.back())
 			return true
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if tool_name=="item_place":
+			if not event.pressed and role=="dm" and not pending_item_id.is_empty():
+				var id=pending_item_id;pending_item_id="";activate_tool("select",true)
+				var result: Dictionary=session.belongings_action({"action":"place","id":id,"position":_bounded_point(event.position)});hint_changed.emit(str(result.get("message",result.get("error","Item placed."))))
+			return true
 		if tool_name=="token_place":
 			if not event.pressed and role=="dm" and not pending_token.is_empty():
 				var token_data:=pending_token.duplicate()

@@ -29,8 +29,10 @@ func start() -> void:
 	await get_tree().process_frame;await get_tree().process_frame
 	job=Hearth20CampaignJob.new()
 	if operation=="save":
+		if is_instance_valid(app.personal_journal):app.personal_journal.flush()
 		app.lite_bridge.sync_to_campaign()
 		var snapshot=app.campaign.duplicate(true)
+		if is_instance_valid(app.dm_notes_editor):snapshot.dm_notes=app.dm_notes_editor.text
 		if not table_title.strip_edges().is_empty():snapshot.title=table_title.strip_edges().left(96)
 		var checked=Hearth20Contracts.validate_campaign(snapshot)
 		if not checked.ok:complete(checked);return

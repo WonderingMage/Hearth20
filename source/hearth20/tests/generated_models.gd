@@ -24,7 +24,7 @@ func geometry_bounds(node: Node3D,parent=Transform3D.IDENTITY) -> AABB:
 func run() -> void:
 	await Hearth20GeneratedModels.prepare(self)
 	var models=Hearth20GeneratedModels.catalog
-	expect(models.size()==39,"all 36 delivered GLBs and three kits have runtime records")
+	expect(models.size()==42,"all 39 delivered GLBs and three kits have runtime records")
 	expect(Hearth20GeneratedModels.cache.size()==Hearth20GeneratedModels.ACTIVE.size(),"every active replacement loads behind the loader")
 	expect(not Hearth20GeneratedModels.available("map_paper"),"rejected paper model is not preloaded")
 	var total=0;var gpu=0
@@ -58,8 +58,8 @@ func run() -> void:
 			expect(normal.dot(Vector3.UP)>cos(deg_to_rad(1.)),"measured contact plane sits level within one degree: "+id)
 			var axes=record.orientation_basis;var rotation=Basis(Hearth20GeneratedModels.vector(axes[0]),Hearth20GeneratedModels.vector(axes[1]),Hearth20GeneratedModels.vector(axes[2]))
 			expect(absf(rotation.determinant()-1.)<.0001 and rotation.is_equal_approx(rotation.orthonormalized()),"leveling preserves a rigid rotation without shear or mirroring: "+id)
-	expect(total<500000,"complete library fits under 500k triangles")
-	expect(gpu<170*1048576,"complete prepared catalog texture storage stays under 170 MiB")
+	expect(total<530000,"complete library including the two shared wizard parts fits under 530k triangles")
+	expect(gpu<175*1048576,"complete prepared catalog with the shared pendant stays under 175 MiB")
 	expect(int(models.room.triangles)<300000 and int(models.room.original_triangles)>4500000,"room reduction retains less than seven percent of source triangles")
 	expect(int(models.table.triangles)<=60000,"main table reduced to under 60k triangles")
 	expect(FileAccess.file_exists("res://hearth20/generated_models/CREDITS.md"),"CC BY source credits bundled")

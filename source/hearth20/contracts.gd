@@ -270,6 +270,7 @@ static func validate_campaign(campaign: Variant,use_asset_cache=true) -> Diction
 	for handout in checked.get("handouts", []):
 		if not handout is Dictionary or not valid_identifier(handout.get("id", "")) or not handout.get("public", false) is bool or not handout.get("title", "") is String or str(handout.get("title", "")).length() > 96 or not handout.get("body", "") is String or str(handout.get("body", "")).length() > 12000:
 			return {"ok": false, "errors": ["Handout fields exceed supported bounds."]}
+	if not Hearth20Belongings.valid(checked):return {"ok":false,"errors":["Campaign items or personal journals contain invalid data."]}
 	return {"ok": true, "errors": []}
 
 static func valid_movement_policy(policy: Variant) -> bool:

@@ -4,7 +4,11 @@
 
 A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.20](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.20-beta)
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.21](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.21-beta)
+
+**0.3.21** adds saved personal journals and unique custom item inventories. Open **Journal → Items & inventory**. The DM creates an item using a PNG and description, places it on a square, and conceals/reveals it or gives it directly to a player. Players right-click revealed board items to collect them; right-click an owned inventory item to destroy it after confirmation. Notes save to the host after a typing pause or **Save notes now**. Manual saves and the five-minute autosave keep notes, item images and ownership across sessions. Rejoin using the same saved Hearth20 player profile. Other players cannot see your notes or inventory.
+
+This release also includes robe-and-jewelry wizard avatars, the DM-exclusive D20 pendant, twenty eye expressions and two CRT treatments: solid visor eyes or yellow sclera with black irises. The unused Token Sheet tab is removed. Voice and mouth animation are not included.
 
 **0.3.20** adds the supplied textured tavern and tabletop props with reduced geometry, compressed textures, level bases and properly seated counter decorations. The original curled parchment is restored. Drinking now guides the rim to the mouth, tilts away from the camera and returns smoothly to the side table for beer, four sodas and water, across all three sips.
 
@@ -16,7 +20,7 @@ The DM now has one **Autosave** slot refreshed every five minutes during play. I
 
 The 0.3.17 update downloads every loaded map and its foreground images in the background. Partial files continue across DM tab switches and concealment, and cached destinations do not download again. Each player sees the map of their deployed owned token; a token in inventory has no board view. The DM can browse other maps without changing player views. Drawings, movement, pings and measurements use each token’s map. The map-edge bar shows ready map-file counts, bytes and measured MB/s.
 
-The 0.3.16 sidebar hotfix prevents Conceal/Reveal, Scene scrolling and routine refreshes from changing the selected page. Table → Help is replaced by a DM-only **Token Sheet** tab displaying **In development**. Creature imports and editable statistics remain future work. Player Chat and Journal selections stay selected during refreshes.
+The 0.3.16 sidebar hotfix prevents Conceal/Reveal, Scene scrolling and routine refreshes from changing the selected page. The former Help/Token Sheet placeholder has since been removed in 0.3.21. Creature imports and editable statistics remain future work. Player Chat and Journal selections stay selected during refreshes.
 
 The 0.3.15 token-picker hotfix moves token image selection to the main window and uses the native Windows chooser. Cancel, Close and selecting an image explicitly release the dialog's input lock. The token inspector and inventory share this path, and the selected image remains tied to the original token if the board selection changes. Verification stays limited to token editing and map UI.
 
