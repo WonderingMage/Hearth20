@@ -1439,7 +1439,7 @@ func _finish_library_scene_change(title_value: String) -> void:
 	board.map_texture_cache_key=""
 	board.lighting_cache_key=""
 	board.selected_actor_id=""
-	board.selected_object_id=""
+	board.clear_drawing_selection(false)
 	board.activate_tool("select",true)
 	board.fit_map()
 	scene_recovery.clear()

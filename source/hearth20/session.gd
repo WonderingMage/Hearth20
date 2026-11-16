@@ -660,6 +660,10 @@ func _broadcast_presence() -> void:
 	if local_role!="dm":return
 	table_roster=presence_for("dm-local");table_presence_changed.emit(table_roster.duplicate(true))
 	for peer in peer_to_player:
+		if int(peer) not in multiplayer.get_peers():continue
+		if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
+			var remote: ENetPacketPeer=multiplayer.multiplayer_peer.get_peer(int(peer))
+			if remote==null or remote.get_state()!=ENetPacketPeer.STATE_CONNECTED or remote.get_channels()==0:continue
 		var player=str(peer_to_player[peer])
 		if remote_players.get(player,{}).get("avatar_presence",false):receive_presence.rpc_id(int(peer),presence_for(player))
 
@@ -1219,6 +1223,21 @@ func _apply_board_action(command: Dictionary, player: String) -> Dictionary:
 				undo = {"action":"delete", "id":clean.id}
 			else: objects[index] = clean
 			scene.annotations = objects
+		"delete_many":
+			var ids=command.get("ids")
+			if not ids is Array or ids.is_empty() or ids.size()>256:return {"ok":false,"error":"Select between 1 and 256 drawings."}
+			var unique={};var removed=[]
+			for id in ids:
+				if not Hearth20Contracts.valid_identifier(id) or unique.has(id):return {"ok":false,"error":"Invalid or repeated drawing selection."}
+				unique[id]=true
+			for i in objects.size():
+				var object: Dictionary=objects[i]
+				if not unique.has(str(object.id)):continue
+				if object.kind not in Hearth20DrawingSelection.KINDS or (player!="dm-local" and (object.owner!=player or object.get("layer","tokens")!="tokens")):return {"ok":false,"error":"You can remove only your own drawings on the token layer."}
+				removed.append({"index":i,"object":object.duplicate(true)})
+			if removed.size()!=ids.size():return {"ok":false,"error":"The selection changed. Select the drawings again."}
+			undo={"action":"restore_many","objects":removed}
+			scene.annotations=objects.filter(func(object):return not unique.has(str(object.id)))
 		"delete":
 			var found := false
 			for i in objects.size():
@@ -1234,12 +1253,19 @@ func _apply_board_action(command: Dictionary, player: String) -> Dictionary:
 			var history: Array = board_undo.get(player, [])
 			if history.is_empty() or history.back().scene != scene.id: return {"ok":false, "error":"No drawing edit to undo on this map."}
 			var last: Dictionary = history.back()
+			if last.action=="restore_many":
+				if objects.size()+last.objects.size()>256:return {"ok":false,"error":"This map has no room to restore the whole drawing selection."}
+				for record in last.objects:
+					if objects.any(func(object):return object.id==record.object.id):return {"ok":false,"error":"One of those drawings was restored elsewhere. Undo was left unchanged."}
+					if player!="dm-local" and (record.object.owner!=player or record.object.get("layer","tokens")!="tokens"):return {"ok":false,"error":"You can restore only your own drawings."}
 			var affected_id := str(last.get("id",last.get("object",{}).get("id","")))
 			for o in objects:
 				if o.id == affected_id and player != "dm-local" and (o.owner != player or o.get("layer","tokens") != "tokens"): return {"ok":false,"error":"The DM has moved that drawing to another layer."}
 			history.pop_back()
 			if last.action == "delete":
 				objects = objects.filter(func(o: Dictionary) -> bool: return o.id != last.id)
+			elif last.action=="restore_many":
+				for record in last.objects:objects.insert(mini(int(record.index),objects.size()),record.object)
 			else:
 				var restored := false
 				for i in objects.size():
@@ -1340,7 +1366,7 @@ func _apply_board_action(command: Dictionary, player: String) -> Dictionary:
 		undo.scene = scene.id
 		var history: Array = board_undo.get(player, [])
 		history.append(undo)
-		if history.size() > 30: history.pop_front()
+		while history.size()>30 or (history.size()>1 and var_to_bytes(history).size()>8*1024*1024):history.pop_front()
 		board_undo[player] = history
 	recent_requests[key] = true
 	while recent_requests.size() > 2048: recent_requests.erase(recent_requests.keys()[0])

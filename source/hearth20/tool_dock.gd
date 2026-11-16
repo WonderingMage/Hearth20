@@ -613,7 +613,12 @@ func _selection_ui_reopen() -> void:
 	open("select")
 
 func _selection_ui() -> void:
-	note.text="Click an object on the active layer to select it. Drag to move. Delete removes it; Ctrl+Z restores your last drawing edit."
+	note.text="Click a drawing to select or move it. Drag empty space to box-select drawings. Backspace/Delete removes the selection; Ctrl+Z restores it. Space + drag or middle mouse pans."
+	if board.selected_object_ids.size()>1:
+		_target().add_child(label("%d drawings selected"%board.selected_object_ids.size(),16,Color("#76e0ca")))
+		button("Delete selected drawings",func():board.delete_selected_drawings())
+		button("Undo last drawing edit",func():_report(session.board_action({"action":"undo"})))
+		return
 	selected=board.selected_object().duplicate(true)
 	selection_note=label("No drawing selected" if selected.is_empty() else str(selected.kind).capitalize()+" · "+str(selected.get("layer","tokens")).capitalize(),16,Color("#76e0ca"))
 	_target().add_child(selection_note)
@@ -645,7 +650,7 @@ func _selection_ui() -> void:
 			number("Spread",float(selected.get("spread_degrees",360)),1,360,func(v): selected.spread_degrees=v,"°")
 			number("God rays",float(selected.get("ray_strength",0.55))*100,0,100,func(v): selected.ray_strength=v/100.0,"%")
 			button("Apply light settings",func(): _report(session.board_action({"action":"update","object":selected})),true)
-		button("Delete selected drawing",func(): _report(session.board_action({"action":"delete","id":board.selected_object_id})); board.selected_object_id=""; open("select"))
+		button("Delete selected drawing",func():board.delete_selected_drawings())
 	button("Undo last drawing edit",func(): _report(session.board_action({"action":"undo"})))
 	if session.local_role=="dm": button("Layers & object placement",func(): open("layers"))
 

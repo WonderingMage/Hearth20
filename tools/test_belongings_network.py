@@ -3,7 +3,7 @@ from pathlib import Path
 import json,os,secrets,subprocess,time,sys,hashlib
 root=Path(__file__).resolve().parents[1]
 external=len(sys.argv)>1
-out=root/'qa'/('items-release/network' if external else 'belongings-network');out.mkdir(parents=True,exist_ok=True)
+out=root/'qa'/('drawing-release/item-network' if '--drawing' in sys.argv else 'items-release/network' if external else 'belongings-network');out.mkdir(parents=True,exist_ok=True)
 for file in list(out.glob('*.ready'))+list(out.glob('*.json'))+list(out.glob('invitation.txt')):file.unlink()
 engine=r'C:\Users\fstre\AppData\Local\HearthtableCodexTools\Godot-4.5.1\bin\Godot_v4.5.1-stable_win64_console.exe'
 if external:engine=str(Path(sys.argv[1]).resolve())

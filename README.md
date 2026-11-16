@@ -4,7 +4,9 @@
 
 A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.21](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.21-beta)
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.22](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.22-beta)
+
+**0.3.22** removes the accidental gold bounding box around unfinished drawings. In **Select (V)**, drag empty board space to box-select drawings on the current layer, then press **Backspace** or **Delete**. **Ctrl+Z** restores the group in one step; **Escape** clears selection. Players select/delete only their own drawings. Tokens and custom items retain their existing controls. Use **Space + drag** or the middle mouse button to pan.
 
 **0.3.21** adds saved personal journals and unique custom item inventories. Open **Journal → Items & inventory**. The DM creates an item using a PNG and description, places it on a square, and conceals/reveals it or gives it directly to a player. Players right-click revealed board items to collect them; right-click an owned inventory item to destroy it after confirmation. Notes save to the host after a typing pause or **Save notes now**. Manual saves and the five-minute autosave keep notes, item images and ownership across sessions. Rejoin using the same saved Hearth20 player profile. Other players cannot see your notes or inventory.
 

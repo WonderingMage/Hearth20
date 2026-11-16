@@ -3,13 +3,15 @@ from pathlib import Path
 import datetime,hashlib,json,os,subprocess,sys,re
 root=Path(__file__).resolve().parents[1]
 artifact=json.loads((root/'qa/portable/artifact.json').read_text())
-exe=Path(artifact['exe']);out=root/'qa/items-release';out.mkdir(exist_ok=True)
-assert artifact['version']=='0.3.21-beta' and not artifact['debug']
+drawing='--drawing' in sys.argv
+exe=Path(artifact['exe']);out=root/'qa'/('drawing-release' if drawing else 'items-release');out.mkdir(exist_ok=True)
+assert artifact['version']==('0.3.22-beta' if drawing else '0.3.21-beta') and not artifact['debug']
 with exe.open('rb') as f:assert hashlib.file_digest(f,'sha256').hexdigest()==artifact['sha256']
 env_base=os.environ.copy();results=[]
 cwd=out/'empty-cwd';cwd.mkdir(exist_ok=True)
 headless=['autosave','campaign_saves','beyond_core','map_navigation','map_background','steam_images','preferences_updates']
 native=['belongings','sidebar_stability','map_switch_input','map_package_ui','token_picker_input','session_tools_ui','wizard_avatars','wizard_eyes','public_beta']
+if drawing:headless.append('token_routes');native.insert(0,'drawing_selection')
 for name in headless+native:
     folder=out/name;folder.mkdir(exist_ok=True);env=env_base.copy()
     for key,sub in [('APPDATA','Roaming'),('LOCALAPPDATA','Local')]:

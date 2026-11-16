@@ -47,6 +47,10 @@ var fx_settings := {"effect":"breath", "color":"#ff682b", "size":1.0, "duration"
 var pending_token: Dictionary={}
 var pending_item_id=""
 var selected_object_id := ""
+var selected_object_ids: Array[String]=[]
+var selecting_drawings=false
+var drawing_selection_start=Vector2.ZERO
+var drawing_selection_end=Vector2.ZERO
 var draft: Dictionary = {}
 var tool_drag := false
 var moving_object := false
@@ -88,6 +92,7 @@ func _ready() -> void:
 	resized.connect(_on_resized)
 
 func set_campaign(value: Dictionary, active_session: Node, active_role: String) -> void:
+	clear_drawing_selection(false)
 	campaign = value
 	session = active_session
 	if session and not session.ping_received.is_connected(_on_ping_received):
@@ -105,6 +110,7 @@ func set_player_snapshot(value: Dictionary) -> void:
 	if role != "player" or value.get("edition", "") != Hearth20Identity.EDITION:
 		return
 	if bool(value.get("connection_closed", false)):
+		clear_drawing_selection(false)
 		remote_rulers.clear()
 		local_ruler.clear()
 		draft.clear()
@@ -148,6 +154,7 @@ func set_player_snapshot(value: Dictionary) -> void:
 			seen_fx.erase(seen_fx.keys()[0])
 	active_fx.events = active_fx.events.filter(func(event: Dictionary) -> bool: return current_fx_ids.has(str(event.get("id", ""))))
 	if view_changed:
+		clear_drawing_selection(false)
 		fit_pending = true
 		dragging_actor = false
 		measuring = false
@@ -157,6 +164,7 @@ func set_player_snapshot(value: Dictionary) -> void:
 
 func set_role(active_role: String) -> void:
 	if role != active_role:
+		clear_drawing_selection(false)
 		map_texture_cache = null
 		map_texture_cache_key = ""
 	role = active_role
@@ -183,7 +191,7 @@ func current_assets() -> Dictionary:
 	return snapshot.get("assets", {}) if role == "player" else campaign.get("assets", {})
 
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT and event.pressed and not read_only_preview and not dragging_actor and not tool_drag and tool_name=="select":
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT and event.pressed and not read_only_preview and not dragging_actor and not tool_drag and not selecting_drawings and tool_name=="select":
 		var item=item_at(event.position)
 		if not item.is_empty():Hearth20ItemsWindow.board_context(self,item,event.position);accept_event();return
 	if _tool_input(event):
@@ -1079,6 +1087,10 @@ func _process(_delta: float) -> void:
 
 func activate_tool(value: String, dismiss_ruler: bool = false) -> void:
 	if read_only_preview: return
+	selecting_drawings=false
+	# Text appearance editing retains its target; drawing previews never show handles.
+	var editing_text=value=="text" and selected_object_ids.size()<=1 and selected_object().get("kind","")=="text"
+	if value!="select" and not editing_text:clear_drawing_selection(false)
 	if tool_drag or dismiss_ruler or not bool(local_ruler.get("linger",false)):
 		if session: session.send_tool_preview({})
 		local_ruler.clear()
@@ -1116,13 +1128,11 @@ func _tool_input(event: InputEvent) -> bool:
 	if read_only_preview: return false
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
+			clear_drawing_selection()
 			activate_tool("select",true)
 			return false
-		if event.keycode in [KEY_DELETE, KEY_BACKSPACE] and not selected_object_id.is_empty():
-			var result: Dictionary = session.board_action({"action":"delete", "id":selected_object_id})
-			hint_changed.emit(str(result.get("error", "Drawing removed. Ctrl+Z restores your last edit.")))
-			selected_object_id = ""
-			object_selected.emit({})
+		if event.keycode in [KEY_DELETE, KEY_BACKSPACE] and tool_name=="select" and not selected_object_id.is_empty() and not tool_drag:
+			delete_selected_drawings()
 			return true
 		if event.keycode == KEY_Z and event.ctrl_pressed and selected_template_id.is_empty() and not session.board_undo.get(session.local_player_id, []).is_empty():
 			var result: Dictionary = session.board_action({"action":"undo"})
@@ -1146,6 +1156,14 @@ func _tool_input(event: InputEvent) -> bool:
 			if local_ruler.points.size() < 64: local_ruler.points.append(local_ruler.points.back())
 			return true
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if selecting_drawings and not event.pressed:
+			drawing_selection_end=_bounded_point(event.position);selecting_drawings=false
+			if _world_to_screen(drawing_selection_start,float(current_scene().cell_pixels)).distance_to(event.position)>=5.:
+				var area=Rect2(drawing_selection_start,drawing_selection_end-drawing_selection_start)
+				for object in current_scene().get("annotations",[]):
+					if Hearth20DrawingSelection.editable(object,role,active_layer,session.local_player_id) and Hearth20DrawingSelection.touches(object,area):selected_object_ids.append(str(object.id))
+			selected_object_id=selected_object_ids[0] if not selected_object_ids.is_empty() else ""
+			object_selected.emit(selected_object());hint_changed.emit("%d drawing%s selected · Backspace/Delete to remove · Ctrl+Z to undo"%[selected_object_ids.size(),"" if selected_object_ids.size()==1 else "s"]);queue_redraw();return true
 		if tool_name=="item_place":
 			if not event.pressed and role=="dm" and not pending_item_id.is_empty():
 				var id=pending_item_id;pending_item_id="";activate_tool("select",true)
@@ -1174,10 +1192,17 @@ func _tool_input(event: InputEvent) -> bool:
 			grab_focus()
 			var point := _bounded_point(event.position)
 			if tool_name == "select":
+				if event.shift_pressed:return false
 				var object := object_at(point)
 				selected_object_id = str(object.get("id", ""))
+				selected_object_ids.clear()
+				if not selected_object_id.is_empty():selected_object_ids.append(selected_object_id)
 				object_selected.emit(object)
-				if object.is_empty(): return false
+				if object.is_empty():
+					if not _actor_at(event.position).is_empty():return false
+					selected_actor_id="";selected_template_id="";selection_changed.emit("")
+					selecting_drawings=true;drawing_selection_start=point;drawing_selection_end=point
+					hint_changed.emit("Drag a box to select drawings · Space + drag or middle mouse to pan");return true
 				selected_actor_id = ""
 				selected_template_id = ""
 				selection_changed.emit("")
@@ -1254,6 +1279,8 @@ func _tool_input(event: InputEvent) -> bool:
 				hint_changed.emit(str(result.get("error", "Placed. Use Select to move, edit or delete it.")))
 			draft.clear()
 			return true
+	if event is InputEventMouseMotion and selecting_drawings:
+		drawing_selection_end=_bounded_point(event.position);queue_redraw();return true
 	if event is InputEventMouseMotion and tool_drag:
 		var point := _bounded_point(event.position)
 		if tool_name == "measure": local_ruler.points[-1] = _ruler_point(event.position)
@@ -1275,6 +1302,21 @@ func _tool_input(event: InputEvent) -> bool:
 		return true
 	return false
 
+func clear_drawing_selection(notify=true) -> void:
+	selected_object_id="";selected_object_ids.clear();selecting_drawings=false
+	if notify:object_selected.emit({})
+	queue_redraw()
+func drawing_is_selected(object: Dictionary) -> bool:
+	var id=str(object.get("id",""))
+	return tool_name=="select" and not id.is_empty() and (id==selected_object_id or id in selected_object_ids)
+func delete_selected_drawings() -> void:
+	var ids=selected_object_ids.duplicate()
+	if ids.is_empty() and not selected_object_id.is_empty():ids.append(selected_object_id)
+	if ids.is_empty():return
+	var command={"action":"delete_many","ids":ids} if ids.size()>1 else {"action":"delete","id":ids[0]}
+	var result: Dictionary=session.board_action(command)
+	hint_changed.emit(str(result.get("error","Drawings removed. Ctrl+Z restores this selection.")))
+	if result.ok:clear_drawing_selection()
 func selected_object() -> Dictionary:
 	for object in current_scene().get("annotations", []):
 		if str(object.id) == selected_object_id: return object
@@ -1347,12 +1389,16 @@ func _draw_object(o: Dictionary, cell_px: float) -> void:
 				if o.kind == "window" or (o.kind == "door" and bool(o.get("open",false))):
 					for i in range(1,points.size()): draw_dashed_line(points[i-1],points[i],color,width,7,true)
 				else: draw_polyline(points,color,width,true)
-	if str(o.get("id","")) == selected_object_id:
+	if drawing_is_selected(o):
 		draw_rect(rect.grow(5),Color("#f0c674"),false,1,true)
-		if o.kind in ["rectangle","ellipse","text"]:
+		if selected_object_ids.size()<=1 and o.kind in ["rectangle","ellipse","text"]:
 			for p in [rect.position,rect.end,Vector2(rect.position.x,rect.end.y),Vector2(rect.end.x,rect.position.y)]: draw_rect(Rect2(p-Vector2.ONE*3,Vector2.ONE*6),Color("#f0c674"))
 
 func _draw_tool_preview(cell_px: float) -> void:
+	if tool_name=="select" and selecting_drawings:
+		var a=_world_to_screen(drawing_selection_start,cell_px);var b=_world_to_screen(drawing_selection_end,cell_px)
+		if a.distance_to(b)>=5.:
+			var rect=Rect2(a,b-a).abs();draw_rect(rect,Color("#e0bd7524"));draw_rect(rect,Color("#e0bd75"),false,1.5,true)
 	if tool_name=="token_place" and not pending_token.is_empty() and role=="dm":
 		var point:=_bounded_point(get_local_mouse_position())
 		point=Hearth20TokenInventory.snap_position(current_scene(),point)
