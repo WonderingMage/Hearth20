@@ -13,16 +13,21 @@ var primary: Button
 var restore_note: Label
 var last_restore_allowed=true
 var selected_path=""
+var closing=false
 static func open(owner: Node,owner_app: Hearth20App=null,mode="open",callback: Callable=Callable()) -> Hearth20CampaignVault:
 	for child in owner.get_children():
-		if child is Hearth20CampaignVault and not child.is_queued_for_deletion():Hearth20Design.popup_window(child);return child
+		if child is Hearth20CampaignVault and not child.closing and not child.is_queued_for_deletion():Hearth20Design.popup_window(child);return child
 	var window=Hearth20CampaignVault.new();window.app=owner_app;window.action=mode;window.choose_callback=callback;owner.add_child(window);window.setup();return window
 func label(parent: Node,text: String,points=14) -> Label:
 	var item=Label.new();item.text=text;item.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;item.add_theme_font_size_override("font_size",points);parent.add_child(item);return item
 func button(parent: Node,text: String,callback: Callable) -> Button:
 	var item=Button.new();item.text=text;item.custom_minimum_size.y=42;item.pressed.connect(callback);parent.add_child(item);return item
 func setup() -> void:
-	title="Hearth20 · Campaign vault";size=Vector2i(960,720);min_size=Vector2i(800,640);theme=Hearth20Design.theme();transient=true;exclusive=true;close_requested.connect(queue_free)
+	title="Hearth20 · Campaign vault";size=Vector2i(960,720);min_size=Vector2i(800,640);theme=Hearth20Design.theme();transient=true;exclusive=true;close_requested.connect(_close)
+	window_input.connect(func(event):
+		if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
+			set_input_as_handled()
+			_close())
 	var panel=PanelContainer.new();panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Hearth20Regal.swatch(Hearth20Regal.BG),3,26,Hearth20Regal.swatch(Hearth20Regal.GOLD)));add_child(panel)
 	var column=VBoxContainer.new();column.add_theme_constant_override("separation",16);panel.add_child(column)
 	var heading=label(column,"✦  THE CAMPAIGN VAULT  ✦",30);heading.add_theme_font_override("font",Hearth20Design.font(true));heading.add_theme_color_override("font_color",Hearth20Regal.swatch(Hearth20Regal.GOLD))
@@ -41,13 +46,23 @@ func setup() -> void:
 	restore_note=label(right,"End the active session before restoring a saved table. You can browse saves and return to your game here.",14);restore_note.visible=false
 	var footer=HBoxContainer.new();footer.add_theme_constant_override("separation",12);column.add_child(footer)
 	button(footer,"Open AppData save folder",func():DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(Hearth20Identity.SAVE_ROOT));OS.shell_open(ProjectSettings.globalize_path(Hearth20Identity.SAVE_ROOT)))
-	var spacer=Control.new();spacer.size_flags_horizontal=Control.SIZE_EXPAND_FILL;footer.add_child(spacer);button(footer,"Back",queue_free)
+	var spacer=Control.new();spacer.size_flags_horizontal=Control.SIZE_EXPAND_FILL;footer.add_child(spacer);button(footer,"Back",_close)
 	primary=button(footer,"Save new table" if action=="save" else "Open selected table",confirm);primary.custom_minimum_size.x=190
 	listing=Hearth20CampaignJob.new();listing.list_tables();refresh_primary();Hearth20Design.popup_window(self)
+func _close() -> void:
+	closing=true;hide()
+	if listing!=null:listing.cancel_listing()
+	else:queue_free()
 func _process(_delta: float) -> void:
 	if action=="open" and last_restore_allowed!=can_restore():refresh_primary()
 	if listing==null or not listing.done():return
-	var records: Array=listing.finish();listing=null
+	var records=listing.finish();listing=null
+	if closing:
+		queue_free()
+		return
+	if not records is Array:
+		status.text="The saved tables could not be listed. Close the vault and try again."
+		return
 	if action=="save":records=records.filter(func(record):return not record.get("autosave",false))
 	status.text="%d saved table%s · stored in this PC’s AppData"%[records.size(),"" if records.size()==1 else "s"]
 	if records.is_empty():label(rows,"Your adventures will appear here after their first save.",15)

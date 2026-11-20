@@ -13,14 +13,17 @@ var eye_buttons={}
 var eye_color_buttons={}
 var eye_treatment_buttons={}
 var eye_icons={}
-static func open(parent: Node,owner_session: Hearth20Session,host: bool) -> Hearth20AvatarWardrobe:
+static func open(parent: Node,owner_session: Hearth20Session,host: bool,save_label="Take my seat") -> Hearth20AvatarWardrobe:
+	for child in parent.get_children():
+		if child is Hearth20AvatarWardrobe and not child.is_queued_for_deletion():return child
 	var window=Hearth20AvatarWardrobe.new();window.session=owner_session;window.is_host=host
-	parent.add_child(window);window.setup();return window
-func setup() -> void:
+	window.exclusive=parent is Window
+	parent.add_child(window);window.setup(save_label);return window
+func setup(save_label="Take my seat") -> void:
 	title="Hearth20 · Your wizard";size=Vector2i(860,740);min_size=Vector2i(740,700);theme=Hearth20Design.theme();transient=true;close_requested.connect(queue_free)
 	value=Hearth20AvatarStyle.remembered(is_host)
-	if is_host and session.local_role=="dm":value=Hearth20AvatarStyle.clean(session.campaign.get("host_avatar",value),true)
-	elif not is_host and session.local_role=="player":
+	if is_instance_valid(session) and is_host and session.local_role=="dm":value=Hearth20AvatarStyle.clean(session.campaign.get("host_avatar",value),true)
+	elif is_instance_valid(session) and not is_host and session.local_role=="player":
 		for entry in session.table_roster:
 			if entry.get("mine",false):value=Hearth20AvatarStyle.clean(entry.style,false)
 	var panel=PanelContainer.new();panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Hearth20Regal.swatch(Hearth20Regal.BG),3,20,Hearth20Regal.swatch(Hearth20Regal.GOLD)));add_child(panel)
@@ -44,7 +47,7 @@ func setup() -> void:
 	note=Label.new();note.text="Your robe, eyes and jewelry are remembered for your next visit.";note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;box.add_child(note)
 	var actions=HBoxContainer.new();actions.alignment=BoxContainer.ALIGNMENT_END;box.add_child(actions)
 	var cancel=Button.new();cancel.text="Cancel";cancel.pressed.connect(queue_free);actions.add_child(cancel)
-	var save=Button.new();save.text="Take my seat";save.custom_minimum_size=Vector2(160,42);save.pressed.connect(_save);actions.add_child(save)
+	var save=Button.new();save.text=save_label;save.custom_minimum_size=Vector2(160,42);save.pressed.connect(_save);actions.add_child(save)
 	Hearth20Design.popup_window(self);_prepare()
 func _page(caption: String) -> VBoxContainer:
 	var scroll=ScrollContainer.new();scroll.name=caption;scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;appearance_tabs.add_child(scroll)
@@ -90,8 +93,9 @@ func _rebuild() -> void:
 	avatar=Hearth20WizardAvatar.new();stage.add_child(avatar);avatar.setup(value,is_host)
 func _save() -> void:
 	if not Hearth20AvatarStyle.valid(value,is_host):return
-	if (session.local_role=="dm")==is_host:
-		if is_host or not session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
+	if is_instance_valid(session) and (session.local_role=="dm")==is_host:
+		var live_player=not session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer and not session.local_player_id.is_empty() and session.client_snapshot.get("avatar_presence",false)
+		if is_host or live_player:
 			var result=session.set_avatar(value)
 			if not result.ok:note.text=result.error;return
 	Hearth20AvatarStyle.remember(value,is_host);queue_free()

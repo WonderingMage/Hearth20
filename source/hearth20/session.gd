@@ -25,6 +25,7 @@ signal jax_alert_cancelled
 const MAX_CLIENTS := 8
 const MAX_PORT := 65535
 const MAX_SECRET_LENGTH := 128
+const MAP_IDLE_MSEC := 90000
 
 var jax_last_sent_msec=-10000
 var jax_last_received_msec=-10000
@@ -54,6 +55,7 @@ var pending_proofs: Dictionary = {}
 var token_drag_scope=""
 var refreshment_tick=0.
 var transport="direct"
+var direct_join_deadline=0
 var steam_link: Node
 var steam_chunks=Hearth20SteamChunks.new()
 var steam_outgoing={}
@@ -71,26 +73,41 @@ var background_peer_cursor=0
 var map_rate_tick=0
 var map_rate_bytes=0
 var map_rate=0.0
+var map_idle_deadline=0
 var map_transfer_state: Dictionary={"active":false,"progress":0.0,"received":0,"total":0,"phase":""}
 
 func _ready() -> void:
 	dice_rng.randomize()
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.server_disconnected.connect(func():
-		_clear_client_view()
-		status_changed.emit("The Hearth20 host disconnected. Private table data cleared.")
-		if transport=="steam" and is_instance_valid(steam_link):steam_link.connection_lost.call_deferred()
+		_connection_ended("The Hearth20 host disconnected. Private table data cleared.")
 	)
 	multiplayer.connection_failed.connect(func():
-		_clear_client_view()
-		status_changed.emit("Could not connect to the Hearth20 host. Private table data cleared.")
-		if transport=="steam" and is_instance_valid(steam_link):steam_link.connection_lost.call_deferred()
+		_connection_ended("Could not connect to the Hearth20 host. Check the address and try again.")
 	)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
+func _connection_ended(note: String) -> void:
+	if transport=="direct" and local_role=="player" and not multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
+		_restore_direct_table.call_deferred(multiplayer.multiplayer_peer,note)
+		return
+	_clear_client_view()
+	status_changed.emit(note)
+	if transport=="steam" and is_instance_valid(steam_link):steam_link.connection_lost.call_deferred()
+
+func _restore_direct_table(peer: MultiplayerPeer,note: String) -> void:
+	if transport!="direct" or local_role!="player" or peer!=multiplayer.multiplayer_peer:return
+	stop_session()
+	configure(campaign)
+	_broadcast_dm_state()
+	status_changed.emit(note)
+
+func cancel_direct_join() -> void:
+	if direct_join_deadline>0:_restore_direct_table(multiplayer.multiplayer_peer,"Direct connection cancelled.")
+
 func configure(campaign_data: Dictionary) -> void:
 	jax_alert_cancelled.emit();jax_last_sent_msec=-10000;jax_last_received_msec=-10000
-	map_stream.clear();peer_map_downloads.clear();pending_map_snapshot.clear()
+	map_stream.clear(false);peer_map_downloads.clear();pending_map_snapshot.clear()
 	campaign = campaign_data
 	Hearth20MapLibrary.discard_empty_starter(campaign,str(campaign.get("active_scene","")))
 	if not campaign.has("map_covered"):
@@ -158,6 +175,8 @@ func join_host(address: String, port: int, secret: String, nickname: String) -> 
 	local_player_id = ""
 	invite_secret = secret
 	pending_nickname = clean_name
+	direct_join_deadline=Time.get_ticks_msec()+Hearth20SteamChunks.IDLE_MSEC
+	status_changed.emit("Connecting to the Hearth20 host…")
 	return {"ok": true}
 
 func adopt_steam_peer(peer: MultiplayerPeer,hosting: bool,secret: String,nickname: String) -> Dictionary:
@@ -200,7 +219,8 @@ func _clear_client_view() -> void:
 	jax_alert_cancelled.emit();jax_last_received_msec=-10000
 	table_roster.clear();table_presence_changed.emit([])
 	avatar_submitted=false
-	background_mode=false;map_preparing=false;pending_map_snapshot.clear();peer_map_downloads.clear();map_stream.clear()
+	direct_join_deadline=0;map_idle_deadline=0
+	background_mode=false;map_preparing=false;pending_map_snapshot.clear();peer_map_downloads.clear();map_stream.clear(false)
 	_finish_map_download()
 	steam_images.clear()
 	var interrupted=pending_table_commands.duplicate();pending_table_commands.clear()
@@ -318,6 +338,7 @@ func receive_snapshot(snapshot: Dictionary) -> void:
 		if received.get("replayed",false):return
 		var fraction:=float(received.get("progress",0.))
 		if transport=="steam":steam_link.transfer_update(fraction,"Receiving the battlemap and campaign…")
+		elif direct_join_deadline>0:direct_join_deadline=Time.get_ticks_msec()+Hearth20SteamChunks.IDLE_MSEC
 		if not background_mode:
 			map_transfer_state={"id":str(snapshot._h20_transfer.id),"active":true,"progress":fraction,"received":roundi(fraction*float(snapshot._h20_transfer.size)),"total":int(snapshot._h20_transfer.size),"phase":"Preparing map…" if received.complete else "Downloading map…"}
 			map_transfer_progress.emit(map_transfer_state.duplicate())
@@ -361,6 +382,7 @@ func _install_snapshot(snapshot: Dictionary,completed_transfer="") -> void:
 		var resolved=_resolve_background_view(snapshot)
 		if not resolved.ok:_steam_transfer_failed(1,resolved.error);return
 		if resolved.get("waiting",false):
+			direct_join_deadline=0
 			pending_map_snapshot=snapshot;client_snapshot=_map_loading_view(snapshot)
 			timeline_changed.emit(timeline_for_local());snapshot_received.emit(client_snapshot.duplicate(true));_background_map_progress();return
 		snapshot=resolved.snapshot;steam_images.remember(snapshot)
@@ -378,6 +400,7 @@ func _install_snapshot(snapshot: Dictionary,completed_transfer="") -> void:
 		if client_snapshot.get("scene",{}).get("id","")!=snapshot.scene.get("id",""):return
 		snapshot.scene.light_field=client_snapshot.get("scene",{}).get("light_field",{})
 	for key in ["map_unchanged","assets_unchanged","light_unchanged"]:snapshot.erase(key)
+	direct_join_deadline=0
 	steam_images.remember(snapshot);pending_map_snapshot={};client_snapshot=snapshot
 	timeline_changed.emit(timeline_for_local());snapshot_received.emit(client_snapshot.duplicate(true))
 	if background_mode:_background_map_progress()
@@ -1499,7 +1522,7 @@ func submit_join_character(sheet: Dictionary, png: PackedByteArray) -> Dictionar
 		if job.is_empty():return {"ok":false,"error":"The character image could not be prepared."}
 		steam_outgoing[1]={"active":job,"pending":{},"cache":{},"kind":"character"}
 		return {"ok":true,"pending":true}
-	request_join_character.rpc_id(1,sheet,png)
+	if rpc_id(1,"request_join_character",sheet,png)!=OK:return {"ok":false,"error":"The character could not be sent. Check the connection and try again."}
 	return {"ok":true,"pending":true}
 @rpc("any_peer","call_remote","reliable")
 func request_join_character(sheet: Dictionary, png: PackedByteArray) -> void:
@@ -1514,7 +1537,9 @@ func request_join_character(sheet: Dictionary, png: PackedByteArray) -> void:
 		if not received.value is Array or received.value.size()!=2 or not received.value[0] is Dictionary or not received.value[1] is PackedByteArray:_steam_transfer_failed(peer,"The character transfer was invalid.");return
 		sheet=received.value[0];png=received.value[1]
 	var rate_key = "join-character:"+player;var now = Time.get_ticks_msec()
-	if now-int(request_rates.get(rate_key,-10000))<1500:return
+	if now-int(request_rates.get(rate_key,-10000))<1500:
+		receive_character_submission.rpc_id(peer,{"ok":false,"error":"Wait a moment before sending your character again."})
+		return
 	request_rates[rate_key]=now
 	var result = Hearth20JoinCharacter.submit(campaign,player,sheet,png)
 	if result.ok:
@@ -1657,7 +1682,7 @@ func _send_map_catalog(peer: int) -> void:
 			slot.active=""
 	if not wanted.is_empty() and wanted in slot.queue:
 		slot.queue.erase(wanted);slot.queue.push_front(wanted)
-	var preparing=map_stream.worker!=null or not map_stream.queue.is_empty()
+	var preparing=map_stream.failure.is_empty() and (map_stream.worker!=null or not map_stream.queue.is_empty())
 	var signature=Hearth20Contracts.sha256(var_to_bytes([offers,preparing,map_stream.failure]))
 	if signature==slot.catalog:return
 	slot.catalog=signature
@@ -1702,7 +1727,9 @@ func _background_map_progress() -> void:
 	if map_preparing:
 		state.active=true
 		if state.received==state.total:state.phase="Preparing background maps…"
-	if not pending_map_snapshot.is_empty():state.phase="Downloading your map…"
+	if not pending_map_snapshot.is_empty():state.active=true;state.phase="Downloading your map…"
+	if not state.active:map_idle_deadline=0
+	elif map_idle_deadline==0 or state.received>int(map_transfer_state.get("received",0)):map_idle_deadline=now+MAP_IDLE_MSEC
 	map_transfer_state=state;map_transfer_progress.emit(state.duplicate())
 
 func _pump_background_maps() -> void:
@@ -1725,11 +1752,19 @@ func _pump_background_maps() -> void:
 		var record={}
 		for candidate in map_stream.records.values():
 			if candidate.id==slot.active:record=candidate;break
-		if record.is_empty():dry+=1;continue
+		if record.is_empty():
+			peer_map_downloads.erase(peer)
+			_steam_transfer_failed(peer,"A cached map is unavailable. Reopen the campaign to prepare it again.")
+			dry+=1;continue
 		var file=FileAccess.open(record.path,FileAccess.READ)
-		if file==null:status_changed.emit("A cached map file is unavailable. Reopen the campaign to prepare it again.");dry+=1;continue
-		file.seek(int(slot.offset));var bytes=file.get_buffer(mini(Hearth20MapStream.CHUNK,int(record.size)-int(slot.offset)));file.close()
-		if bytes.is_empty():dry+=1;continue
+		var expected=mini(Hearth20MapStream.CHUNK,int(record.size)-int(slot.offset))
+		var bytes=PackedByteArray()
+		if file!=null:
+			file.seek(int(slot.offset));bytes=file.get_buffer(expected);file.close()
+		if bytes.size()!=expected or expected<=0:
+			peer_map_downloads.erase(peer)
+			_steam_transfer_failed(peer,"A cached map is missing or incomplete. Reopen the campaign to prepare it again.")
+			dry+=1;continue
 		var error=rpc_id(peer,"receive_map_asset",{"id":slot.active,"offset":int(slot.offset),"bytes":bytes})
 		if error!=OK:dry+=1;continue
 		dry=0;slot.offset+=bytes.size()
@@ -1740,13 +1775,23 @@ func _exit_tree() -> void:
 	map_stream.clear()
 
 func _process(delta: float) -> void:
-	if transport=="steam" or not steam_outgoing.is_empty():
+	var now=Time.get_ticks_msec()
+	if local_role=="player":
+		if direct_join_deadline>0 and now>=direct_join_deadline:
+			_restore_direct_table(multiplayer.multiplayer_peer,"Direct connection timed out. Check your DM’s address and try again.")
+			return
+		if map_idle_deadline>0 and now>=map_idle_deadline and client_snapshot.get("scene",{}).get("id","")=="map-loading":
+			_steam_transfer_failed(1,"The map download stopped making progress. Join the table again.")
+			return
+	if transport=="steam" or not steam_outgoing.is_empty() or not steam_chunks.incoming.is_empty():
 		_pump_steam_transfers()
 	if local_role=="dm" and not peer_map_downloads.is_empty():
 		if map_stream.tick(campaign):
 			for peer in peer_map_downloads:
 				_send_map_catalog(peer);_send_peer_snapshot(peer,str(peer_to_player.get(peer,"")))
 		_pump_background_maps()
+	elif map_stream.worker!=null and map_stream.work_key.is_empty():
+		map_stream.tick(campaign)
 	if local_role!="dm" or campaign.is_empty():return
 	refreshment_tick+=delta
 	if refreshment_tick<.25:return
@@ -1807,7 +1852,7 @@ func _steam_transfer_failed(peer: int,note: String) -> void:
 	status_changed.emit(note)
 	if local_role=="dm":_reject_peer(peer)
 	elif transport=="steam" and is_instance_valid(steam_link):steam_link.connection_lost.call_deferred()
-	else:stop_session()
+	else:_restore_direct_table(multiplayer.multiplayer_peer,note)
 func _refreshment_ledger_path() -> String:
 	return "user://hearth20/refreshments/"+str(campaign.get("refreshment_scope","invalid"))+".json"
 func _load_refreshment_ledger() -> void:

@@ -1,6 +1,6 @@
 extends RefCounted
 class_name Hearth20Design
-## Original native visual system: midnight surfaces, brass accents, crisp vector icons.
+## Native interface palette, typography, control states and icons.
 const BG := Color("#0b0e15")
 const SURFACE := Color("#131925")
 const RAISED := Color("#1a2230")
@@ -19,6 +19,18 @@ static func popup_window(window: Window) -> void:
 	available=Vector2i(maxi(320,available.x),maxi(240,available.y))
 	window.min_size=window.min_size.min(available)
 	window.popup_centered(window.size.min(available))
+
+static func open_file_picker(dialog: FileDialog, ratio: float) -> void:
+	if dialog.visible:return
+	dialog.transient=true
+	dialog.transient_to_focused=false
+	dialog.exclusive=true
+	dialog.popup_centered_ratio(ratio)
+
+static func dismiss_file_picker(dialog: FileDialog) -> void:
+	if not is_instance_valid(dialog):return
+	dialog.hide()
+	dialog.exclusive=false
 
 static func track_number(input: SpinBox) -> void:
 	input.get_line_edit().text_changed.connect(func(text):input.set_meta("number_draft",text))
@@ -114,6 +126,11 @@ static func icon(name_value: String, pixels: int = 20) -> Texture2D:
 		"foreground":'<path d="M3 18l6-9 4 5 3-7 5 11z"/><circle cx="7" cy="5" r="2"/>',
 		"tokens":'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="9" r="3"/><path d="M6 18a6 6 0 0112 0"/>',
 		"light":'<path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/><circle cx="12" cy="12" r="5"/>',
+		"gear":'<path d="M9.2 3h5.6l.8 2.7 2.6 1.4 2.8-.6 2 3.5-1.9 2v1l1.9 2-2 3.5-2.8-.6-2.6 1.4-.8 2.7H9.2l-.8-2.7-2.6-1.4-2.8.6L1 15l1.9-2v-1L1 10l2-3.5 2.8.6 2.6-1.4z"/><circle cx="12" cy="12.5" r="3.4"/>',
+		"host":'<path d="M4 21V8l8-5 8 5v13M3 21h18M9 21v-7h6v7M10 9h4"/>',
+		"cup":'<path d="M5 8h12v6a5 5 0 01-5 5h-2a5 5 0 01-5-5zM17 9h1.5a2.5 2.5 0 010 5H17M4 21h14M9 5V2M13 5V2"/>',
+		"up":'<path d="M12 20V4M6 10l6-6 6 6"/>',
+		"back":'<path d="M20 12H4m6-6-6 6 6 6"/>',
 		"crest":'<path d="M12 1l9 5v12l-9 5-9-5V6zM7 17V8l5 3 5-3v9M7 13h10"/>',
 		"die4":'<path d="M12 2L23 21H1zM12 2v12L1 21M12 14l11 7"/>',
 		"die6":'<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/>',
@@ -192,8 +209,16 @@ static func theme() -> Theme:
 		for key in result.get_color_list(type_name):
 			var value: Color=result.get_color(key,type_name)
 			result.set_color(key,type_name,Hearth20Regal.swatch(Hearth20Regal.INK) if value==Color.WHITE and key.begins_with("font") else Hearth20Regal.resolve(value))
-	for kind in ["Button","OptionButton","CheckButton","QuietButton","RailButton","ChoiceButton"]:
-		for state in ["normal","hover","pressed"]: result.set_stylebox(state,kind,Hearth20Regal.button_style(state))
+	var warm_border := Color("#514431") if not Hearth20Regal.light_mode else Color("#b49b72")
+	for kind in ["Button","OptionButton","CheckButton","ChoiceButton","QuietButton","RailButton"]:
+		var quiet: bool = kind in ["QuietButton","RailButton"]
+		result.set_stylebox("normal",kind,panel(Color.TRANSPARENT if quiet else SURFACE,6,8,Color.TRANSPARENT if quiet else warm_border))
+		result.set_stylebox("hover",kind,panel(RAISED,6,8,warm_border))
+		result.set_stylebox("pressed",kind,panel(Color("#363124"),6,8,GOLD))
+		result.set_stylebox("focus",kind,panel(Color.TRANSPARENT,6,0,GOLD))
+		result.set_stylebox("disabled",kind,panel(Color.TRANSPARENT,6,8,Color.TRANSPARENT))
+		result.set_color("icon_normal_color",kind,Hearth20Regal.swatch(Hearth20Regal.MUTED))
+		result.set_color("icon_hover_color",kind,Hearth20Regal.swatch(Hearth20Regal.GOLD))
 	for kind in ["HSlider","VSlider"]:
 		result.set_stylebox("slider",kind,panel(Color("#131925"),3,3,Color("#605844")))
 		result.set_stylebox("grabber_area",kind,panel(GOLD,3,3,GOLD))
@@ -208,4 +233,4 @@ static func theme() -> Theme:
 static func primary(button: Button) -> void:
 	button.set_meta("h20_primary",true)
 	for state in ["normal","hover","pressed"]: button.add_theme_stylebox_override(state,Hearth20Regal.button_style(state,true))
-	for key in ["font_color","font_hover_color","font_pressed_color","icon_normal_color","icon_hover_color","icon_pressed_color"]: button.add_theme_color_override(key,Color("#211c14"))
+	for key in ["font_color","font_hover_color","font_pressed_color","font_focus_color","icon_normal_color","icon_hover_color","icon_pressed_color"]: button.add_theme_color_override(key,Color("#211c14"))

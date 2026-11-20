@@ -1,12 +1,11 @@
 extends RefCounted
 class_name Hearth20Identity
 ## Hearth20 identity and campaign persistence boundary.
-## These identifiers are development namespace values, not a release identity.
 
 const PRODUCT_ID := "com.wonderingmage.hearth20.seated"
-const PRODUCT_NAME := "Hearth20 Beta"
+const PRODUCT_NAME := "Hearth20"
 const EDITION := "hearth20-seated"
-const VERSION := "0.3.23-beta"
+const VERSION := "1.0.0"
 const UPDATE_CHANNEL_DEFAULT := "beta"
 const SCHEMA_ID := "hearth20.seated.campaign.v1"
 const SCHEMA_VERSION := 1
@@ -106,7 +105,7 @@ static func _save_campaign_checked(value: Dictionary,file_path: String,progress:
 	return result
 
 static func _write_campaign(value: Dictionary,file_path: String,progress: Callable) -> Dictionary:
-	# The asynchronous saver validates its detached snapshot on the main thread first.
+	# Callers validate their detached snapshots before asking the writer to commit.
 	if not file_path.ends_with("." + SAVE_EXTENSION):
 		return {"ok": false, "errors": ["Hearth20 campaigns must use .%s." % SAVE_EXTENSION]}
 	if not file_path.begins_with(SAVE_ROOT + "/") or file_path.contains("..") or file_path.contains("\\"):
@@ -139,7 +138,7 @@ static func _write_campaign(value: Dictionary,file_path: String,progress: Callab
 		var backup := file_path + ".previous"
 		# Keep a good recovery copy when the current file was truncated.
 		var prior=_read_campaign_file(file_path)
-		var valid_prior=prior.ok and Hearth20Contracts.validate_campaign(prior.campaign).ok
+		var valid_prior=prior.ok and Hearth20Contracts.validate_campaign(prior.campaign,false).ok
 		if valid_prior or not FileAccess.file_exists(backup):
 			var backup_error := DirAccess.copy_absolute(absolute_destination, ProjectSettings.globalize_path(backup))
 			if backup_error != OK:
@@ -151,14 +150,14 @@ static func _write_campaign(value: Dictionary,file_path: String,progress: Callab
 		return {"ok": false, "errors": ["Could not finish Hearth20 campaign save."]}
 	return {"ok": true, "errors": [], "path": file_path}
 
-static func load_campaign(file_path: String) -> Dictionary:
+static func load_campaign(file_path: String,use_asset_cache=true) -> Dictionary:
 	if not file_path.ends_with("." + SAVE_EXTENSION) or not file_path.begins_with(SAVE_ROOT + "/") or file_path.contains("..") or file_path.contains("\\"):
 		return {"ok": false, "errors": ["Choose an existing Hearth20 campaign file."]}
 	var failure={"ok":false,"errors":["The saved campaign could not be opened."]}
 	for candidate in [file_path,file_path+".previous"]:
 		var loaded=_read_campaign_file(candidate)
 		if loaded.ok:
-			var checked=Hearth20Contracts.validate_campaign(loaded.campaign)
+			var checked=Hearth20Contracts.validate_campaign(loaded.campaign,use_asset_cache)
 			if checked.ok:
 				loaded.recovered=candidate!=file_path
 				return loaded

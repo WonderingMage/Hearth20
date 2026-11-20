@@ -20,6 +20,7 @@ var cancel_button: Button
 var end_button: Button
 var friends_loaded=false
 var direct_status: Label
+var direct_feedback=""
 var direct_port: SpinBox
 var direct_address: LineEdit
 var direct_code: LineEdit
@@ -79,7 +80,7 @@ func setup(owner_app: Hearth20App,action: String) -> void:
 	_build_steam();_build_direct()
 	var footer=HBoxContainer.new();column.add_child(footer)
 	advanced_button=_button(footer,"Advanced connection",_toggle_advanced)
-	cancel_button=_button(footer,"Cancel connection",func():link.cancel());end_button=_button(footer,"Leave table",func():app._leave_table();refresh())
+	cancel_button=_button(footer,"Cancel connection",_cancel_connection);end_button=_button(footer,"Leave table",func():app._leave_table();refresh())
 	var spacer=Control.new();spacer.size_flags_horizontal=Control.SIZE_EXPAND_FILL;footer.add_child(spacer);_button(footer,"Return to the table",_close)
 	link.changed.connect(refresh);app.session.status_changed.connect(_session_status);nickname.text_changed.connect(func(_text):refresh())
 	if link.pending_invite>0:invite_field.text=str(link.pending_invite);intent="join"
@@ -139,12 +140,13 @@ func _build_direct() -> void:
 	direct_status=_label(page,"",13);direct_status.custom_minimum_size.y=58
 	var host_row=HBoxContainer.new();page.add_child(host_row);_label(host_row,"Port",13)
 	direct_port=SpinBox.new();direct_port.min_value=1024;direct_port.max_value=65535;direct_port.value=app.host_port.value;host_row.add_child(direct_port)
-	direct_host=_button(host_row,"Host by Direct IP",func():app.host_port.value=direct_port.value;app._host_table();refresh())
+	direct_host=_button(host_row,"Host by Direct IP",func():direct_feedback="";app.host_port.value=direct_port.value;app._host_table();refresh())
 	_button(page,"Copy local connection details",func():DisplayServer.clipboard_set(_direct_details()))
 	direct_address=LineEdit.new();direct_address.placeholder_text="DM's host address";direct_address.text=Hearth20PlayerProfile.preferences().address;page.add_child(direct_address)
 	direct_code=LineEdit.new();direct_code.placeholder_text="DM invite code";direct_code.max_length=128;page.add_child(direct_code)
 	direct_join=_button(page,"Join by Direct IP",func():
-		app.join_address.text=direct_address.text;app.join_secret.text=direct_code.text;app.player_name.text=nickname.text;app.host_port.value=direct_port.value;app._join_table();refresh())
+		app.join_address.text=direct_address.text;app.join_secret.text=direct_code.text;app.player_name.text=nickname.text;app.host_port.value=direct_port.value
+		var result=app._join_table();direct_feedback="Connecting to the Hearth20 host…" if result.ok else str(result.error);refresh())
 	_label(page,"Same computer: 127.0.0.1. Same Wi-Fi/LAN: use the DM's local IPv4 address. Internet play through Direct IP needs the DM's public address and UDP port forwarding. Steam mode handles connections through Steam instead.",12)
 func _direct_details() -> String:
 	var addresses=[]
@@ -179,7 +181,7 @@ func _set_intent(value: String) -> void:
 func _toggle_advanced() -> void:
 	auto_host_pending=false
 	retry_until=0
-	if link.busy():link.cancel()
+	_cancel_connection()
 	tabs.current_tab=1 if tabs.current_tab==0 else 0
 	advanced_button.text="Back to guided setup" if tabs.current_tab==1 else "Advanced connection"
 func _open_steam() -> void:
@@ -275,8 +277,10 @@ func refresh() -> void:
 	invite_button.disabled=link.state!="hosting" or not link.initialized
 	copy_button.disabled=link.state!="hosting";friend_refresh.disabled=link.state!="hosting"
 	friend_invite.disabled=link.state!="hosting" or friend_list.get_selected_items().is_empty()
-	cancel_button.visible=link.busy();end_button.visible=online;direct_host.disabled=online or link.busy();direct_join.disabled=online or link.busy()
-	direct_status.text="Connected through Steam. Leave this table before starting a Direct IP session." if app.session.transport=="steam" else _direct_details()
+	var direct_pending=app.session.direct_join_deadline>0
+	cancel_button.visible=link.busy() or direct_pending;end_button.visible=online and not direct_pending
+	direct_host.disabled=online or link.busy();direct_join.disabled=online or link.busy()
+	direct_status.text="Connected through Steam. Leave this table before starting a Direct IP session." if app.session.transport=="steam" else direct_feedback if not direct_feedback.is_empty() else _direct_details()
 	if hosting and not friends_loaded:
 		friends_loaded=true
 		call_deferred("_load_friends")
@@ -296,7 +300,9 @@ func _update_guidance(hosting: bool) -> void:
 	else:
 		step_title.text="1 · Connect your Steam account"
 		step_description.text="Open Steam and sign in on this PC. We’ll prepare the connection and fill in your name. Each player uses their own Steam account."
-func _session_status(_note: String) -> void:refresh()
+func _session_status(note: String) -> void:
+	if tabs.current_tab==1 and app.session.transport=="direct" and not direct_feedback.is_empty():direct_feedback=note
+	refresh()
 func _result(result: Dictionary) -> void:
 	refresh()
 	if not result.get("ok",false):
@@ -306,5 +312,8 @@ func _close() -> void:
 	retry_until=0
 	auto_host_pending=false
 	if not nickname.text.strip_edges().is_empty():_remember_name()
-	if link.busy():link.cancel()
+	_cancel_connection()
 	queue_free()
+func _cancel_connection() -> void:
+	if link.busy():link.cancel()
+	else:app.session.cancel_direct_join()

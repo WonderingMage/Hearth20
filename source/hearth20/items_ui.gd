@@ -87,14 +87,15 @@ func create_editor() -> void:
 	var description=TextEdit.new();description.placeholder_text="What it looks like, how it works, or simply ‘orange’.";description.wrap_mode=TextEdit.LINE_WRAPPING_BOUNDARY;description.size_flags_vertical=Control.SIZE_EXPAND_FILL;column.add_child(description)
 	var image_note=Label.new();image_note.text="PNG required · optimized to 512 pixels for quick transfer";image_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;column.add_child(image_note)
 	var payload={"png":PackedByteArray()}
-	button(column,"Choose item PNG…",func():
-		var picker=FileDialog.new();picker.access=FileDialog.ACCESS_FILESYSTEM;picker.file_mode=FileDialog.FILE_MODE_OPEN_FILE;picker.add_filter("*.png","Item PNG");picker.use_native_dialog=OS.get_name()=="Windows";picker.transient=true;picker.transient_to_focused=false;window.add_child(picker)
-		picker.file_selected.connect(func(path):
-			var inspected=Hearth20Assets.inspect_token_png(path)
-			if inspected.ok:payload.png=inspected.bytes;image_note.text=path.get_file()+" · ready"
-			else:image_note.text=inspected.error
-			picker.hide();picker.exclusive=false;picker.queue_free())
-		picker.canceled.connect(func():picker.hide();picker.exclusive=false;picker.queue_free());picker.close_requested.connect(func():picker.hide();picker.exclusive=false;picker.queue_free());picker.popup_centered_ratio(.7))
+	var picker=FileDialog.new();picker.access=FileDialog.ACCESS_FILESYSTEM;picker.file_mode=FileDialog.FILE_MODE_OPEN_FILE;picker.add_filter("*.png","Item PNG");picker.use_native_dialog=OS.get_name()=="Windows";window.add_child(picker)
+	var dismiss:=Hearth20Design.dismiss_file_picker.bind(picker)
+	picker.file_selected.connect(func(path):
+		dismiss.call()
+		var inspected=Hearth20Assets.inspect_token_png(path)
+		if inspected.ok:payload.png=inspected.bytes;image_note.text=path.get_file()+" · ready"
+		else:image_note.text=inspected.error)
+	picker.canceled.connect(dismiss);picker.close_requested.connect(dismiss)
+	button(column,"Choose item PNG…",func():Hearth20Design.open_file_picker(picker,.7))
 	button(column,"Create in DM vault",func():
 		var result=app.session.create_custom_item(name_input.text,description.text,payload.png)
 		if result.ok:selected_id=result.id;refresh(true);window.queue_free()

@@ -51,24 +51,25 @@ func tick(campaign: Dictionary) -> bool:
 	var changed=false
 	if worker!=null and not worker.is_alive():
 		var record: Dictionary=worker.wait_to_finish();worker=null
-		changed=true
-		if record.is_empty():failure="A map could not be prepared for background download."
-		elif _open() and disk_bytes+int(record.size)<=DISK_LIMIT:
-			var path=folder.path_join(str(record.id)+".blob");var file=FileAccess.open(path,FileAccess.WRITE)
-			if file!=null:
-				file.store_buffer(record.data);file.close()
-				if FileAccess.get_sha256(path)==record.cipher_sha256:
-					record.erase("data");record.path=path;records[work_key]=record;disk_bytes+=int(record.size);changed=true
-				else:failure="The map cache could not be written. Check disk space."
-			else:failure="The map cache is not writable."
-		else:failure="The map cache is full. Free some disk space and reconnect."
+		if not work_key.is_empty():
+			changed=true
+			if record.is_empty():failure="A map could not be prepared for background download."
+			elif _open() and disk_bytes+int(record.size)<=DISK_LIMIT:
+				var path=folder.path_join(str(record.id)+".blob");var file=FileAccess.open(path,FileAccess.WRITE)
+				if file!=null:
+					file.store_buffer(record.data);file.close()
+					if FileAccess.get_sha256(path)==record.cipher_sha256:
+						record.erase("data");record.path=path;records[work_key]=record;disk_bytes+=int(record.size)
+					else:failure="The map cache could not be written. Check disk space."
+				else:failure="The map cache is not writable."
+			else:failure="The map cache is full. Free some disk space and reconnect."
 		work_key="";work_scene=""
 	if worker==null and not queue.is_empty() and failure.is_empty():
 		var item: Dictionary=queue.pop_front();var scene=Hearth20Contracts.find_scene(campaign,item.scene)
 		if item.kind=="foreground":
 			var source=Hearth20Assets.read_asset(campaign,item.asset,"token")
 			work_key=item.key;work_scene=item.scene;worker=Thread.new()
-			if worker.start(func():return _encrypt(source,"foreground"))!=OK:worker=null;work_key="";failure="The foreground worker could not start."
+			if worker.start(func():return _encrypt(source,"foreground"))!=OK:worker=null;work_key="";failure="The foreground worker could not start.";return true
 			return changed
 		if scene.is_empty() or signature(scene)!=item.key:return changed
 		var context=campaign.duplicate();context.map_covered=false
@@ -76,7 +77,7 @@ func tick(campaign: Dictionary) -> bool:
 		var source=Hearth20Assets.read_asset(campaign,str(page.get("map_asset","")),"map")
 		var sight=Hearth20Vision.build_view(context,"prefetch",page)
 		work_key=item.key;work_scene=item.scene;worker=Thread.new()
-		if worker.start(func():return _prepare(source,page,sight))!=OK:worker=null;work_key="";failure="The background map worker could not start."
+		if worker.start(func():return _prepare(source,page,sight))!=OK:worker=null;work_key="";failure="The background map worker could not start.";return true
 	return changed
 static func _prepare(source: PackedByteArray,page: Dictionary,sight: Dictionary) -> Dictionary:
 	var png=Hearth20Vision.mask_map(source,sight) if page.get("dynamic_lighting",false) else Hearth20Contracts._mask_fogged_map(source,page)
@@ -158,8 +159,9 @@ func progress() -> Dictionary:
 			map_count+=1
 			if received.get(id,{}).get("complete",false):count+=1
 	return {"active":amount<total,"received":amount,"total":total,"completed_maps":count,"map_count":map_count,"progress":float(amount)/maxi(1,total),"phase":"Downloading maps in background…"}
-func clear() -> void:
-	if worker!=null:worker.wait_to_finish();worker=null
+func clear(wait_for_worker=true) -> void:
+	# The worker uses detached inputs. An empty work key discards its late result.
+	if worker!=null and (wait_for_worker or not worker.is_alive()):worker.wait_to_finish();worker=null
 	# This random connection directory contains only files created by this instance.
 	if not folder.is_empty():
 		for collection in [records,received]:

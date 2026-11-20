@@ -1,6 +1,7 @@
 extends Node
 class_name Hearth20CasinoPortal
 ## Owns loading, map suspension, table rendering and deterministic teardown.
+const AssetRequests=preload("res://hearth20/asset_requests.gd")
 var app: Hearth20App
 var layer: Control
 var scene: Hearth20CasinoTable
@@ -27,7 +28,8 @@ var phase="closed"
 var saved: Array=[]
 var assets: Dictionary={}
 var paths={"art":"res://hearth20/casino/card-art.png","materials":"res://hearth20/casino/materials.png","salon":"res://hearth20/casino/tavern-v2.png","catalog":"res://hearth20/casino/salon.png","book":"res://hearth20/casino/book-materials.png","cover":"res://hearth20/casino/da-rolls-cover.png"}
-var loaded: Dictionary={}
+var pending_textures: Array=[]
+var load_error=""
 var game: Dictionary={}
 var started_msec=0
 var staged_frames=0
@@ -45,7 +47,7 @@ func current() -> Dictionary:return Hearth20TavernGames.project(app.campaign,"dm
 func sync() -> void:
 	if app.seated_shell!=null:
 		if not app.seated_shell.ready_to_show or app.seated_shell.desired_mode()!="casino":return
-		if phase=="closed" and not app.seated_shell.switching:return
+		if phase=="closed":return # The mode switch owns entry and recovery.
 	if app.session.local_role=="player" and (app.session.client_snapshot.get("connection_closed",false) or app.session.client_snapshot.is_empty()):
 		if phase!="closed":close_local()
 		return
@@ -58,7 +60,7 @@ func open() -> void:
 	if phase!="closed":return
 	if app.seated_shell!=null and app.seated_shell.desired_mode()!="casino":app.seated_shell.leave_focus();app.seated_shell.look_up=true;return
 	if is_instance_valid(app.beyond_sheet):app.beyond_sheet.suspend_native()
-	game=current();app.dice_stage.suspended=true;app.dice_stage.clear_rolls();phase="loading";started_msec=Time.get_ticks_msec();saved.clear();loaded.clear();assets.clear()
+	game=current();app.dice_stage.suspended=true;app.dice_stage.clear_rolls();phase="loading";started_msec=Time.get_ticks_msec();saved.clear();assets.clear();load_error=""
 	# Only visual/gameplay branches pause. Session/RPC processing keeps running.
 	for child in app.get_children():
 		if child!=self and child!=app.session:
@@ -72,9 +74,12 @@ func open() -> void:
 	column.add_child(_label("✧   T H E   G I L D E D   T A B L E   ✧",25));load_note=_label("Leaving the map · preparing your seat…",15);column.add_child(load_note)
 	progress=ProgressBar.new();progress.show_percentage=false;progress.custom_minimum_size.y=8;column.add_child(progress)
 	var tip=_label("Keep your strongest dragons close. A weaker play can awaken a useful power.",13);tip.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;column.add_child(tip)
-	for key in paths:
-		var err=ResourceLoader.load_threaded_request(paths[key],"Texture2D")
-		if err not in [OK,ERR_BUSY]:load_note.text="Unable to load the casino artwork. Return to the map and try again.";_button(column,"Return to map",close_local);return
+	_button(column,"Return to map",close_local)
+	for path in paths.values():
+		if not ResourceLoader.exists(path,"Texture2D") or ResourceLoader.load_threaded_request(path,"Texture2D")!=OK:
+			_fail_load("The casino artwork could not load. You’re back at the table.")
+			return
+		pending_textures.append(path)
 func _capture_branch(node: Node) -> void:
 	if node is CanvasItem or node is Window:
 		saved.append({"node":weakref(node),"kind":"visual","visible":node.visible,"process":node.process_mode});node.hide();node.process_mode=Node.PROCESS_MODE_DISABLED
@@ -96,14 +101,10 @@ func close_local() -> void:
 		if scene.card_viewport!=null:scene.card_viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
 		if scene.game_view!=null:scene.game_view.release_pending()
 	if app.seated_shell!=null and is_instance_valid(scene):app.seated_shell.release_casino_scene()
-	if is_instance_valid(layer):layer.queue_free()
+	if is_instance_valid(layer):layer.hide();layer.queue_free()
 	scene=null;hud=null;loader=null
-	# Drain in-flight resource requests so abandoned loaders retain no hidden scene.
-	for key in paths:
-		if loaded.has(key):continue
-		while ResourceLoader.load_threaded_get_status(paths[key])==ResourceLoader.THREAD_LOAD_IN_PROGRESS:await get_tree().process_frame
-		if ResourceLoader.load_threaded_get_status(paths[key])==ResourceLoader.THREAD_LOAD_LOADED:ResourceLoader.load_threaded_get(paths[key])
-	assets.clear();loaded.clear();await get_tree().process_frame
+	AssetRequests.discard(get_tree(),pending_textures)
+	pending_textures.clear();assets.clear()
 	for record in saved:
 		var node=record.node.get_ref()
 		if not is_instance_valid(node):continue
@@ -118,15 +119,34 @@ func close_local() -> void:
 	if is_instance_valid(app.toolbox):
 		app.toolbox.rail_buttons.casino.button_pressed=false
 		if app.toolbox.rail_buttons.has(app.toolbox.current):app.toolbox.rail_buttons[app.toolbox.current].button_pressed=true
+func _fail_load(message: String) -> void:
+	load_error=message
+	close_local()
+	app._on_status(message)
+func _exit_tree() -> void:
+	AssetRequests.discard(get_tree(),pending_textures)
 func _process(_delta: float) -> void:
+	if phase in ["loading","warming"]:
+		if app.seated_shell!=null and app.seated_shell.desired_mode()!="casino":
+			close_local()
+			return
+		if Time.get_ticks_msec()-started_msec>=AssetRequests.TIMEOUT_MSEC:
+			_fail_load("Casino loading timed out. You’re back at the table.")
+			return
 	if phase=="loading":
 		var total=0.;var all_ready=true
 		for key in paths:
-			if loaded.has(key):total+=1.;continue
-			var amount=[];var state=ResourceLoader.load_threaded_get_status(paths[key],amount)
-			if state==ResourceLoader.THREAD_LOAD_LOADED:loaded[key]=true;assets[key]=ResourceLoader.load_threaded_get(paths[key]);total+=1.
-			elif state==ResourceLoader.THREAD_LOAD_FAILED:load_note.text="Casino artwork could not be loaded.";return
-			else:all_ready=false;total+=float(amount[0]) if not amount.is_empty() else 0.
+			if assets.has(key):total+=1.;continue
+			var path=paths[key];var amount=[];var state=ResourceLoader.load_threaded_get_status(path,amount)
+			if state==ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+				all_ready=false;total+=float(amount[0]) if not amount.is_empty() else 0.
+				continue
+			pending_textures.erase(path)
+			var texture=ResourceLoader.load_threaded_get(path) if state!=ResourceLoader.THREAD_LOAD_INVALID_RESOURCE else null
+			if not texture is Texture2D:
+				_fail_load("The casino artwork could not load. You’re back at the table.")
+				return
+			assets[key]=texture;total+=1.
 		progress.value=total/paths.size()*65
 		if all_ready:
 			load_note.text="Setting the table · lighting the candles…";scene=app.seated_shell.use_casino_scene(layer) if app.seated_shell!=null else Hearth20CasinoTable.new()

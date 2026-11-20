@@ -23,25 +23,82 @@ static func open(owner: Node,owner_app: Hearth20App=null) -> Hearth20SettingsWin
 		if child is Hearth20SettingsWindow and not child.is_queued_for_deletion():Hearth20Design.popup_window(child);return child
 	var window=Hearth20SettingsWindow.new();owner.add_child(window);window.setup(owner_app);Hearth20Design.popup_window(window);return window
 func setup(owner_app: Hearth20App) -> void:
-	app=owner_app;name="Hearth20Preferences";title="Hearth20 · Settings";theme=Hearth20Design.theme();size=Vector2i(980,650);min_size=Vector2i(780,540);exclusive=true;dialog_hide_on_ok=false;ok_button_text="Apply changes";get_cancel_button().text="Close";pending=Hearth20Preferences.values.duplicate(true)
+	app=owner_app
+	name="Hearth20Preferences"
+	title="Settings"
+	theme=Hearth20Design.theme()
+	size=Vector2i(900,690)
+	min_size=Vector2i(680,520)
+	exclusive=true
+	dialog_hide_on_ok=false
+	ok_button_text="Apply changes"
+	var close_button=get_cancel_button()
+	var apply_button=get_ok_button()
+	close_button.text="Close"
+	pending=Hearth20Preferences.values.duplicate(true)
+	Hearth20Design.primary(apply_button)
+	var actions=apply_button.get_parent() as HBoxContainer
+	if actions!=null and close_button.get_parent()==actions:
+		# Keep the native confirmation signals and remove only the footer's flexible gaps.
+		for control in actions.get_children():
+			if control.get_class()=="Control":
+				control.size_flags_horizontal=Control.SIZE_SHRINK_END
+		actions.alignment=BoxContainer.ALIGNMENT_END
+		actions.add_theme_constant_override("separation",6)
+		actions.move_child(apply_button,-1)
 	if DisplayServer.get_name()!="headless":
 		var main=get_tree().root;pending.monitor=main.current_screen;window_position=main.position
 		pending.window_mode=0 if main.mode in [Window.MODE_WINDOWED,Window.MODE_MAXIMIZED] else 2 if main.mode==Window.MODE_EXCLUSIVE_FULLSCREEN else 1
 		if pending.window_mode==0:pending.width=main.size.x;pending.height=main.size.y
 	display_baseline=pending.duplicate(true)
-	var column=VBoxContainer.new();column.custom_minimum_size=Vector2(700,0);column.add_theme_constant_override("separation",12);add_child(column)
-	var heading=Label.new();heading.text="THE CHAMBER OF PREFERENCES";heading.add_theme_font_override("font",Hearth20Design.font(true));heading.add_theme_font_size_override("font_size",25);heading.add_theme_color_override("font_color",Hearth20Regal.swatch(Hearth20Regal.GOLD));column.add_child(heading)
-	tabs=TabContainer.new();tabs.custom_minimum_size=Vector2(700,280);tabs.size_flags_vertical=Control.SIZE_EXPAND_FILL;column.add_child(tabs)
+	var column=VBoxContainer.new()
+	column.custom_minimum_size.x=560
+	column.add_theme_constant_override("separation",18)
+	add_child(column)
+	var heading=Label.new()
+	heading.text="Settings"
+	heading.add_theme_font_override("font",Hearth20Design.font(true))
+	heading.add_theme_font_size_override("font_size",30)
+	column.add_child(heading)
+	tabs=TabContainer.new()
+	tabs.custom_minimum_size.y=250
+	tabs.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	column.add_child(tabs)
 	updater=Hearth20Updater.service(self);updater.changed.connect(_update_status);updater.app=app
 	_build();confirmed.connect(_apply);canceled.connect(_cancel);close_requested.connect(_cancel)
 	Hearth20Regal.sync(self)
 func page(caption: String) -> VBoxContainer:
-	var scroll=ScrollContainer.new();scroll.name=caption;scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;tabs.add_child(scroll)
-	var column=VBoxContainer.new();column.size_flags_horizontal=Control.SIZE_EXPAND_FILL;column.add_theme_constant_override("separation",16);scroll.add_child(column);return column
+	var scroll=ScrollContainer.new()
+	scroll.name=caption
+	scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus=true
+	tabs.add_child(scroll)
+	var inset=MarginContainer.new()
+	inset.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	scroll.add_child(inset)
+	for side in ["left","right","top","bottom"]:
+		inset.add_theme_constant_override("margin_"+side,12)
+	var column=VBoxContainer.new()
+	column.add_theme_constant_override("separation",16)
+	inset.add_child(column)
+	return column
 func note(parent: Node,text: String) -> Label:
-	var label=Label.new();label.text=text;label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;label.add_theme_font_size_override("font_size",14);parent.add_child(label);return label
+	var label=Label.new()
+	label.text=text
+	label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color",Hearth20Regal.swatch(Hearth20Regal.MUTED))
+	parent.add_child(label)
+	return label
 func row(parent: Node,title_text: String) -> HBoxContainer:
-	var line=HBoxContainer.new();line.add_theme_constant_override("separation",18);parent.add_child(line);var label=Label.new();label.text=title_text;label.custom_minimum_size.x=220;line.add_child(label);return line
+	var line=HBoxContainer.new()
+	line.add_theme_constant_override("separation",18)
+	parent.add_child(line)
+	var label=Label.new()
+	label.text=title_text
+	label.custom_minimum_size.x=192
+	label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+	line.add_child(label)
+	return line
 func choice(parent: Node,caption: String,key: String,options: Array) -> OptionButton:
 	var control=OptionButton.new();control.size_flags_horizontal=Control.SIZE_EXPAND_FILL;control.custom_minimum_size.y=36;row(parent,caption).add_child(control)
 	for item in options:
@@ -78,21 +135,35 @@ func _build() -> void:
 		var key=entry[1];slider.value_changed.connect(func(value):pending[key]=value/100.;percent.text=str(roundi(value))+"%";Hearth20Preferences.apply_audio(pending))
 	toggle(audio,"Mute while Hearth20 is in the background","mute_unfocused");button(audio,"♪ Play a sound preview",_sound_preview)
 	toggle(audio,"Allow the table’s Jax alert (Esc dismisses it)","table_alerts")
-	var updates=page("Updates");note(updates,"HEARTH20 BETA · "+Hearth20Identity.VERSION+"\nOfficial updates: WonderingMage/Hearth20 on GitHub. Campaigns, player identities, settings and website sign-in remain in your local profile.")
+	var updates=page("Updates");note(updates,"HEARTH20 · "+Hearth20Identity.VERSION+"\nOfficial updates: WonderingMage/Hearth20 on GitHub. Campaigns, player identities, settings and website sign-in remain in your local profile.")
 	toggle(updates,"Check for updates when Hearth20 opens","startup_updates")
-	update_channel=choice(updates,"Update channel","update_channel",[["Beta releases","beta"],["Beta + Steam test builds","steam-test"]])
+	update_channel=choice(updates,"Update channel","update_channel",[["Public releases","beta"],["Public releases + Steam test","steam-test"]])
 	if not updater.busy and updater.channel!=pending.update_channel:updater.set_channel(pending.update_channel)
 	update_channel.item_selected.connect(func(index):updater.set_channel(str(update_channel.get_item_metadata(index))))
-	note(updates,"Both channels include prereleases. Steam test builds contain the latest multiplayer fixes. Apply changes to remember your selected channel.")
+	note(updates,"Select Public releases for regular updates. Steam test also offers preview builds. Apply changes to save your selection.")
 	var buttons=HBoxContainer.new();buttons.add_theme_constant_override("separation",10);updates.add_child(buttons)
 	check_button=button(buttons,"Check for updates",func():updater.check());download_button=button(buttons,"Download update",func():updater.download());install_button=button(buttons,"Restart & update",func():updater.install());stop_button=button(buttons,"Cancel download",func():updater.cancel())
 	update_note=note(updates,"");update_progress=ProgressBar.new();update_progress.show_percentage=true;update_progress.custom_minimum_size.y=18;updates.add_child(update_progress)
 	button(updates,"Open Hearth20 releases",func():OS.shell_open(Hearth20Updater.RELEASES_PAGE));_update_status()
+	_build_appearance()
+func _build_appearance() -> void:
+	var appearance=page("Appearance")
+	note(appearance,"Choose your wizard’s robe, eyes, and jewelry. Save your appearance to use it at your next table.")
+	var session=app.session if is_instance_valid(app) else null
+	var offline=session==null or session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer
+	if offline or session.local_role=="player":
+		button(appearance,"Edit player wizard",func():_open_wardrobe(false))
+	if offline or session.local_role=="dm":
+		button(appearance,"Edit Game Master wizard",func():_open_wardrobe(true))
+func _open_wardrobe(host: bool) -> void:
+	var session=app.session if is_instance_valid(app) else null
+	if session!=null and not session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer and (session.local_role=="dm")!=host:return
+	Hearth20AvatarWardrobe.open(self,session,host,"Save appearance")
 func _update_status() -> void:
 	if update_note==null:return
 	update_channel.disabled=updater.busy or updater.install_requested
 	install_button.disabled=updater.busy or updater.install_requested
-	update_note.text=updater.message;update_progress.visible=updater.busy;update_progress.value=updater.progress;check_button.disabled=updater.busy;download_button.visible=not updater.release.is_empty() and not updater.verified;download_button.disabled=updater.busy;install_button.visible=updater.verified;stop_button.visible=updater.busy and updater.stage=="download"
+	update_note.text=updater.message;update_progress.visible=updater.busy;update_progress.value=updater.progress;check_button.disabled=updater.busy or updater.install_requested;download_button.visible=not updater.release.is_empty() and not updater.verified;download_button.disabled=updater.busy or updater.install_requested;install_button.visible=updater.verified;stop_button.visible=updater.can_cancel_download()
 func _display_changed() -> bool:
 	for key in ["window_mode","width","height","monitor","vsync","fps","background_fps","quality"]:
 		if pending[key]!=display_baseline[key]:return true

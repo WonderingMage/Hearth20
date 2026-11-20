@@ -1,5 +1,6 @@
 extends Window
 class_name Hearth20JoinPawnWindow
+const SUBMISSION_TIMEOUT_MSEC=45000
 var app: Hearth20App
 var cancelled=false
 var name_field: LineEdit
@@ -8,7 +9,9 @@ var preview: TextureRect
 var png=PackedByteArray()
 var send_button: Button
 var choose_button: Button
+var files: FileDialog
 var submitting=false
+var submission_deadline=0
 func setup(owner_app: Hearth20App) -> void:
 	app=owner_app;title="Hearth20 · Bring your character";size=Vector2i(600,560);min_size=size;theme=Hearth20Design.theme();transient=true;exclusive=true;close_requested.connect(_close)
 	var panel=PanelContainer.new();panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#18120c"),3,28,Color("#ba9247")));add_child(panel)
@@ -19,23 +22,32 @@ func setup(owner_app: Hearth20App) -> void:
 	name_field.text=app.session.pending_nickname.left(64)
 	name_field.text_changed.connect(func(_text):_validate())
 	preview=TextureRect.new();preview.custom_minimum_size=Vector2(150,150);preview.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;preview.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;box.add_child(preview)
-	var files=FileDialog.new();files.access=FileDialog.ACCESS_FILESYSTEM;files.file_mode=FileDialog.FILE_MODE_OPEN_FILE;files.filters=PackedStringArray(["*.png ; Character token PNG"]);files.file_selected.connect(func(path):
+	files=FileDialog.new();files.access=FileDialog.ACCESS_FILESYSTEM;files.file_mode=FileDialog.FILE_MODE_OPEN_FILE;files.filters=PackedStringArray(["*.png ; Character token PNG"])
+	var dismiss:=Hearth20Design.dismiss_file_picker.bind(files)
+	files.canceled.connect(dismiss);files.close_requested.connect(dismiss)
+	files.file_selected.connect(func(path):
+		dismiss.call()
 		var result=Hearth20Assets.inspect_token_png(path)
 		if not result.ok:
 			png=PackedByteArray();preview.texture=null;status.text=str(result.error);_validate();return
 		png=result.bytes;var image=Image.new();image.load_png_from_buffer(png);preview.texture=ImageTexture.create_from_image(image);status.text="Token selected · one grid square. Continue to send it to your DM.";_validate())
 	add_child(files)
-	var choose=Button.new();choose.text="Choose token PNG…";choose.pressed.connect(func():files.popup_centered_ratio(.8));box.add_child(choose)
+	var choose=Button.new();choose.text="Choose token PNG…";choose.pressed.connect(func():Hearth20Design.open_file_picker(files,.8));box.add_child(choose)
 	choose_button=choose
-	send_button=Button.new();send_button.text="Send character to DM inventory";send_button.custom_minimum_size.y=44;box.add_child(send_button);send_button.pressed.connect(func():
+	var actions=HBoxContainer.new();box.add_child(actions)
+	var leave_button=Button.new();leave_button.text="Leave table";leave_button.pressed.connect(_close);actions.add_child(leave_button)
+	send_button=Button.new();send_button.text="Send character to DM inventory";send_button.custom_minimum_size.y=44;send_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL;actions.add_child(send_button);send_button.pressed.connect(func():
 		if submitting:return
 		if name_field.text.strip_edges().is_empty() or png.is_empty():status.text="Choose a character name and a PNG first.";return
 		var result=app.session.submit_join_character({"name":name_field.text.strip_edges()},png)
-		if result.ok:submitting=true;_validate();status.text="Sending your character…"
+		if result.ok:
+			submission_deadline=Time.get_ticks_msec()+SUBMISSION_TIMEOUT_MSEC
+			submitting=true;set_process(true);_validate();status.text="Sending your character…"
 		else:status.text=str(result.get("error","Unable to send character.")))
 	app.session.character_submission_result.connect(func(result):
 		if result.ok:cancelled=true;_close()
-		else:submitting=false;status.text=str(result.get("error","Unable to accept character."));_validate())
+		else:_submission_failed(str(result.get("error","Unable to accept character."))))
+	set_process(false)
 	_validate()
 	Hearth20Design.popup_window(self)
 func _validate() -> void:
@@ -43,6 +55,26 @@ func _validate() -> void:
 	send_button.disabled=submitting or name_field.text.strip_edges().is_empty() or png.is_empty()
 	name_field.editable=not submitting
 	choose_button.disabled=submitting
+func _process(_delta: float) -> void:
+	if not submitting:return
+	# Keep waiting while a Steam character image makes progress.
+	var upload: Dictionary=app.session.steam_outgoing.get(1,{})
+	if upload.get("kind","")=="character":
+		var job: Dictionary=upload.get("active",{})
+		submission_deadline=maxi(submission_deadline,int(job.get("last_sent",0))+SUBMISSION_TIMEOUT_MSEC)
+	if Time.get_ticks_msec()>=submission_deadline:
+		_submission_failed("The DM has not confirmed your character. Try sending again or leave the table.")
+func _submission_failed(message: String) -> void:
+	submitting=false
+	set_process(false)
+	status.text=message
+	_validate()
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not files.visible and event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
+		get_viewport().set_input_as_handled()
+		_close()
 func _close() -> void:
-	if not cancelled and app.session.local_role=="player":app.session.stop_session()
+	if is_queued_for_deletion():return
+	hide()
 	queue_free()
+	if not cancelled and app.session.local_role=="player":app.session.stop_session()

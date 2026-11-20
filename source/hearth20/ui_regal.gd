@@ -4,13 +4,13 @@ class_name Hearth20Regal
 static var light_mode:=false
 static var revision:=0
 static var textures: Dictionary={}
-const BG := ["#100e0b","#eee4cf"]
-const SURFACE := ["#191610","#f7eedc"]
-const RAISED := ["#252017","#e6d7b9"]
-const BORDER := ["#5c4a2c","#b69a63"]
-const INK := ["#f3e7cd","#302618"]
-const MUTED := ["#b9a98a","#756345"]
-const GOLD := ["#e0bd75","#8b6028"]
+const BG := ["#141210","#eee7d8"]
+const SURFACE := ["#1e1a16","#f8f1e4"]
+const RAISED := ["#2b251e","#e8dcc6"]
+const BORDER := ["#554637","#ad9471"]
+const INK := ["#f2e9d9","#2a2119"]
+const MUTED := ["#b9ab97","#6b5841"]
+const GOLD := ["#e2bd79","#845921"]
 static func swatch(pair: Array) -> Color: return Color(str(pair[1 if light_mode else 0]))
 static func resolve(c: Color) -> Color:
 	if c.a<0.001: return c
@@ -19,13 +19,13 @@ static func resolve(c: Color) -> Color:
 	for pair in [BG,SURFACE,RAISED,BORDER,INK,MUTED,GOLD]:
 		if hex==Color(str(pair[0])).to_html(false) or hex==Color(str(pair[1])).to_html(false):
 			var mapped:=swatch(pair); mapped.a=c.a; return mapped
-	if hex in ["0b0e15","0b1018","0b1015","0d1420","0e1420","0b0e14","0c111b","0b0f17","0b101a","0d1421"]: target=swatch(BG)
-	elif hex in ["131925","111722","111a28","111a27","101824","111b29","192130","192130","151d29","151d28","121b29","141c29","151d2a","161e2b"]: target=swatch(SURFACE)
-	elif hex in ["1a2230","1b2331","222b3b","232d40","283248","1e2737","252f40","192130","192130","1c2534","182331","1c2634","1c2633","1e293b"]: target=swatch(RAISED)
-	elif hex in ["2b3545","303b4d","596274","222b3a","38465d","30394c","354157","3a465c","66718a","303b4a","2b3546"]: target=swatch(BORDER)
-	elif hex in ["edf0f6","f3ead8","d9e2e6","d2dce5","dce6ee","e8edf4","e6edf3"]: target=swatch(INK)
-	elif hex in ["9ba6b9","9cadb5","93a4ac","8b9fa8","91a6ad","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","748198","596375","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8"]: target=swatch(MUTED)
-	elif hex in ["ddbd82","ebcf9e","f0c674","d2ae79","80cbbf","76e0ca","62e4d1","9ee5d8"]: target=swatch(GOLD)
+	if hex in ["100e0b","0b0e15","0b1018","0b1015","0d1420","0e1420","0b0e14","0c111b","0b0f17","0b101a","0d1421"]: target=swatch(BG)
+	elif hex in ["191610","131925","111722","111a28","111a27","101824","111b29","192130","192130","151d29","151d28","121b29","141c29","151d2a","161e2b"]: target=swatch(SURFACE)
+	elif hex in ["252017","1a2230","1b2331","222b3b","232d40","283248","1e2737","252f40","192130","192130","1c2534","182331","1c2634","1c2633","1e293b"]: target=swatch(RAISED)
+	elif hex in ["5c4a2c","2b3545","303b4d","596274","222b3a","38465d","30394c","354157","3a465c","66718a","303b4a","2b3546"]: target=swatch(BORDER)
+	elif hex in ["f3e7cd","edf0f6","f3ead8","d9e2e6","d2dce5","dce6ee","e8edf4","e6edf3"]: target=swatch(INK)
+	elif hex in ["b9a98a","9ba6b9","9cadb5","93a4ac","8b9fa8","91a6ad","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","748198","596375","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8","8b9fa8"]: target=swatch(MUTED)
+	elif hex in ["e0bd75","ddbd82","ebcf9e","f0c674","d2ae79","80cbbf","76e0ca","62e4d1","9ee5d8"]: target=swatch(GOLD)
 	elif hex in ["363124","3a3327"]: target=Color("#3c2c14") if not light_mode else Color("#d9bf8b")
 	elif hex in ["605844","957c50","9a8050","a38958","756b56"]: target=swatch(BORDER)
 	else:
@@ -87,9 +87,8 @@ static func sync(node: Node) -> void:
 		if node is ColorRect:
 			if not node.has_meta("regal_raw_color"): node.set_meta("regal_raw_color",node.color)
 			node.color=resolve(node.get_meta("regal_raw_color"))
-		if node is Button and not node.get_meta("regal_custom_button",false) and int(node.get_meta("regal_button_revision",-1))!=revision:
-			var primary: bool=node.get_meta("h20_primary",false)
-			for state in ["normal","hover","pressed"]: node.add_theme_stylebox_override(state,button_style(state,primary))
+		if node is Button and node.get_meta("h20_primary",false) and int(node.get_meta("regal_button_revision",-1))!=revision:
+			for state in ["normal","hover","pressed"]: node.add_theme_stylebox_override(state,button_style(state,true))
 			node.set_meta("regal_button_revision",revision)
 		if node is CanvasItem and node.modulate!=Color.WHITE:
 			if not node.has_meta("regal_raw_modulate"): node.set_meta("regal_raw_modulate",node.modulate)

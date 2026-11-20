@@ -26,7 +26,7 @@ static func index_saved(campaign: Dictionary,path: String) -> void:
 	var scale=minf(320./image.get_width(),180./image.get_height())
 	image.resize(maxi(1,roundi(image.get_width()*scale)),maxi(1,roundi(image.get_height()*scale)),Image.INTERPOLATE_LANCZOS)
 	image.save_png(path+".thumb.png")
-static func list_tables() -> Array:
+static func list_tables(cancelled: Callable=Callable()) -> Array:
 	var result=[];var folder=DirAccess.open(Hearth20Identity.SAVE_ROOT)
 	if folder==null:return result
 	var paths={}
@@ -35,6 +35,7 @@ static func list_tables() -> Array:
 		var path=Hearth20Identity.SAVE_ROOT.path_join(candidate)
 		if valid_path(path):paths[path]=true
 	for path in paths:
+		if cancelled.is_valid() and cancelled.call():return []
 		var record={};var meta=FileAccess.open(path+".meta.json",FileAccess.READ)
 		if meta!=null and meta.get_length()<32768:
 			var parser=JSON.new();var parsed=parser.parse(meta.get_as_text());var value=parser.data if parsed==OK else null

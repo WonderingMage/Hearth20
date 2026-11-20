@@ -9,8 +9,7 @@ var action_area: VBoxContainer
 var scroller: ScrollContainer
 var fields: Dictionary = {}
 var rail_buttons: Dictionary = {}
-var tool_rail: VBoxContainer
-var rail_hint: Label
+var rail_captions: Dictionary = {}
 var current := "draw"
 var title: Label
 var note: Label
@@ -35,8 +34,7 @@ var dice_roll_button: Button
 var pending_dice_request=""
 var dice_status_text=""
 
-func setup(owner_app: Node, rail: VBoxContainer) -> void:
-	tool_rail=rail
+func setup(owner_app: Node, rail: HFlowContainer) -> void:
 	app = owner_app
 	board = app.board
 	session = app.session
@@ -50,8 +48,9 @@ func setup(owner_app: Node, rail: VBoxContainer) -> void:
 	add_child(action_area)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for child in rail.get_children(): child.hide()
-	rail.custom_minimum_size.x = 46
-	rail.add_theme_constant_override("separation", 4)
+	rail.alignment = FlowContainer.ALIGNMENT_CENTER
+	rail.add_theme_constant_override("h_separation", 2)
+	rail.add_theme_constant_override("v_separation", 2)
 	var group := ButtonGroup.new()
 	for tool in [["select","↖","Select","V"],["tokens","","Tokens · add, edit and grant control","K"],["draw","✎","Draw","D"],["text","T","Text","T"],["measure","⌁","Measure","M"],["dice","◇","Dice","R"],["fx","✦","Effects","X"],["casino","","Tavern casino · Games",""],["beacon","◎","Beacon","B"],["mask","▧","Mask","H"],["lighting","☼","Lighting","L"],["layers","▱","Layers",""]]:
 		var button := Button.new()
@@ -59,26 +58,18 @@ func setup(owner_app: Node, rail: VBoxContainer) -> void:
 		button.icon=Hearth20Design.icon(str(tool[0]),22)
 		button.add_theme_constant_override("icon_max_width",22)
 		button.theme_type_variation="RailButton"
-		button.custom_minimum_size = Vector2(44,38)
+		button.custom_minimum_size = Vector2(36,36)
 		button.add_theme_font_size_override("font_size",12)
 		button.tooltip_text = str(tool[2])+(" · "+str(tool[3]) if not str(tool[3]).is_empty() else "")
 		button.toggle_mode = true
 		button.button_group = group
-		button.pressed.connect(func(): open(str(tool[0])))
-		if tool[0]=="beacon":
-			var divider:=HSeparator.new()
-			rail.add_child(divider)
+		button.pressed.connect(func(): choose_tool(str(tool[0])))
 		rail.add_child(button)
 		rail_buttons[str(tool[0])] = button
+		if tool[0] in ["select","draw","text","measure","dice","fx"]:
+			rail_captions[str(tool[0])] = "FX" if tool[0]=="fx" else str(tool[2])
 		if tool[0] in ["tokens","casino","beacon","mask","lighting","layers"]: dm_controls.append(button)
 	rail_buttons.select.button_pressed = true
-	var hint := Label.new()
-	rail_hint=hint
-	hint.text="F  fit"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size",10)
-	hint.add_theme_color_override("font_color",Color("#93a4ac"))
-	rail.add_child(hint)
 	content = VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation",14)
@@ -90,6 +81,13 @@ func setup(owner_app: Node, rail: VBoxContainer) -> void:
 	open("draw", false)
 	board.activate_tool("select")
 	rail_buttons.select.button_pressed=true
+
+func choose_tool(tool: String) -> void:
+	if tool=="select" and not app.inspector_tabs.visible:
+		open(tool,false)
+		app.inspector_tabs.current_tab=app.inspector_tabs.get_tab_idx_from_control(self)
+	else:
+		open(tool)
 
 func refresh_role() -> void:
 	for control in dm_controls: control.visible = session.local_role == "dm"
@@ -237,9 +235,12 @@ func choices(values: Array, selected_value: String, callback: Callable, columns:
 			result.add_theme_color_override("icon_pressed_color",Color(Hearth20BoardTools.COLORS[key]))
 	return grid
 
-func refresh_density(compact: bool) -> void:
-	if is_instance_valid(tool_rail):tool_rail.add_theme_constant_override("separation",1 if compact else 4)
-	if is_instance_valid(rail_hint):rail_hint.visible=not compact
+func refresh_density(compact: bool, show_captions: bool) -> void:
+	for tool in rail_captions:
+		var button: Button = rail_buttons[tool]
+		var caption := str(rail_captions[tool]) if show_captions else ""
+		if button.text != caption:
+			button.text = caption
 	if current=="dice":
 		if note!=null: note.visible=not compact
 		for item in die_buttons:

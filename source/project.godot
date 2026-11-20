@@ -1,7 +1,7 @@
 ; Isolated D&D Beyond experiment. Never uses the original Hearth20 profile.
 config_version=5
 [application]
-config/name="Hearth20 Beta"
+config/name="Hearth20"
 config/edition="hearth20-seated"
 config/hearth20_debug=false
 config/hearth20_debug.hearth20_debug=true

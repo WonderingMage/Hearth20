@@ -8,7 +8,7 @@ var last_state={}
 func setup(owner_session: Hearth20Session) -> void:
 	session=owner_session;mouse_filter=Control.MOUSE_FILTER_IGNORE
 	caption=Label.new();caption.mouse_filter=Control.MOUSE_FILTER_IGNORE;caption.add_theme_font_size_override("font_size",11)
-	caption.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE);caption.offset_right=-226;caption.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;add_child(caption)
+	caption.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE);caption.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;add_child(caption)
 	session.map_transfer_progress.connect(_show_progress)
 	resized.connect(func():if session!=null:_show_progress(last_state))
 	_show_progress(session.map_transfer_state)

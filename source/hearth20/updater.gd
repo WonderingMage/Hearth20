@@ -8,6 +8,7 @@ const ASSET="Hearth20_Beta_Portable.exe"
 const MANIFEST="Hearth20-Beta-Manifest.json"
 const TEST_MANIFEST="Hearth20-Steam-Test-Manifest.json"
 const LIMIT=1500*1024*1024
+const DOWNLOAD_IDLE_MSEC=45000
 var app: Hearth20App
 var request: HTTPRequest
 var release={}
@@ -19,6 +20,10 @@ var progress=0.
 var message="Check when you are ready. Updates are downloaded only when you ask."
 var staged_path=""
 var hashing: Thread
+var hash_cancelled=false
+var download_touched=0
+var download_seen=0
+var install_worker: Thread
 var tick=0.
 var channel=Hearth20Preferences.values.get("update_channel",Hearth20Identity.UPDATE_CHANNEL_DEFAULT)
 var startup_checked=false
@@ -53,7 +58,7 @@ func _startup_status() -> void:
 	startup_progress.visible=busy;startup_progress.value=progress
 	startup_prompt.get_ok_button().disabled=busy or install_requested
 	startup_prompt.ok_button_text="Restart & update" if verified else "Update & restart"
-	startup_prompt.get_cancel_button().text="Cancel download" if busy and stage=="download" else "Later"
+	startup_prompt.get_cancel_button().text="Cancel download" if can_cancel_download() else "Later"
 func show_startup_prompt() -> void:
 	if is_instance_valid(startup_prompt):return
 	startup_prompt=ConfirmationDialog.new();startup_prompt.name="StartupUpdatePrompt";startup_prompt.title="A new chapter for Hearth20";startup_prompt.theme=Hearth20Design.theme();startup_prompt.exclusive=false;startup_prompt.dialog_hide_on_ok=false;startup_prompt.size=Vector2i(560,260)
@@ -70,7 +75,7 @@ func _accept_startup_update() -> void:
 	else:download()
 func _dismiss_startup_update() -> void:
 	if install_requested or (busy and stage=="install"):return
-	if busy and stage=="download":cancel()
+	if can_cancel_download():cancel()
 	if is_instance_valid(startup_prompt):startup_prompt.queue_free();startup_prompt=null
 static func version_parts(value: String) -> Array:
 	if value.length()>80:return []
@@ -137,23 +142,23 @@ func _fail(text: String) -> void:
 	busy=false;stage="idle";request.download_file="";_notify(text)
 func check() -> void:
 	if busy or install_requested:return
-	busy=true;verified=false;release={};manifest={};stage="check";request.download_file="";request.body_size_limit=4*1024*1024;request.timeout=30.;_notify("Checking GitHub · "+("Beta + Steam test builds…" if channel=="steam-test" else "Beta releases…"))
+	busy=true;verified=false;release={};manifest={};stage="check";request.download_file="";request.body_size_limit=4*1024*1024;request.timeout=30.;_notify("Checking GitHub · "+("Public releases and Steam tests…" if channel=="steam-test" else "Public releases…"))
 	if request.request(API,["Accept: application/vnd.github+json","User-Agent: Hearth20-Beta"])!=OK:_fail("GitHub could not be reached. Try again when you are online.")
 func download() -> void:
 	if busy or install_requested or release.is_empty():return
-	busy=true;stage="metadata";request.download_file="";request.body_size_limit=65536;_notify("Checking the release information…")
+	busy=true;stage="metadata";request.download_file="";request.body_size_limit=65536;request.timeout=30.;_notify("Checking the release information…")
 	if request.request(release.metadata.browser_download_url,["User-Agent: Hearth20-Beta"])!=OK:_fail("The release information could not be downloaded.")
 func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByteArray) -> void:
 	if result!=HTTPRequest.RESULT_SUCCESS or code!=200:
-		_fail("No Hearth20 Beta release is published yet." if stage=="check" and code==404 else "Windows could not save the update. Check free space, folder access and antivirus protection history. Your current game is unchanged." if result==HTTPRequest.RESULT_DOWNLOAD_FILE_WRITE_ERROR else "The update could not be fetched (HTTP %d). Your game is unchanged."%code);return
+		_fail("No Hearth20 release is published yet." if stage=="check" and code==404 else "Windows could not save the update. Check free space, folder access and antivirus protection history. Your current game is unchanged." if result==HTTPRequest.RESULT_DOWNLOAD_FILE_WRITE_ERROR else "The update could not be fetched (HTTP %d). Your game is unchanged."%code);return
 	if stage=="check":
 		var records=JSON.parse_string(body.get_string_from_utf8())
 		if not records is Array:_fail("GitHub returned unreadable release information. Try checking again.");return
 		release=select_release(records,Hearth20Identity.VERSION,channel);busy=false;stage="idle"
 		if release.is_empty():
 			var other=select_release(records,Hearth20Identity.VERSION,"steam-test") if channel=="beta" else {}
-			_notify("No newer Beta release. Steam test "+str(other.version)+" is available; select Beta + Steam test builds to download it." if not other.is_empty() else "No newer "+("Beta or Steam test" if channel=="steam-test" else "Beta")+" release. You are running "+Hearth20Identity.VERSION+".")
-		else:_notify("Hearth20 "+str(release.version)+(" · Steam test" if release.channel=="steam-test" else " · Beta")+" is available. Download size: %.0f MB."%(float(release.exe.size)/1048576.))
+			_notify("No newer public release. Steam test "+str(other.version)+" is available; select Public releases + Steam test to download it." if not other.is_empty() else "No newer "+("public or Steam test" if channel=="steam-test" else "public")+" release. You are running "+Hearth20Identity.VERSION+".")
+		else:_notify("Hearth20 "+str(release.version)+(" · Steam test" if release.channel=="steam-test" else "")+" is available. Download size: %.0f MB."%(float(release.exe.size)/1048576.))
 		return
 	if stage=="metadata":
 		if Hearth20Contracts.sha256(body)!=str(release.metadata.digest).trim_prefix("sha256:"):_fail("Release information failed its GitHub checksum. Nothing was installed.");return
@@ -161,29 +166,51 @@ func _received(result: int,code: int,_headers: PackedStringArray,body: PackedByt
 		if not valid_manifest(parsed,release):_fail("This release belongs to another edition or needs a different campaign/network version. Open the release page for instructions.");return
 		manifest=parsed
 		var folder=ProjectSettings.globalize_path(Hearth20Identity.UPDATE_ROOT+"/staged");DirAccess.make_dir_recursive_absolute(folder);staged_path=folder.path_join("Hearth20-"+str(release.version)+".exe")
-		request.download_file=staged_path+".partial";request.body_size_limit=LIMIT;request.timeout=0.;stage="download";progress=0.;_notify("Downloading the verified release. You can cancel and keep playing.")
+		request.download_file=staged_path+".partial";request.body_size_limit=LIMIT;request.timeout=0.;stage="download";progress=0.
+		download_touched=Time.get_ticks_msec();download_seen=0
+		_notify("Downloading the verified release. You can cancel and keep playing.")
 		if request.request(release.exe.browser_download_url,["User-Agent: Hearth20-Beta"])!=OK:_fail("The update download could not start.")
 	elif stage=="download":
 		var path=staged_path+".partial"
 		var downloaded=FileAccess.open(path,FileAccess.READ)
 		if downloaded==null or downloaded.get_length()!=int(release.exe.size):_fail("The downloaded file is incomplete. Nothing was installed.");return
 		downloaded.close()
-		stage="hash";_notify("Checking the complete download against GitHub’s SHA-256 checksum…");hashing=Thread.new();hashing.start(func():return FileAccess.get_sha256(path))
+		stage="hash";hash_cancelled=false;hashing=Thread.new()
+		if hashing.start(func():return FileAccess.get_sha256(path))!=OK:
+			hashing=null;_remove_partial();_fail("Could not start verifying the download. Try again.");return
+		_notify("Checking the complete download against GitHub’s SHA-256 checksum…")
 func _process(delta: float) -> void:
 	tick+=delta
 	if tick<.15:return
 	tick=0.
-	if busy and stage=="download":progress=100.*float(request.get_downloaded_bytes())/maxf(1.,float(release.exe.size));changed.emit()
+	if busy and stage=="download":
+		var received=request.get_downloaded_bytes()
+		var now=Time.get_ticks_msec()
+		if received>download_seen:download_seen=received;download_touched=now
+		elif now-download_touched>=DOWNLOAD_IDLE_MSEC:
+			request.cancel_request();_remove_partial();_fail("The download stopped transferring data. You can retry when the connection is ready.");return
+		progress=100.*float(received)/maxf(1.,float(release.exe.size));changed.emit()
 	if hashing!=null and not hashing.is_alive():
 		var digest=hashing.wait_to_finish();hashing=null
+		if hash_cancelled:
+			_remove_partial();_fail("Download cancelled. Your current portable is unchanged.");return
 		if digest!=manifest.get("sha256",""):_fail("The download checksum did not match GitHub. Nothing was installed.");return
 		if DirAccess.rename_absolute(staged_path+".partial",staged_path)!=OK:_fail("The verified update could not be staged. Check free disk space.");return
 		verified=true;busy=false;stage="ready";progress=100.;_notify("Verified and ready. Leave multiplayer, then restart to update. Your previous EXE is retained as a backup.")
+func can_cancel_download() -> bool:
+	return busy and not install_requested and stage in ["metadata","download","hash"] and not (stage=="hash" and hash_cancelled)
+func _remove_partial() -> void:
+	if not staged_path.is_empty() and FileAccess.file_exists(staged_path+".partial"):DirAccess.remove_absolute(staged_path+".partial")
 func cancel() -> void:
-	var cancelled_download=busy and stage in ["download","hash"]
+	if install_requested:return
+	var cancelled_download=can_cancel_download()
+	if hashing!=null:
+		if not hash_cancelled:
+			hash_cancelled=true
+			_notify("Cancelling verification…")
+		return
 	if request!=null:request.cancel_request()
-	if hashing!=null:hashing.wait_to_finish();hashing=null
-	if stage in ["download","hash"] and FileAccess.file_exists(staged_path+".partial"):DirAccess.remove_absolute(staged_path+".partial")
+	if stage=="download":_remove_partial()
 	busy=false;stage="ready" if verified else "idle"
 	if cancelled_download:message="Download cancelled. Your current portable is unchanged."
 	changed.emit()
@@ -195,18 +222,32 @@ func install() -> void:
 func _install_verified() -> void:
 	if not verified:return
 	# A previously verified file can be quarantined before Restart is clicked.
-	if not FileAccess.file_exists(staged_path) or FileAccess.get_sha256(staged_path)!=manifest.get("sha256",""):
+	if not FileAccess.file_exists(staged_path):
 		verified=false;_notify("The downloaded update is no longer available or has changed. Security software may have blocked or quarantined it. Check its protection history and the official GitHub release. Your current game is unchanged.");return
 	if not is_instance_valid(app):app=null
 	if OS.has_feature("editor"):_notify("Restart updates are available in the portable edition.");return
 	if app!=null and not (app.session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer):_notify("Leave the multiplayer session before restarting for an update.");return
 	if app!=null and is_instance_valid(app.beyond_sheet):
 		if not await app.beyond_sheet.release_for_shutdown():_notify("Return your browser to its own window before restarting to update.");return
-	if app!=null and app.session.local_role=="dm":
-		var backup=Hearth20Identity.save_campaign(app.campaign,Hearth20Identity.SAVE_ROOT+"/before-update-"+str(int(Time.get_unix_time_from_system()))+"-"+Crypto.new().generate_random_bytes(3).hex_encode()+"."+Hearth20Identity.SAVE_EXTENSION)
-		if not backup.ok:_notify("A campaign backup could not be written. The update was not started.");return
-		var saved=Hearth20Identity.save_campaign(app.campaign,Hearth20Identity.SAVE_ROOT+"/table."+Hearth20Identity.SAVE_EXTENSION)
-		if not saved.ok:_notify("Your campaign could not be saved. The update was not started.");return
+	if not is_instance_valid(app):app=null
+	var active_campaign=app.campaign if app!=null and app.session.local_role=="dm" else {}
+	var snapshot=active_campaign.duplicate(true)
+	var path_to_verify=staged_path
+	var expected_hash=str(manifest.get("sha256",""))
+	_notify("Rechecking the update and backing up the current table…")
+	install_worker=Thread.new()
+	if install_worker.start(func():return _prepare_install(path_to_verify,expected_hash,snapshot))!=OK:
+		install_worker=null;_notify("Could not start checking the staged update. Try again.");return
+	while install_worker.is_alive():await get_tree().process_frame
+	var preparation=install_worker.wait_to_finish();install_worker=null
+	if not preparation is Dictionary or not preparation.get("ok",false):
+		if preparation is Dictionary and preparation.get("file_changed",false):verified=false
+		_notify(str(preparation.get("error","Could not verify the staged update.")) if preparation is Dictionary else "Could not verify the staged update.");return
+	if is_instance_valid(app):
+		if not app.session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
+			_notify("Leave the multiplayer session before restarting for an update.");return
+		if not active_campaign.is_empty() and (not is_same(active_campaign,app.campaign) or app.campaign.get("revision")!=snapshot.get("revision")):
+			_notify("The table changed during the backup. Try restarting again when the table is ready.");return
 	var folder=ProjectSettings.globalize_path(Hearth20Identity.UPDATE_ROOT)
 	if DirAccess.make_dir_recursive_absolute(folder)!=OK:_notify("The update folder could not be prepared. Check that it is writable.");return
 	var helper=folder.path_join("Hearth20UpdateHost.exe");var data=FileAccess.get_file_as_bytes("res://hearth20/updater/Hearth20UpdateHost.exe");var file=FileAccess.open(helper,FileAccess.WRITE)
@@ -225,6 +266,24 @@ func _install_verified() -> void:
 	while is_inside_tree() and not FileAccess.file_exists(path+".ready") and not FileAccess.file_exists(path+".result") and Time.get_ticks_msec()<deadline:await get_tree().create_timer(.15).timeout
 	if FileAccess.file_exists(path+".ready"):get_tree().quit()
 	else:_fail("The replacement could not be prepared. Your current game is unchanged. Check free space, folder access and antivirus protection history for the update or restart helper.")
+static func _prepare_install(path: String,digest: String,snapshot: Dictionary) -> Dictionary:
+	if not FileAccess.file_exists(path) or FileAccess.get_sha256(path)!=digest:
+		return {"ok":false,"file_changed":true,"error":"The downloaded update is no longer available or has changed. Check antivirus protection history or download it again."}
+	if not snapshot.is_empty():
+		if not Hearth20Contracts.validate_campaign(snapshot,false).ok:
+			return {"ok":false,"error":"The current table could not be backed up. The update was not started."}
+		var prefix=Hearth20Identity.SAVE_ROOT+"/"
+		var suffix="."+Hearth20Identity.SAVE_EXTENSION
+		var backup=prefix+"before-update-"+str(int(Time.get_unix_time_from_system()))+"-"+Crypto.new().generate_random_bytes(3).hex_encode()+suffix
+		if not Hearth20Identity._save_campaign_checked(snapshot,backup).ok:
+			return {"ok":false,"error":"A campaign backup could not be written. The update was not started."}
+		if not Hearth20Identity._save_campaign_checked(snapshot,prefix+"table"+suffix).ok:
+			return {"ok":false,"error":"Your campaign could not be saved. The update was not started."}
+	return {"ok":true}
+func _exit_tree() -> void:
+	cancel()
+	for worker in [hashing,install_worker]:
+		if worker!=null and worker.is_started():worker.wait_to_finish()
 static func _write_json(path: String,value: Dictionary) -> bool:
 	var file=FileAccess.open(path,FileAccess.WRITE)
 	if file==null:return false
@@ -239,4 +298,3 @@ static func confirm_startup() -> void:
 	var plan=JSON.parse_string(FileAccess.get_file_as_string(path))
 	if not plan is Dictionary or plan.get("edition","")!=Hearth20Identity.EDITION or plan.get("version","")!=Hearth20Identity.VERSION or str(plan.get("target","")).replace("\\","/")!=OS.get_executable_path().replace("\\","/"):return
 	_write_json(path+".confirmed",{"version":Hearth20Identity.VERSION,"pid":OS.get_process_id()})
-func _exit_tree() -> void:cancel()

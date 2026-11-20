@@ -27,7 +27,11 @@ var welcome_open: Button
 var toolbar: HBoxContainer
 var brand_box: VBoxContainer
 var campaign_box: VBoxContainer
+var board_controls: Control
 var download_meter: Hearth20MapDownloadMeter
+var token_card: PanelContainer
+var selected_name: Label
+var selected_detail: Label
 
 func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer, footer: PanelContainer) -> void:
 	app=owner_app
@@ -38,7 +42,7 @@ func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer,
 	for child in toolbar.get_children():
 		toolbar.remove_child(child)
 		if child not in [app.save_button,app.load_button,app.inspector_toggle,app.chat_shortcut_button,app.cover_map_button,app.inventory_drop_button]: child.queue_free()
-	toolbar.custom_minimum_size.y=62
+	toolbar.custom_minimum_size.y=56
 	toolbar.add_theme_constant_override("separation",12)
 	var mark:=TextureRect.new()
 	mark.texture=Hearth20Design.icon("crest",32)
@@ -51,10 +55,11 @@ func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer,
 	brand_box=brand
 	brand.add_theme_constant_override("separation",0)
 	brand.size_flags_vertical=Control.SIZE_SHRINK_CENTER
-	brand.custom_minimum_size.x=164
+	brand.custom_minimum_size.x=108
 	toolbar.add_child(brand)
-	brand.add_child(text_label("H E A R T H 2 0",16,Hearth20Design.INK))
-	brand.add_child(text_label("THE ADVENTURE AT YOUR TABLE",9,Hearth20Design.GOLD))
+	var wordmark := text_label("Hearth20",20,Hearth20Design.INK)
+	wordmark.add_theme_font_override("font",Hearth20Design.font(true))
+	brand.add_child(wordmark)
 	var divider:=VSeparator.new()
 	divider.custom_minimum_size=Vector2(1,30)
 	divider.size_flags_vertical=Control.SIZE_SHRINK_CENTER
@@ -65,11 +70,11 @@ func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer,
 	title_box.size_flags_vertical=Control.SIZE_SHRINK_CENTER
 	title_box.add_theme_constant_override("separation",2)
 	toolbar.add_child(title_box)
-	campaign_label=text_label("",14,Hearth20Design.INK)
+	campaign_label=text_label("",15,Hearth20Design.INK)
 	campaign_label.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 	campaign_label.custom_minimum_size.x=90
 	title_box.add_child(campaign_label)
-	session_badge=text_label("",10,Hearth20Design.MUTED)
+	session_badge=text_label("",11,Hearth20Design.MUTED)
 	title_box.add_child(session_badge)
 	map_library_button=make_button("map","Maps",func(): app._open_map_library())
 	map_library_button.tooltip_text="Browse 15 sample maps and campaign scenes"
@@ -80,8 +85,9 @@ func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer,
 	appearance.name="AppearanceMedallion"
 	toolbar.add_child(appearance)
 	var preferences_button=make_button("gear","",func():app.open_preferences());preferences_button.tooltip_text="Settings · Display, audio and updates";preferences_button.custom_minimum_size=Vector2(40,36);toolbar.add_child(preferences_button)
-	search_button=make_button("search","Find a tool   Ctrl K",toggle_palette)
-	search_button.custom_minimum_size.x=160
+	search_button=make_button("search","Find tool",toggle_palette)
+	search_button.tooltip_text="Find a tool (Ctrl+K)"
+	search_button.custom_minimum_size.x=120
 	toolbar.add_child(search_button)
 	app.chat_shortcut_button.theme_type_variation="QuietButton"
 	app.chat_shortcut_button.icon=Hearth20Design.icon("chat",18)
@@ -105,11 +111,11 @@ func setup(owner_app: Node, toolbar: HBoxContainer, board_panel: PanelContainer,
 		button.theme_type_variation="QuietButton"
 		button.tooltip_text=str(item[2])
 		toolbar.add_child(button)
-	var overlay:=Control.new()
-	overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE
-	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	board_panel.add_child(overlay)
-	_build_map_controls(overlay)
+	board_controls=Control.new()
+	board_controls.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	board_controls.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	board_panel.add_child(board_controls)
+	_build_map_controls(board_controls)
 	app.board.rich_empty_state=true
 	footer.add_theme_stylebox_override("panel",Hearth20Design.panel(Color(0,0,0,0),0,2,Color(0,0,0,0)))
 	footer.custom_minimum_size.y=22
@@ -141,9 +147,6 @@ func make_button(icon_name: String, caption: String, callback: Callable) -> Butt
 	return result
 
 func _build_map_controls(overlay: Control) -> void:
-	download_meter=Hearth20MapDownloadMeter.new();download_meter.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	download_meter.offset_left=16;download_meter.offset_right=-16;download_meter.offset_top=-30;download_meter.offset_bottom=-5
-	overlay.add_child(download_meter);download_meter.setup(app.session)
 	var top:=HBoxContainer.new()
 	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	top.offset_left=16; top.offset_top=14; top.offset_right=-16; top.offset_bottom=58
@@ -184,26 +187,7 @@ func _build_map_controls(overlay: Control) -> void:
 		if app.session.local_role=="dm": app.toolbox.open("layers"))
 	layer_button.tooltip_text="Active editing layer"
 	top.add_child(layer_button)
-	var zoom_panel:=PanelContainer.new()
-	zoom_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	zoom_panel.offset_left=-221; zoom_panel.offset_right=-16; zoom_panel.offset_top=-56; zoom_panel.offset_bottom=-16
-	zoom_panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#151d2bed"),10,4,Color("#354257"),true))
-	overlay.add_child(zoom_panel)
-	var row:=HBoxContainer.new()
-	row.add_theme_constant_override("separation",3)
-	zoom_panel.add_child(row)
-	row.add_child(make_button("minus","",func(): app.board._zoom_at(app.board.size*0.5,1.0/1.15)))
-	zoom_value=text_label("100%",12,Hearth20Design.INK)
-	zoom_value.custom_minimum_size.x=44
-	zoom_value.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	row.add_child(zoom_value)
-	row.add_child(make_button("plus","",func(): app.board._zoom_at(app.board.size*0.5,1.15)))
-	row.add_child(make_button("fit","Fit",func(): app.board.fit_map()))
-	map_detail=text_label("",11,Hearth20Design.MUTED)
-	map_detail.mouse_filter=Control.MOUSE_FILTER_IGNORE
-	map_detail.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	map_detail.offset_left=18; map_detail.offset_right=250; map_detail.offset_top=-38; map_detail.offset_bottom=-18
-	overlay.add_child(map_detail)
+	_build_board_dock(overlay)
 	welcome_card=PanelContainer.new()
 	welcome_card.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	welcome_card.offset_left=-218; welcome_card.offset_right=218; welcome_card.offset_top=-155; welcome_card.offset_bottom=155
@@ -220,7 +204,6 @@ func _build_map_controls(overlay: Control) -> void:
 	crest.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
 	crest.modulate=Hearth20Design.GOLD
 	welcome.add_child(crest)
-	welcome.add_child(text_label("A PLACE FOR YOUR NEXT ADVENTURE",10,Hearth20Design.GOLD))
 	welcome_title=text_label("Set the scene.",30,Hearth20Design.INK)
 	welcome_title.add_theme_font_override("font",Hearth20Design.font(true))
 	welcome.add_child(welcome_title)
@@ -240,6 +223,101 @@ func _build_map_controls(overlay: Control) -> void:
 	welcome_open.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	actions.add_child(welcome_open)
 
+func _build_board_dock(overlay: Control) -> void:
+	var stack := VBoxContainer.new()
+	stack.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stack.offset_left=12
+	stack.offset_top=12
+	stack.offset_right=-12
+	stack.offset_bottom=-12
+	stack.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	stack.add_theme_constant_override("separation",6)
+	overlay.add_child(stack)
+
+	var space := Control.new()
+	space.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	space.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	stack.add_child(space)
+	token_card=PanelContainer.new()
+	token_card.name="SelectedTokenSummary"
+	token_card.size_flags_horizontal=Control.SIZE_SHRINK_END
+	token_card.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#141c29f8"),8,12,Hearth20Design.BORDER,true))
+	stack.add_child(token_card)
+	var token_copy := VBoxContainer.new()
+	token_copy.custom_minimum_size.x=152
+	token_copy.add_theme_constant_override("separation",4)
+	token_card.add_child(token_copy)
+	token_copy.add_child(text_label("Selected token",11,Hearth20Design.GOLD))
+	selected_name=text_label("",17,Hearth20Design.INK)
+	selected_name.add_theme_font_override("font",Hearth20Design.font(true))
+	selected_name.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+	token_copy.add_child(selected_name)
+	selected_detail=text_label("",11,Hearth20Design.MUTED)
+	token_copy.add_child(selected_detail)
+	token_copy.add_child(make_button("tokens","Edit token",func():app._show_sidebar_page(app.token_page)))
+	token_card.hide()
+
+	var status_row := HBoxContainer.new()
+	status_row.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	stack.add_child(status_row)
+	map_detail=text_label("",11,Hearth20Design.MUTED)
+	map_detail.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	map_detail.size_flags_vertical=Control.SIZE_SHRINK_CENTER
+	status_row.add_child(map_detail)
+	var stretch := Control.new()
+	stretch.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	stretch.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	status_row.add_child(stretch)
+	var zoom_panel:=PanelContainer.new()
+	zoom_panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#151d2bed"),8,3,Hearth20Design.BORDER,true))
+	status_row.add_child(zoom_panel)
+	var row:=HBoxContainer.new()
+	row.add_theme_constant_override("separation",2)
+	zoom_panel.add_child(row)
+	row.add_child(make_button("minus","",func(): app.board._zoom_at(app.board.size*0.5,1.0/1.15)))
+	zoom_value=text_label("100%",12,Hearth20Design.INK)
+	zoom_value.custom_minimum_size.x=44
+	zoom_value.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(zoom_value)
+	row.add_child(make_button("plus","",func(): app.board._zoom_at(app.board.size*0.5,1.15)))
+	row.add_child(make_button("fit","Fit",func(): app.board.fit_map()))
+
+	var rail_margin := MarginContainer.new()
+	rail_margin.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	stack.add_child(rail_margin)
+	var fit_rail := func():
+		var inset := roundi(maxf(0.0,(stack.size.x-740.0)*0.5))
+		rail_margin.add_theme_constant_override("margin_left",inset)
+		rail_margin.add_theme_constant_override("margin_right",inset)
+	stack.resized.connect(fit_rail)
+	fit_rail.call()
+	var dock := PanelContainer.new()
+	dock.name="BoardToolStrip"
+	dock.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#141c29f8"),9,5,Hearth20Design.BORDER,true))
+	rail_margin.add_child(dock)
+	app.dm_rail.reparent(dock,false)
+
+	download_meter=Hearth20MapDownloadMeter.new()
+	download_meter.custom_minimum_size.y=22
+	stack.add_child(download_meter)
+	download_meter.setup(app.session)
+	app.inspector_tabs.visibility_changed.connect(_refresh_token_card)
+	app.board.selection_changed.connect(func(_id):_refresh_token_card())
+
+func _refresh_token_card() -> void:
+	var id: String=app.board.selected_actor_id
+	var actor: Dictionary={}
+	if app.session.local_role=="dm" and app.board.role=="dm" and not app.inspector_tabs.visible and not id.is_empty():
+		for candidate in app.board.current_actors():
+			if str(candidate.get("id",""))==id:
+				actor=candidate
+				break
+	token_card.visible=not actor.is_empty()
+	if actor.is_empty():return
+	selected_name.text=str(actor.get("name","Unnamed token"))
+	selected_name.tooltip_text=selected_name.text
+	selected_detail.text="Concealed from players" if actor.get("hidden",false) or actor.get("layer","tokens")=="gm" else "Visible to players"
+
 func _process(delta: float) -> void:
 	update_elapsed+=delta
 	if update_elapsed<0.15: return
@@ -251,27 +329,48 @@ func _update_labels() -> void:
 	var scene: Dictionary=app.board.current_scene()
 	var is_player: bool=app.session.local_role=="player"
 	map_library_button.visible=not is_player
+	layer_button.visible=not is_player
 	campaign_label.text="Your adventure" if is_player else str(app.campaign.get("title","New table"))
 	var connected: bool=not (app.multiplayer.multiplayer_peer is OfflineMultiplayerPeer)
-	session_badge.text=("PLAYER" if is_player else "GAME MASTER")+"  /  "+("CONNECTED" if connected else "LOCAL TABLE")
-	session_badge.add_theme_color_override("font_color",Hearth20Design.TEAL if connected else Hearth20Design.MUTED)
+	session_badge.text=("Player" if is_player else "Game Master")+"  ·  "+("Connected" if connected else "Local table")
+	session_badge.add_theme_color_override("font_color",Hearth20Regal.resolve(Hearth20Design.TEAL if connected else Hearth20Design.MUTED))
 	scene_label.text=str(scene.get("title","Awaiting a scene")).left(30)
-	scene_detail.text="%s ft per square   ·   %s × %s" % [str(scene.get("feet_per_cell",5)).trim_suffix(".0"),str(scene.get("width_cells",24)),str(scene.get("height_cells",16))]
+	scene_detail.text="%s ft per square   ·   %d × %d" % [str(scene.get("feet_per_cell",5)).trim_suffix(".0"),int(scene.get("width_cells",24)),int(scene.get("height_cells",16))]
 	layer_button.text={"tokens":"Tokens","gm":"DM layer","map":"Map","foreground":"Foreground","light":"Light"}.get(app.board.active_layer,"Tokens")
 	zoom_value.text="%d%%" % roundi(app.board.camera_zoom*100)
 	map_detail.text="%d tokens  ·  %s" % [app.board.current_actors().size(),"Snap on" if scene.get("snap_to_grid",true) else "Free placement"]
-	map_detail.visible=not download_meter.visible
+	map_detail.visible=not download_meter.visible and app.board.size.x>=356
 	app.inspector_toggle.text=""
 	app.inspector_toggle.button_pressed=app.inspector_tabs.visible
-	app.chat_shortcut_button.text="Chat"+(" · %d"%app.unread_chat_count if app.unread_chat_count>0 else "")
-	var compact=size.x<1500
-	brand_box.visible=size.x>=1150;campaign_box.visible=size.x>=1050
-	toolbar.add_theme_constant_override("separation",8 if compact else 12)
-	app.inventory_drop_button.text="Tokens" if compact else "✧ Token vault"
-	app.cover_map_button.text=("Reveal map" if app.cover_map_button.button_pressed else "Cover map") if compact else ("◇ Reveal map" if app.cover_map_button.button_pressed else "◇ Cover map")
-	search_button.text="Ctrl K" if compact else "Find a tool   Ctrl K"
-	search_button.custom_minimum_size.x=74 if compact else 160
-	app.toolbox.refresh_density(size.y<720)
+	app.inspector_toggle.tooltip_text="Hide side panel" if app.inspector_tabs.visible else "Open side panel · sheet, chat, journal and tools"
+	var compact := size.x<1500
+	var icon_only := size.x<900
+	brand_box.visible=size.x>=1150
+	campaign_box.visible=size.x>=1050
+	toolbar.add_theme_constant_override("separation",5 if icon_only else (8 if compact else 12))
+	map_library_button.text="" if icon_only else "Maps"
+	var vault_button: Button=app.inventory_drop_button
+	var cover_button: Button=app.cover_map_button
+	vault_button.text="" if icon_only else ("Tokens" if compact else "Token vault")
+	vault_button.icon=Hearth20Design.icon("tokens",18) if icon_only else null
+	vault_button.add_theme_constant_override("icon_max_width",18)
+	var cover_label := "Reveal map" if cover_button.button_pressed else "Cover map"
+	cover_button.text="" if icon_only else cover_label
+	cover_button.icon=Hearth20Design.icon("mask",18) if icon_only else null
+	cover_button.add_theme_constant_override("icon_max_width",18)
+	cover_button.tooltip_text=cover_label+" for players"
+	app.chat_shortcut_button.text="" if icon_only else "Chat"+(" · %d"%app.unread_chat_count if app.unread_chat_count>0 else "")
+	app.chat_shortcut_button.tooltip_text="Table chat"+(" · %d unread"%app.unread_chat_count if app.unread_chat_count>0 else "")
+	app.save_button.text="" if icon_only else "Save"
+	search_button.text="" if icon_only else ("Ctrl K" if compact else "Find tool")
+	search_button.custom_minimum_size.x=38 if icon_only else (74 if compact else 120)
+	if app.board.size.x<356:
+		layer_button.tooltip_text="Active editing layer · "+layer_button.text
+		layer_button.text=""
+	else:
+		layer_button.tooltip_text="Active editing layer"
+	app.toolbox.refresh_density(size.y<720,size.x>=1400)
+	_refresh_token_card()
 	var waiting: bool=is_player and (scene.is_empty() or scene.get("id","")=="disconnected")
 	var gate: String=str(scene.get("id","")) if is_player else ""
 	var gated: bool=gate in ["unplaced","map-loading","blackout"]

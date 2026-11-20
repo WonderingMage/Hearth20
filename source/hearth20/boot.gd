@@ -2,31 +2,36 @@ extends Control
 class_name Hearth20Boot
 ## The original full-resolution party illustration stays separate from table loading.
 const APP_SCENE := "res://hearth20_seated.tscn"
+const AssetRequests=preload("res://hearth20/asset_requests.gd")
 const TITLE_ART := preload("res://hearth20/menu_art/party-revised.jpg")
 const SCRIM := """
 shader_type canvas_item;
 void fragment(){
-    float shade=(1.-smoothstep(.08,.61,UV.x))*.90;
-    float edge=pow(length((UV-vec2(.5))*vec2(.85,1.1)),2.)*.38;
-    COLOR=vec4(.026,.018,.012,clamp(shade+edge,0.,.96));
+    float left=(1.-smoothstep(.17,.67,UV.x))*.96;
+    float top=(1.-smoothstep(.015,.23,UV.y))*.44;
+    float bottom=smoothstep(.61,1.,UV.y)*.55;
+    COLOR=vec4(.026,.018,.012,1.-(1.-left)*(1.-max(top,bottom)));
 }
 """
 var artwork: TextureRect
 var heading: Label
 var progress: ProgressBar
 var progress_note: Label
+var cancel_loading_button: Button
+var credits_button: Button
 var menu: VBoxContainer
+var utilities: HBoxContainer
 var copy_column: VBoxContainer
 var loading:=false
 var mode:="new"
 var load_paths: Array[String]=[]
 var loaded: Array[Resource]=[]
-var load_errors: Array[String]=[]
 var campaign_thread: Thread
 var campaign_result: Dictionary={}
 var campaign_path=""
 var advance_pending:=false
 var loading_drawn:=false
+var loading_started=0
 var menu_drawn_msec:=0
 var debug_enabled:=bool(ProjectSettings.get_setting_with_override("application/config/hearth20_debug"))
 var debug_dialog: AcceptDialog
@@ -47,40 +52,105 @@ func _ready() -> void:
 	var rage_material:=ShaderMaterial.new();rage_material.shader=preload("res://hearth20/menu_art/rage.gdshader");rage.material=rage_material;add_child(rage)
 	var scrim=ColorRect.new();scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);scrim.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var shader=Shader.new();shader.code=SCRIM;var material=ShaderMaterial.new();material.shader=shader;scrim.material=material;add_child(scrim)
-	var margin=MarginContainer.new();margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left","right"]:margin.add_theme_constant_override("margin_"+side,46)
-	for side in ["top","bottom"]:margin.add_theme_constant_override("margin_"+side,28)
+	var margin=MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for side in ["left","right"]:
+		margin.add_theme_constant_override("margin_"+side,44)
+	for side in ["top","bottom"]:
+		margin.add_theme_constant_override("margin_"+side,20)
 	add_child(margin)
 	var column=VBoxContainer.new();column.add_theme_constant_override("separation",12);margin.add_child(column)
 	var top=HBoxContainer.new();top.add_theme_constant_override("separation",10);column.add_child(top)
-	var edition=_label("A   T A B L E   F O R   L E G E N D S",11);edition.size_flags_horizontal=Control.SIZE_EXPAND_FILL;top.add_child(edition)
+	var brand := TextureRect.new()
+	brand.texture=Hearth20Design.icon("crest",24)
+	brand.modulate=Color("#e2bd79")
+	brand.custom_minimum_size=Vector2(28,28)
+	brand.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
+	brand.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	brand.size_flags_vertical=Control.SIZE_SHRINK_CENTER
+	brand.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	top.add_child(brand)
+	var version=_label("Version "+Hearth20Identity.VERSION,13)
+	version.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	version.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+	version.clip_text=true
+	version.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+	top.add_child(version)
+	utilities=HBoxContainer.new()
+	utilities.size_flags_vertical=Control.SIZE_SHRINK_CENTER
+	utilities.add_theme_constant_override("separation",7)
+	top.add_child(utilities)
+	var guide=_button(utilities,"How to play",func():Hearth20PartyGuide.open(self),38)
+	var settings=_button(utilities,"Settings",func():Hearth20SettingsWindow.open(self),38)
+	var quit=_button(utilities,"Quit",func():get_tree().quit(),38)
+	_style_art_button(guide)
+	_style_art_button(settings,true)
+	_style_art_button(quit)
 	var appearance=Hearth20Regal.ThemeMedallion.new();appearance.name="TitleAppearance";top.add_child(appearance)
-	var middle=HBoxContainer.new();middle.size_flags_vertical=Control.SIZE_EXPAND_FILL;column.add_child(middle)
-	var rail=ScrollContainer.new();rail.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;rail.size_flags_vertical=Control.SIZE_EXPAND_FILL;middle.add_child(rail)
-	copy_column=VBoxContainer.new();copy_column.custom_minimum_size.x=340;copy_column.add_theme_constant_override("separation",13);rail.add_child(copy_column)
-	var above=Control.new();above.size_flags_vertical=Control.SIZE_EXPAND_FILL;above.custom_minimum_size.y=12;copy_column.add_child(above)
-	heading=_label("Hearth20",54,true);copy_column.add_child(heading)
-	copy_column.add_child(_label("G A T H E R   Y O U R   P A R T Y",11))
-	var rule=HSeparator.new();copy_column.add_child(rule)
-	var description=_label("A seat at the table. A world beyond the horizon.",16);description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;copy_column.add_child(description)
-	var gap=Control.new();gap.custom_minimum_size.y=16;copy_column.add_child(gap)
-	menu=VBoxContainer.new();menu.add_theme_constant_override("separation",10);copy_column.add_child(menu)
-	var join=_button(menu,"Join a table",func():begin_loading("join"),60);join.name="JoinTable";join.add_theme_font_size_override("font_size",23);join.focus_neighbor_bottom="../HostTable"
-	var host=_button(menu,"Host a new game",func():begin_loading("host"),60);host.name="HostTable";host.add_theme_font_size_override("font_size",23)
-	_button(menu,"Open saved campaign",open_campaign_vault,36)
-	var utilities=GridContainer.new();utilities.columns=2;utilities.add_theme_constant_override("h_separation",8);utilities.add_theme_constant_override("v_separation",8);menu.add_child(utilities)
-	_button(utilities,"How to play",func():Hearth20PartyGuide.open(self),36)
-	_button(utilities,"Settings",func():Hearth20SettingsWindow.open(self),36)
-	_button(utilities,"Quit",func():get_tree().quit(),34)
-	_button(utilities,"Scene credits",_show_scene_credits,34)
-	if Hearth20MultiplayerLab.enabled():_button(menu,"Multiplayer Lab · DM + 2 Players",func():Hearth20MultiplayerLab.start_on_table=true;begin_loading("lab"),36)
-	var below=Control.new();below.size_flags_vertical=Control.SIZE_EXPAND_FILL;below.custom_minimum_size.y=12;copy_column.add_child(below)
-	var space=Control.new();space.size_flags_horizontal=Control.SIZE_EXPAND_FILL;space.mouse_filter=Control.MOUSE_FILTER_IGNORE;middle.add_child(space)
-	progress=ProgressBar.new();progress.show_percentage=false;progress.max_value=100;progress.custom_minimum_size.y=4;progress.hide();column.add_child(progress)
-	progress_note=_label("",13);progress_note.hide();column.add_child(progress_note)
-	var footer=HBoxContainer.new();column.add_child(footer)
-	var version=_label("BETA  /  "+Hearth20Identity.VERSION,11);version.size_flags_horizontal=Control.SIZE_EXPAND_FILL;footer.add_child(version)
-	var place=_label("YOUR PARTY.    YOUR LEGEND.",11);place.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;footer.add_child(place)
+	var rail=ScrollContainer.new()
+	rail.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	rail.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	rail.follow_focus=true
+	column.add_child(rail)
+	copy_column=VBoxContainer.new()
+	copy_column.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	copy_column.alignment=BoxContainer.ALIGNMENT_END
+	copy_column.add_theme_constant_override("separation",17)
+	rail.add_child(copy_column)
+	heading=_label("Hearth20",68,true)
+	copy_column.add_child(heading)
+	var rule=ColorRect.new()
+	rule.color=Color("#c89d62")
+	rule.custom_minimum_size=Vector2(63,2)
+	rule.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
+	rule.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	copy_column.add_child(rule)
+	menu=VBoxContainer.new()
+	menu.add_theme_constant_override("separation",6)
+	copy_column.add_child(menu)
+	var actions=HFlowContainer.new()
+	actions.add_theme_constant_override("h_separation",10)
+	actions.add_theme_constant_override("v_separation",8)
+	menu.add_child(actions)
+	var join=_button(actions,"Join a table",func():begin_loading("join"),52)
+	join.name="JoinTable"
+	join.custom_minimum_size.x=156
+	join.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
+	_style_menu_button(join,"connect",17)
+	Hearth20Design.primary(join)
+	var host=_button(actions,"Host a new game",func():begin_loading("host"),52)
+	host.name="HostTable"
+	host.custom_minimum_size.x=171
+	host.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
+	_style_menu_button(host,"host",17)
+	_style_art_button(host,true)
+	actions.sort_children.connect(func():
+		var wide=is_equal_approx(join.position.y,host.position.y)
+		join.focus_neighbor_right=join.get_path_to(host) if wide else NodePath()
+		join.focus_neighbor_bottom=NodePath() if wide else join.get_path_to(host)
+		host.focus_neighbor_left=host.get_path_to(join) if wide else NodePath()
+		host.focus_neighbor_top=NodePath() if wide else host.get_path_to(join)
+	)
+	var saved=_button(menu,"Open saved campaign",open_campaign_vault,38)
+	_style_menu_button(saved,"open",14)
+	_style_art_button(saved)
+	saved.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
+	if Hearth20MultiplayerLab.enabled():
+		_button(menu,"Multiplayer Lab · DM + 2 Players",func():Hearth20MultiplayerLab.start_on_table=true;begin_loading("lab"),36)
+	progress=ProgressBar.new();progress.show_percentage=false;progress.max_value=100;progress.custom_minimum_size.y=4;progress.hide();copy_column.add_child(progress)
+	progress_note=_label("",13)
+	progress_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	progress_note.hide()
+	copy_column.add_child(progress_note)
+	cancel_loading_button=_button(copy_column,"Cancel loading",_cancel_loading,36)
+	cancel_loading_button.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
+	_style_art_button(cancel_loading_button,true)
+	cancel_loading_button.hide()
+	credits_button=_button(column,"Scene credits",_show_scene_credits,32)
+	_style_art_button(credits_button)
+	credits_button.size_flags_horizontal=Control.SIZE_SHRINK_END
+	resized.connect(_layout_menu)
+	_layout_menu()
 	Hearth20Regal.sync(self)
 	RenderingServer.frame_post_draw.connect(_on_first_title_draw,CONNECT_ONE_SHOT)
 
@@ -101,8 +171,29 @@ func _button(parent: Node,caption: String,action: Callable,height: int=40) -> Bu
 	var button=Button.new();button.text=caption;button.tooltip_text=caption;button.custom_minimum_size.y=height;button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	button.pressed.connect(action);parent.add_child(button);return button
 
-func _unhandled_key_input(_event: InputEvent) -> void:
-	pass
+func _style_menu_button(button: Button,glyph: String,points: int) -> void:
+	button.icon=Hearth20Design.icon(glyph,19)
+	button.alignment=HORIZONTAL_ALIGNMENT_LEFT
+	button.add_theme_constant_override("icon_max_width",19)
+	button.add_theme_constant_override("h_separation",12)
+	button.add_theme_font_size_override("font_size",points)
+
+func _style_art_button(button: Button,outlined:=false) -> void:
+	# The illustration stays dark even when the app uses its parchment theme.
+	button.theme_type_variation="QuietButton"
+	if outlined:
+		button.add_theme_stylebox_override("normal",Hearth20Design.panel(Color("#211911"),6,8,Color("#745d40")))
+	button.add_theme_stylebox_override("hover",Hearth20Design.panel(Color("#271f18"),6,8,Color("#745d40")))
+	button.add_theme_stylebox_override("pressed",Hearth20Design.panel(Color("#34261c"),6,8,Color("#c89d62")))
+	for state in ["color","hover_color","pressed_color","focus_color"]:
+		button.add_theme_color_override("font_"+state,Color("#f5e9d4"))
+	for state in ["normal_color","hover_color","pressed_color","focus_color"]:
+		button.add_theme_color_override("icon_"+state,Color("#d8be97"))
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if loading and event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
+		_cancel_loading()
+		get_viewport().set_input_as_handled()
 
 func _show_scene_credits() -> void:
 	var dialog=AcceptDialog.new()
@@ -127,48 +218,60 @@ func begin_loading(action: String,save_path="") -> void:
 	if action=="saved" and save_path.is_empty():open_campaign_vault();return
 	campaign_path=save_path
 	if is_instance_valid(debug_dialog): debug_dialog.queue_free()
-	load_errors.clear(); loaded.clear(); loading_drawn=false; advance_pending=false
-	mode=action; loading=true; menu.hide(); progress.show(); progress_note.show(); progress.value=0; progress_note.text="Preparing your table…"
-	load_paths=[APP_SCENE,"res://hearth20/fx_noise.png"]
-	for entry in Hearth20MapLibrary.catalog(): load_paths.append("res://hearth20/sample_maps/"+str(entry.id)+"-thumb.png")
-	for path in load_paths:
-		if ResourceLoader.load_threaded_request(path,"",false)!=OK: load_errors.append(path)
+	loaded.clear();loading_drawn=DisplayServer.get_name()=="headless";advance_pending=false
+	mode=action;loading=true;loading_started=Time.get_ticks_msec();menu.hide();utilities.hide();credits_button.hide();progress.show();progress_note.show();cancel_loading_button.show();progress.value=0;progress_note.text="Preparing your table…"
+	var paths=[APP_SCENE,"res://hearth20/fx_noise.png"]
+	for entry in Hearth20MapLibrary.catalog():paths.append("res://hearth20/sample_maps/"+str(entry.id)+"-thumb.png")
+	for path in paths:
+		if not ResourceLoader.exists(path) or ResourceLoader.load_threaded_request(path)!=OK:
+			_return_from_loading("A bundled resource could not load. You can retry or quit.")
+			return
+		load_paths.append(path)
 	if action=="saved":
 		campaign_thread=Thread.new()
-		campaign_thread.start(func(): return Hearth20Identity.load_campaign(campaign_path))
-	RenderingServer.frame_post_draw.connect(_on_loading_drawn,CONNECT_ONE_SHOT)
+		if campaign_thread.start(func():return Hearth20Identity.load_campaign(save_path))!=OK:
+			campaign_thread=null
+			_return_from_loading("Could not start reading the save. You can retry or open a different campaign.")
+			return
+	if not loading_drawn:RenderingServer.frame_post_draw.connect(_on_loading_drawn,CONNECT_ONE_SHOT)
 func _on_loading_drawn() -> void:
 	loading_drawn=true
+func _layout_menu() -> void:
+	copy_column.custom_minimum_size.x=clampf(size.x*.39,260.,500.)
+	heading.add_theme_font_size_override("font_size",roundi(clampf(minf(size.x*.079,size.y*.125),42.,106.)))
 func _process(_delta: float) -> void:
-	Hearth20Regal.sync(self)
-	if copy_column!=null:
-		copy_column.custom_minimum_size.x=clampf(size.x*.30,280.,380.)
-		if size.y<680:heading.add_theme_font_size_override("font_size",42)
-		else:heading.add_theme_font_size_override("font_size",54)
-	if not loading or not loading_drawn or advance_pending: return
+	if not loading or advance_pending:return
+	if Time.get_ticks_msec()-loading_started>=AssetRequests.TIMEOUT_MSEC:
+		_return_from_loading("Loading took too long. You can retry or open a different campaign.")
+		return
+	if not loading_drawn:return
 	var complete:=0; var total:=0.0
 	for path in load_paths:
-		var status:=ResourceLoader.load_threaded_get_status(path)
+		var fraction:=[];var status:=ResourceLoader.load_threaded_get_status(path,fraction)
 		if status==ResourceLoader.THREAD_LOAD_LOADED: complete+=1; total+=1
-		elif status==ResourceLoader.THREAD_LOAD_FAILED:
-			if path not in load_errors: load_errors.append(path)
-		else:
-			var fraction:=[]; ResourceLoader.load_threaded_get_status(path,fraction)
-			if not fraction.is_empty(): total+=float(fraction[0])
+		elif status!=ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			_return_from_loading("A bundled resource could not load. You can retry or quit.")
+			return
+		elif not fraction.is_empty():total+=float(fraction[0])
 	var campaign_ready:=campaign_thread==null or not campaign_thread.is_alive()
 	progress.value=total/maxf(1,load_paths.size())*100
 	progress_note.text="Reading campaign and player grants…" if not campaign_ready else "Preparing map library and table controls…"
 	if complete==load_paths.size() and campaign_ready:
 		advance_pending=true; call_deferred("_enter_table")
-	elif not load_errors.is_empty():
-		loading=false; menu.show(); progress_note.text="A bundled resource could not load. You can retry or quit."
 func _enter_table() -> void:
+	if not loading or not advance_pending:return
 	for path in load_paths: loaded.append(ResourceLoader.load_threaded_get(path))
+	load_paths.clear()
 	if campaign_thread!=null:
-		campaign_result=campaign_thread.wait_to_finish(); campaign_thread=null
+		var result=campaign_thread.wait_to_finish();campaign_thread=null
+		campaign_result=result if result is Dictionary else {}
 		if not campaign_result.get("ok",false):
-			loading=false; advance_pending=false; menu.show(); progress.hide(); progress_note.text="No saved campaign could be opened. Start a new table or try again."; return
+			_return_from_loading("No saved campaign could be opened. Start a new table or try again.")
+			return
 	var packed: PackedScene=loaded[0]
+	if packed==null:
+		_return_from_loading("The table could not be opened. You can retry or quit.")
+		return
 	var experience: Control=packed.instantiate()
 	get_parent().add_child(experience)
 	var app: Hearth20App=experience.app
@@ -177,5 +280,20 @@ func _enter_table() -> void:
 	elif mode in ["host","join"]:experience.focus_connections_when_ready(mode)
 	get_tree().current_scene=experience
 	queue_free()
+func _cancel_loading() -> void:
+	_return_from_loading("Loading cancelled.")
+func _return_from_loading(message: String) -> void:
+	_release_loading()
+	loaded.clear();loading=false;advance_pending=false;menu.show();utilities.show();credits_button.show();progress.hide();cancel_loading_button.hide();progress_note.text=message
+func _release_loading() -> void:
+	if RenderingServer.frame_post_draw.is_connected(_on_loading_drawn):RenderingServer.frame_post_draw.disconnect(_on_loading_drawn)
+	AssetRequests.discard(get_tree(),load_paths)
+	load_paths.clear()
+	if campaign_thread!=null:
+		_discard_campaign_read(get_tree(),campaign_thread)
+		campaign_thread=null
+static func _discard_campaign_read(tree: SceneTree,worker: Thread) -> void:
+	while worker.is_alive():await tree.process_frame
+	worker.wait_to_finish()
 func _exit_tree() -> void:
-	if campaign_thread!=null: campaign_thread.wait_to_finish()
+	_release_loading()

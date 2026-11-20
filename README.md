@@ -1,10 +1,12 @@
-# Hearth20 Beta
+# Hearth20
 
 <img src="branding/hearth20-beta-icon.png" width="128" alt="A beer mug with a golden d20 inside" />
 
 A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.23](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.23-beta)
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 1.0.0](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v1.0.0)
+
+**1.0.0** brings the Black & Brass title, seated table and battlemap to the regular Windows release. The bottom tool strip keeps the map open, and the selected token summary leads to the detailed editor. See the [release notes](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v1.0.0).
 
 **0.3.23** rebuilds the tavern and adds four shared exterior views. It fixes casino settlements, journal switching, hero placement, duplicate map downloads and map FX. Read the [release notes](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.23-beta).
 

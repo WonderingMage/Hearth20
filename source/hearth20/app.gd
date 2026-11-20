@@ -51,7 +51,7 @@ var scene_recovery: Dictionary = {}
 var save_button: Button
 var load_button: Button
 var host_button: Button
-var dm_rail: VBoxContainer
+var dm_rail: HFlowContainer
 var scene_page: ScrollContainer
 var token_page: ScrollContainer
 var session_page: ScrollContainer
@@ -172,8 +172,8 @@ func _ready() -> void:
 	_on_status("Hearth20 %s · Ready. Import a map or open a saved table." % Hearth20Identity.VERSION)
 
 func _select_initial_scene_tab() -> void:
-	if session != null and session.local_role != "player" and inspector_tabs != null:
-		_show_sidebar_page(workspace_tabs)
+	if session != null and session.local_role != "player" and is_instance_valid(inspector_tabs) and not inspector_tabs.visible:
+		inspector_tabs.current_tab = inspector_tabs.get_tab_idx_from_control(workspace_tabs)
 		workspace_tabs.current_tab = workspace_tabs.get_tab_idx_from_control(scene_page)
 
 func _process(_delta: float) -> void:
@@ -190,7 +190,7 @@ func _build_ui() -> void:
 	add_child(background)
 	var root := VBoxContainer.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 10)
+	root.add_theme_constant_override("separation", 8)
 	root.offset_left=12
 	root.offset_top=4
 	root.offset_right=-12
@@ -228,16 +228,8 @@ func _build_ui() -> void:
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 12)
 	root.add_child(body)
-	dm_rail = VBoxContainer.new()
-	dm_rail.custom_minimum_size.x = 66
-	dm_rail.add_theme_constant_override("separation", 6)
-	var rail_frame:=PanelContainer.new()
-	rail_frame.add_theme_stylebox_override("panel",Hearth20Design.panel(Color("#121925"),12,5,Hearth20Design.BORDER,true))
-	var rail_scroll:=ScrollContainer.new()
-	rail_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
-	rail_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO
-	rail_frame.add_child(rail_scroll);rail_scroll.add_child(dm_rail)
-	body.add_child(rail_frame)
+	dm_rail = HFlowContainer.new()
+	root.add_child(dm_rail)
 	mode_select = _add_button(dm_rail, "↖\nSelect", _select_mode)
 	mode_select.toggle_mode = true
 	mode_select.button_pressed = true
@@ -247,11 +239,6 @@ func _build_ui() -> void:
 	mode_doors.toggle_mode = true
 	mode_rocket = _add_button(dm_rail, "✦\nRocket", _begin_rocket)
 	mode_rocket.toggle_mode = true
-	var keyboard_note := Label.new()
-	keyboard_note.text = "F fit\nSpace pan\nEsc cancel"
-	keyboard_note.add_theme_font_size_override("font_size", 11)
-	keyboard_note.add_theme_color_override("font_color", Color("#91a09f"))
-	dm_rail.add_child(keyboard_note)
 	var board_panel := PanelContainer.new()
 	board_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	board_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -263,7 +250,7 @@ func _build_ui() -> void:
 	board_panel.add_child(board)
 	body.add_child(board_panel)
 	inspector_tabs = TabContainer.new()
-	inspector_tabs.custom_minimum_size.x = 352
+	inspector_tabs.custom_minimum_size.x = 328
 	inspector_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	inspector_tabs.add_theme_stylebox_override("panel",Hearth20Design.panel(Hearth20Design.SURFACE,14,14,Hearth20Design.BORDER,true))
 	body.add_child(inspector_tabs)
@@ -328,6 +315,7 @@ func _build_ui() -> void:
 	if session.has_signal("timeline_changed"):
 		session.timeline_changed.connect(_on_timeline_changed)
 	inspector_tabs.current_tab = 0
+	inspector_tabs.hide()
 	_update_grid_state()
 	var footer := PanelContainer.new()
 	footer.custom_minimum_size.y = 26
@@ -353,8 +341,6 @@ func _build_ui() -> void:
 	token_files.add_filter("*.png", "PNG token image")
 	token_files.title="Hearth20 · Choose token image"
 	token_files.use_native_dialog=OS.get_name()=="Windows"
-	token_files.transient=true
-	token_files.transient_to_focused=false
 	token_files.file_selected.connect(_on_token_selected)
 	token_files.canceled.connect(_cancel_token_dialog);token_files.close_requested.connect(_cancel_token_dialog)
 	# File pickers must belong to the real window, not the rendered map SubViewport.
@@ -954,7 +940,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if toolbox != null and not event.ctrl_pressed and not event.alt_pressed:
 		var shortcuts := {KEY_V:"select",KEY_K:"tokens",KEY_D:"draw",KEY_T:"text",KEY_M:"measure",KEY_R:"dice",KEY_X:"fx",KEY_B:"beacon",KEY_H:"mask",KEY_L:"lighting"}
 		if shortcuts.has(event.keycode):
-			toolbox.open(shortcuts[event.keycode])
+			toolbox.choose_tool(shortcuts[event.keycode])
 			get_viewport().set_input_as_handled()
 			return
 	if event.keycode == KEY_ESCAPE:
@@ -1404,11 +1390,11 @@ func _add_token() -> void:
 	board.add_token("Token %d" % (campaign.actors.size() + 1), false, Vector2(7, 5))
 
 func _open_map_dialog() -> void:
-	if board.role == "dm":
-		if seated_shell!=null and seated_shell.focus_state=="table":seated_shell.focus_map()
-		map_dialog.popup_centered_ratio(0.78)
+	if board.role!="dm" or token_dialog.visible:return
+	if seated_shell!=null and seated_shell.focus_state=="table":seated_shell.focus_map()
+	Hearth20Design.open_file_picker(map_dialog,.78)
 func _cancel_map_dialog() -> void:
-	if is_instance_valid(map_dialog):map_dialog.hide()
+	Hearth20Design.dismiss_file_picker(map_dialog)
 	_on_status("Map import cancelled. Your current table is unchanged.")
 func open_preferences() -> void:
 	Hearth20SettingsWindow.open(seated_shell if seated_shell!=null else self,self)
@@ -1450,6 +1436,7 @@ func _finish_library_scene_change(title_value: String) -> void:
 	_on_status("%s · Scene ready with calibrated grid, editable lights, walls and doors."%title_value)
 
 func _on_map_selected(path: String) -> void:
+	Hearth20Design.dismiss_file_picker(map_dialog)
 	if path.get_extension().to_lower()=="hearth20map":
 		var imported: Dictionary=session.import_map_package(path)
 		if imported.ok:
@@ -1577,22 +1564,21 @@ func _update_grid_state() -> void:
 	grid_snap_button.text = "Turn snapping off" if snapping else "Turn snapping on"
 
 func _open_token_dialog(actor_id: String="") -> void:
-	if session.local_role!="dm" or board.role!="dm":return
+	if session.local_role!="dm" or board.role!="dm" or token_dialog.visible or map_dialog.visible:return
 	var target=actor_id if not actor_id.is_empty() else board.selected_actor_id
 	if Hearth20Contracts.find_actor(campaign,target).is_empty():_on_status("Select a token before choosing its image.");return
 	if seated_shell!=null and seated_shell.focus_state=="table":seated_shell.focus_map()
 	token_image_actor_id=target
-	token_dialog.exclusive=true
-	token_dialog.popup_centered_ratio(0.7)
+	Hearth20Design.open_file_picker(token_dialog,.7)
 
 func _cancel_token_dialog() -> void:
-	if is_instance_valid(token_dialog):token_dialog.hide();token_dialog.exclusive=false
+	Hearth20Design.dismiss_file_picker(token_dialog)
 	token_image_actor_id=""
 	_on_status("Token image selection cancelled. Appearance unchanged.")
 
 func _on_token_selected(path: String) -> void:
 	var target=token_image_actor_id;token_image_actor_id=""
-	if is_instance_valid(token_dialog):token_dialog.hide();token_dialog.exclusive=false
+	Hearth20Design.dismiss_file_picker(token_dialog)
 	if session.local_role!="dm" or target.is_empty():return
 	var result: Dictionary = board.attach_token_png(path,target)
 	_refresh_token_inspector()
@@ -1654,10 +1640,11 @@ func _host_table() -> void:
 	else:
 		_on_status(result.error)
 
-func _join_table() -> void:
+func _join_table() -> Dictionary:
 	if not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer):
-		_on_status("Leave the active table before joining another host.")
-		return
+		var message="Leave the active table before joining another host."
+		_on_status(message)
+		return {"ok":false,"error":message}
 	var result: Dictionary = session.join_host(join_address.text, int(host_port.value), join_secret.text, player_name.text)
 	if result.ok:
 		board.set_role("player")
@@ -1665,6 +1652,7 @@ func _join_table() -> void:
 		_on_status("Connecting to the Hearth20 host…")
 	else:
 		_on_status(result.error)
+	return result
 
 func _assign_hero() -> void:
 	if player_picker.selected < 0 or player_picker.selected >= player_picker.item_count:
@@ -1735,7 +1723,6 @@ func _save_campaign() -> void:
 	Hearth20CampaignVault.open(seated_shell if seated_shell!=null else self,self,"save")
 
 func begin_campaign_save(path: String,title_value: String) -> Hearth20CampaignProgress:
-	if is_instance_valid(campaign_progress) and campaign_progress.active:return campaign_progress
 	campaign_progress=Hearth20CampaignProgress.open(self,"save",path,title_value)
 	return campaign_progress
 
@@ -1887,6 +1874,7 @@ func _on_snapshot(value: Dictionary) -> void:
 	_on_status("Connected. Your authorized scene, character sheet and table rolls are ready.")
 
 func _on_host_state(value: Dictionary) -> void:
+	if board.role!=session.local_role:board.set_role(session.local_role)
 	remote_players = value.get("players", {})
 	player_picker.clear()
 	for player_id in remote_players:
