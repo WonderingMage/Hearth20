@@ -163,7 +163,9 @@ static func apply(campaign: Dictionary, principal: String, command: Dictionary, 
 				if action=="cashout" and g.phase!="between":return fail("Cash out between rounds, or refund the original buy-ins.")
 				if action=="cancel":
 					ctx.house+=int(g.house_in_cp)-int(g.house_out_cp)
-					for s in g.seats:ctx.deltas.append({"id":s.actor_id,"cp":int(s.buyin_cp)});s.hoard=0;s.bets=[];s.committed=0
+					for s in g.seats:
+						ctx.deltas.append({"id":s.actor_id,"cp":int(s.buyin_cp)})
+						s.hoard=0;s.bets=[];s.committed=0;s.street_paid=0
 					g.house_out_cp=g.house_in_cp;g.player_paid_cp=g.initial_cp;g.phase="cancelled"
 				else:
 					for s in g.seats:
@@ -177,7 +179,7 @@ static func apply(campaign: Dictionary, principal: String, command: Dictionary, 
 	if not valid(g) or not integer(ctx.house):return fail("The proposed game or reserve is invalid; nothing was changed.")
 	for delta in ctx.deltas:
 		var a=Hearth20Contracts.find_actor(campaign,delta.id);var cp=Hearth20TavernGames.purse(a)
-		if a.is_empty() or not integer(cp+int(delta.cp)):return fail("A character purse changed; no money was committed.")
+		if a.is_empty() or cp<0 or not integer(cp+int(delta.cp),0,Hearth20TavernGames.MAX_SETTLED_CP):return fail("A character purse changed; no money was committed.")
 	for delta in ctx.deltas:
 		var a=Hearth20Contracts.find_actor(campaign,delta.id);var cp=Hearth20TavernGames.purse(a);Hearth20TavernGames.set_purse(a,cp+int(delta.cp));ledger(campaign,g.id,delta.id,action,int(delta.cp),cp,cp+int(delta.cp))
 	if ctx.house!=bank:ledger(campaign,g.id,"casino-house",action,int(ctx.house)-int(bank),int(bank),int(ctx.house))

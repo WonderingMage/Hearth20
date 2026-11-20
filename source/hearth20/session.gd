@@ -19,11 +19,15 @@ signal refreshment_action_result(result: Dictionary)
 signal table_presence_changed(roster: Array)
 signal avatar_result(result: Dictionary)
 signal belongings_result(result: Dictionary)
+signal jax_alert_received
+signal jax_alert_cancelled
 
 const MAX_CLIENTS := 8
 const MAX_PORT := 65535
 const MAX_SECRET_LENGTH := 128
 
+var jax_last_sent_msec=-10000
+var jax_last_received_msec=-10000
 var campaign: Dictionary = {}
 var client_snapshot: Dictionary = {}
 var local_role := "dm"
@@ -85,6 +89,7 @@ func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 func configure(campaign_data: Dictionary) -> void:
+	jax_alert_cancelled.emit();jax_last_sent_msec=-10000;jax_last_received_msec=-10000
 	map_stream.clear();peer_map_downloads.clear();pending_map_snapshot.clear()
 	campaign = campaign_data
 	Hearth20MapLibrary.discard_empty_starter(campaign,str(campaign.get("active_scene","")))
@@ -173,6 +178,7 @@ func adopt_steam_peer(peer: MultiplayerPeer,hosting: bool,secret: String,nicknam
 	return {"ok":true}
 
 func stop_session() -> void:
+	jax_last_sent_msec=-10000
 	var was_steam=transport=="steam"
 	if multiplayer.multiplayer_peer!=null:multiplayer.multiplayer_peer.close()
 	transport="direct";steam_chunks.clear();steam_outgoing.clear();peer_steam_images.clear()
@@ -191,6 +197,7 @@ func stop_session() -> void:
 	if was_steam and is_instance_valid(steam_link) and not steam_link.closing:steam_link.disconnect_table()
 
 func _clear_client_view() -> void:
+	jax_alert_cancelled.emit();jax_last_received_msec=-10000
 	table_roster.clear();table_presence_changed.emit([])
 	avatar_submitted=false
 	background_mode=false;map_preparing=false;pending_map_snapshot.clear();peer_map_downloads.clear();map_stream.clear()
@@ -619,6 +626,7 @@ func _project_for(player_id: String,map_override: Variant=null) -> Dictionary:
 		projected.character_in_inventory = bool(Hearth20JoinCharacter.current(campaign,player_id).get("in_inventory",false))
 		projected.join_character_id = str(Hearth20JoinCharacter.current(campaign,player_id).get("id",""))
 		projected.table_mode=str(campaign.get("table_mode","map"))
+		projected.room_environment=Hearth20RoomWorlds.clean(campaign.get("room_environment","fey_forest"))
 		projected.avatar_presence=true
 		projected.belongings_supported=true
 		var personal=Hearth20Belongings.project(campaign,player_id)
@@ -1553,6 +1561,37 @@ func set_table_mode(mode: String) -> Dictionary:
 	if campaign.get("table_mode","map")==mode:return {"ok":true,"unchanged":true}
 	campaign.table_mode=mode;campaign.revision=int(campaign.get("revision",0))+1;_broadcast_snapshots();return {"ok":true}
 
+func set_room_environment(id: String) -> Dictionary:
+	if local_role!="dm" or is_spectating("dm-local"):return {"ok":false,"error":"Only the DM can change the window world."}
+	if not Hearth20RoomWorlds.valid(id):return {"ok":false,"error":"Unknown window environment."}
+	if campaign.get("room_environment","fey_forest")==id:return {"ok":true,"unchanged":true}
+	campaign.room_environment=id;campaign.revision=int(campaign.get("revision",0))+1;_broadcast_snapshots();return {"ok":true}
+func send_jax_alert() -> Dictionary:
+	if local_role!="dm" or is_spectating("dm-local"):return {"ok":false,"error":"Only the DM can use the Jax button."}
+	var peer=_jax_peer_id()
+	if peer==0:return {"ok":true,"sent":false}
+	var now=Time.get_ticks_msec()
+	if now-jax_last_sent_msec<Hearth20JaxAlert.COOLDOWN_MSEC:return {"ok":true,"sent":false,"cooldown":true}
+	# A single tiny targeted RPC. No broadcast, campaign mutation or map transfer.
+	var error=rpc_id(peer,"receive_jax_alert")
+	if error!=OK:return {"ok":true,"sent":false}
+	jax_last_sent_msec=now;return {"ok":true,"sent":true}
+func _jax_peer_id() -> int:
+	if transport!="steam" or not is_instance_valid(steam_link) or not steam_link.initialized or steam_link.lobby_id<=0:return 0
+	var peer=multiplayer.multiplayer_peer
+	if not peer.has_method("get_steam_id_for_peer_id"):return 0
+	return Hearth20JaxAlert.find_peer(multiplayer.get_peers(),peer_to_player,func(id):return peer.get_steam_id_for_peer_id(id),func(id):return steam_link.allows_peer(id))
+func _is_jax_local() -> bool:
+	return transport=="steam" and is_instance_valid(steam_link) and steam_link.initialized and steam_link.lobby_id>0 and steam_link.own_id==Hearth20JaxAlert.STEAM_ID
+@rpc("authority","call_remote","reliable")
+func receive_jax_alert() -> void:
+	if local_role!="player" or multiplayer.get_remote_sender_id()!=1 or not _is_jax_local():return
+	var now=Time.get_ticks_msec()
+	if now-jax_last_received_msec<Hearth20JaxAlert.COOLDOWN_MSEC:return
+	jax_last_received_msec=now;jax_alert_received.emit()
+func room_environment() -> String:
+	return Hearth20RoomWorlds.clean(campaign.get("room_environment","fey_forest") if local_role=="dm" else client_snapshot.get("room_environment","fey_forest"))
+
 func is_spectating(player: String="") -> bool:
 	if player.is_empty():player=local_player_id
 	if local_role=="player":return player==local_player_id and bool(client_snapshot.get("refreshments",{}).get("spectating",false))
@@ -1605,7 +1644,7 @@ static func _map_loading_view(snapshot: Dictionary) -> Dictionary:
 
 func _send_map_catalog(peer: int) -> void:
 	if not peer_map_downloads.has(peer) or peer not in multiplayer.get_peers():return
-	var slot: Dictionary=peer_map_downloads[peer];var offers=map_stream.offers()
+	var slot: Dictionary=peer_map_downloads[peer];var offers=map_stream.offers(slot.offered)
 	for info in offers:
 		if slot.offered.has(info.id):continue
 		slot.offered[info.id]=info;slot.queue.append(info.id)

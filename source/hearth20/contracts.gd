@@ -204,6 +204,7 @@ static func validate_campaign(campaign: Variant,use_asset_cache=true) -> Diction
 		for player in checked.viewpoints:
 			if not valid_identifier(player) or not valid_identifier(checked.viewpoints[player]):return {"ok":false,"errors":["Invalid character viewpoint identifiers."]}
 	if not Hearth20TavernGames.valid(checked.get("tavern_game",{})):return {"ok":false,"errors":["Invalid casino state."]}
+	if not Hearth20RoomWorlds.valid(checked.get("room_environment","fey_forest")):return {"ok":false,"errors":["Unknown window environment."]}
 	if checked.get("table_mode","map") not in ["map","casino"]:return {"ok":false,"errors":["Unknown seated table mode."]}
 	if not Hearth20CasinoWallet.valid(checked):return {"ok":false,"errors":["Invalid declared casino balances or settlement notices."]}
 	if not Hearth20Refreshments.valid(checked.get("refreshments",{})):return {"ok":false,"errors":["Invalid saved refreshments."]}

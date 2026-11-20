@@ -1,0 +1,89 @@
+{
+  "id": "gold_vault",
+  "coordinate_system": "godot_y_up",
+  "kind": "gaussian",
+  "source_files": {
+    "panorama.png": "f56380ec10d540b36fbc7738177d6d3b26458101b46ecbb4cef20443a3477806",
+    "environment.ply": "ce35a85bb7f23e49ed4e99fe28d38286a50c3bd30edca470eb2d9a84695a27d0"
+  },
+  "lod": "balanced",
+  "schema": "hearth20-window-environment",
+  "version": 1,
+  "meters_per_unit": 1.0,
+  "origin": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "reference_eye": [
+    0.0,
+    1.9600000381469727,
+    2.450000047683716
+  ],
+  "reconstruction_method": "monocular_depth_inferred_gaussians",
+  "source_lighting": "bright golden vault light",
+  "credits": "Original built-in imagegen panorama; depth inference with Depth Anything V2 Small Apache-2.0; Hearth20 anisotropic surface reconstruction.",
+  "known_limitations": [
+    "Monocular relative-depth inference, not a multi-view trained or measured capture.",
+    "Meter scale is artist-normalized, not measured from a real forest or building.",
+    "Single-surface reconstruction cannot recover genuinely hidden backsides.",
+    "Large camera translations may expose disocclusions; panorama fallback fills holes.",
+    "Source panorama detail limits reconstructed angular resolution.",
+    "Static baked source lighting; independent fireflies/torch positions are separate."
+  ],
+  "model_provenance": {
+    "code_repository": "https://github.com/DepthAnything/Depth-Anything-V2",
+    "code_commit": "a561b849ebae10a6f5ef49e26c83cbbcd36c71bf",
+    "code_files": 14,
+    "model_repository": "depth-anything/Depth-Anything-V2-Small",
+    "model_revision": "03876f8651c73a60fe4c2c48294e09fcb6838fcf",
+    "model_sha256": "715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378",
+    "license": "Apache-2.0 (Small only)",
+    "model_bytes": 99218434
+  },
+  "lods": {
+    "balanced": {
+      "file": "environment.ply",
+      "point_count": 153390,
+      "bounds_min": [
+        -56.94237726643922,
+        -12.286181310407994,
+        -53.89287318760254
+      ],
+      "bounds_max": [
+        57.26992621768272,
+        57.814031151288226,
+        54.603671846057225
+      ],
+      "sha256": "ce35a85bb7f23e49ed4e99fe28d38286a50c3bd30edca470eb2d9a84695a27d0",
+      "bytes": 8590291
+    },
+    "low": {
+      "file": "environment-low.ply",
+      "point_count": 35952,
+      "bounds_min": [
+        -56.908422768846144,
+        -12.286181310407994,
+        -53.89287318760254
+      ],
+      "bounds_max": [
+        57.249637002088164,
+        57.814031151288226,
+        54.603671846057225
+      ],
+      "sha256": "2dd6d673f3fd120825f78ec52f4d93a26093305767a8a76f038d97b10c729416",
+      "bytes": 2013762
+    }
+  },
+  "point_count": 153390,
+  "bounds_min": [
+    -56.942378997802734,
+    -12.286181449890137,
+    -53.89287185668945
+  ],
+  "bounds_max": [
+    57.269927978515625,
+    57.814029693603516,
+    54.60367202758789
+  ]
+}

@@ -4,7 +4,9 @@
 
 A black-and-gold virtual tabletop with a first-person fantasy tavern, private D&D Beyond sheets and four multiplayer casino games.
 
-Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.22](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.22-beta)
+Download the Windows x64 portable from the regular release. Open **Hearth20_Beta_Portable.exe** to play. The player edition includes the guided host/join flow. Diagnostics and the local testing lab are available in the separate development build. [Hearth20 Beta 0.3.23](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.23-beta)
+
+**0.3.23** rebuilds the tavern and adds four shared exterior views. It fixes casino settlements, journal switching, hero placement, duplicate map downloads and map FX. Read the [release notes](https://github.com/WonderingMage/Hearth20/releases/tag/hearth20-beta-v0.3.23-beta).
 
 **0.3.22** removes the accidental gold bounding box around unfinished drawings. In **Select (V)**, drag empty board space to box-select drawings on the current layer, then press **Backspace** or **Delete**. **Ctrl+Z** restores the group in one step; **Escape** clears selection. Players select/delete only their own drawings. Tokens and custom items retain their existing controls. Use **Space + drag** or the middle mouse button to pan.
 

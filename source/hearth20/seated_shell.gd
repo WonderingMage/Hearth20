@@ -2,6 +2,9 @@ extends Control
 class_name Hearth20SeatedShell
 ## One shared 3D room. Map/sheet focus uses the existing interactive application.
 var app: Hearth20App
+var console: Hearth20SkirtConsole
+var console_button: Button
+var jax_alert: Hearth20JaxAlert
 var table: Hearth20CasinoTable
 var map_viewport: SubViewport
 var focus_surface: SubViewportContainer
@@ -50,6 +53,7 @@ func _ready() -> void:
 	focus_surface=SubViewportContainer.new();focus_surface.name="FocusedTableSurface";focus_surface.stretch=true;focus_surface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);focus_surface.z_index=700;add_child(focus_surface)
 	map_viewport=SubViewport.new();map_viewport.name="TableUi";map_viewport.size=Vector2i(1440,900);map_viewport.handle_input_locally=true;map_viewport.gui_embed_subwindows=true;focus_surface.add_child(map_viewport)
 	app=Hearth20App.new();app.name="TableApplication";app.seated_shell=self;app.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);map_viewport.add_child(app)
+	jax_alert=Hearth20JaxAlert.new();add_child(jax_alert);app.session.jax_alert_received.connect(jax_alert.trigger);app.session.jax_alert_cancelled.connect(jax_alert.dismiss)
 	# Canvas notifications/rolls belong to this player's screen, not the map texture.
 	app.casino_portal.balance_notice.reparent(self)
 	# The focused map is at 700; rolls must composite above it on the player's screen.
@@ -71,6 +75,7 @@ func _prepare_table() -> void:
 	refreshments=Hearth20RefreshmentTray.new();add_child(refreshments);refreshments.setup(self)
 	_build_map();_camera(1.);map_viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
 	company=Hearth20TableCompany.new();table.world.add_child(company);company.setup(app.session)
+	console=Hearth20SkirtConsole.new();table.world.add_child(console);console.setup(self)
 	# Compile each room-facing material/light combination behind the loading screen.
 	for direction in 8:
 		if is_instance_valid(loading_bar):loading_bar.value=80.+direction*2.
@@ -99,7 +104,8 @@ func _build_hud() -> void:
 	var row=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;col.add_child(row)
 	_button(row,"Focus battlemap",func():focus_map());_button(row,"Peek at my sheet",focus_sheet);_button(row,"Look up",toggle_pulls)
 	_button(row,"Refreshments",func():refreshments.glance())
-	_button(row,"⚙ Settings",func():app.open_preferences())
+	console_button=_button(row,"Table controls",func():look_up=false;look=Vector2(0,-1.1));console_button.tooltip_text="Look down at the DM’s physical window-world and music buttons"
+	_button(row,"âš™ Settings",func():app.open_preferences())
 	home_row=HBoxContainer.new();home_row.alignment=BoxContainer.ALIGNMENT_CENTER;home_row.anchor_left=.28;home_row.anchor_right=.72;home_row.offset_top=76;home_row.offset_bottom=116;hud.add_child(home_row)
 	_button(home_row,"Host a game",func():app.open_connections("host"));_button(home_row,"Join a game",func():app.open_connections("join"));_button(home_row,"Open campaign",func():focus_map();app._load_campaign())
 	back=Button.new();back.text="↙";back.tooltip_text="Back to the table";back.custom_minimum_size=Vector2(40,36);back.size_flags_vertical=Control.SIZE_SHRINK_CENTER;back.pressed.connect(leave_focus);app.shell.toolbar.add_child(back);app.shell.toolbar.move_child(back,0);back.hide()
@@ -205,13 +211,16 @@ func _camera(delta: float) -> void:
 func _process(delta: float) -> void:
 	if not ready_to_show:return
 	elapsed+=delta;viewport_tick+=delta
+	var exterior=table.room.get_node_or_null("WindowWorld")
+	if exterior!=null:exterior.request(app.session.room_environment())
+	console_button.visible=app.session.local_role=="dm"
 	look_button.visible=focus_state=="table" and not switching and not app.session.is_spectating() and not table.book.opened
 	if desired_mode()!=requested_mode and not switching:requested_mode=desired_mode();_switch(requested_mode)
 	if focus_state=="table":
 		_camera(delta)
-		hud.visible=current_mode=="map" and not looking
-		if current_mode=="casino" and is_instance_valid(app.casino_portal.hud):app.casino_portal.hud.visible=not look_up and not looking and not switching and not table.book.opened and not app.session.is_spectating()
-		if is_instance_valid(app.casino_portal.book_nav):app.casino_portal.book_nav.visible=not look_up and not looking
+		hud.visible=current_mode=="map" and not looking and look_blend.y>-.55
+		if current_mode=="casino" and is_instance_valid(app.casino_portal.hud):app.casino_portal.hud.visible=not look_up and not looking and look_blend.y>-.55 and not switching and not table.book.opened and not app.session.is_spectating()
+		if is_instance_valid(app.casino_portal.book_nav):app.casino_portal.book_nav.visible=not look_up and not looking and look_blend.y>-.55
 		var online=not (app.session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer);home_row.visible=not online and current_mode=="map"
 		mode_label.text="THE ADVENTURE TABLE" if current_mode=="map" else "THE GILDED CASINO"
 		hint.text="Drag a wooden pull down to choose the table" if look_up and app.session.local_role=="dm" else "Only the DM can pull the mode ropes" if look_up else "Click the map or character sheet · Right-drag to look around"
@@ -245,6 +254,15 @@ func _update_sheet_preview() -> void:
 func _input(event: InputEvent) -> void:
 	if not ready_to_show or focus_state!="table" or switching:return
 	if has_modal():return
+	if is_instance_valid(console):
+		if event is InputEventMouseMotion:console.hovered=console.hit(table.camera,event.position*Vector2(table.viewport.size)/size)
+		if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
+			var hit=console.hit(table.camera,event.position*Vector2(table.viewport.size)/size)
+			if event.pressed and not hit.is_empty():console.held=hit;get_viewport().set_input_as_handled();return
+			if not event.pressed and not console.held.is_empty():
+				var pressed=console.held;console.held=""
+				if hit==pressed:console.activate(hit)
+				get_viewport().set_input_as_handled();return
 	if is_instance_valid(refreshments) and refreshments.menu.visible:return
 	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT:
 		looking=event.pressed;get_viewport().set_input_as_handled();return

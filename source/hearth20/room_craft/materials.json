@@ -1,0 +1,47 @@
+{
+  "wood-006": {
+    "name": "Wood 06",
+    "category": "Wood",
+    "root": "res://assets/materials/wood-006",
+    "tile_meters": 2.0,
+    "map_source": "approximate derived detail",
+    "source": "40 Free Wood Textures.zip :: Wooden Planks (1).png",
+    "source_sha256": "dd0fd251894a9f54b044f881653adff102620a94e44f5f7ba97a819fadab03bf",
+    "channels": [
+      "albedo",
+      "normal",
+      "roughness",
+      "height"
+    ]
+  },
+  "wood-004": {
+    "name": "Wood 04",
+    "category": "Wood",
+    "root": "res://assets/materials/wood-004",
+    "tile_meters": 2.0,
+    "map_source": "approximate derived detail",
+    "source": "40 Free Wood Textures.zip :: wooden floor (9).png",
+    "source_sha256": "9f711abc922c8651ad391a636674d3784612d08998413cf7770137741cb24acc",
+    "channels": [
+      "albedo",
+      "normal",
+      "roughness",
+      "height"
+    ]
+  },
+  "stone-023": {
+    "name": "Stylized stone 23",
+    "category": "Stylized stone",
+    "root": "res://assets/materials/stone-023",
+    "tile_meters": 2.0,
+    "map_source": "approximate derived detail",
+    "source": "50 Free Stylized Wall Textures.zip :: 17-32/Asset 7.png",
+    "source_sha256": "a97a68c006e6bacba22e652ff56d61f5b8db714d649fcf8a1c16e07928550233",
+    "channels": [
+      "albedo",
+      "normal",
+      "roughness",
+      "height"
+    ]
+  }
+}

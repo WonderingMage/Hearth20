@@ -84,12 +84,13 @@ static func add_to_campaign(campaign: Dictionary, map_id: String, move_party: bo
 		var asset_id:=Hearth20Assets.store_asset(proposed,checked_prop,"token")
 		proposed.actors.append({"id":str(prepared.id)+"-scenery","name":"Chandelier" if prop.asset=="brass-chandelier" else "Oak canopy","scene_id":prepared.id,"position":prop.position,"is_hero":false,"hidden":false,"owner_player_id":"","layer":"foreground","decorative":true,"token_size":prop.size,"png_asset_id":asset_id})
 	if move_party:
+		var heroes: Array=proposed.actors.filter(func(actor):return actor.get("is_hero",false) and not actor.get("in_inventory",false))
+		var places:=Hearth20TokenInventory.party_positions(prepared,prepared.library_entry,heroes.size())
+		if places.size()<heroes.size():return {"ok":false,"error":"This map does not have enough clear squares for the party."}
 		var index:=0
-		for actor in proposed.actors:
-			if not bool(actor.get("is_hero",false)) or actor.get("in_inventory",false): continue
-			var entry: Dictionary=prepared.library_entry[index%prepared.library_entry.size()]
+		for actor in heroes:
 			actor.scene_id=prepared.id
-			actor.position=Hearth20TokenInventory.snap_position(prepared,Vector2(float(entry.x),float(entry.y)))
+			actor.position=places[index]
 			index+=1
 	proposed.revision=int(proposed.get("revision",0))+1
 	discard_empty_starter(proposed,prepared.id)

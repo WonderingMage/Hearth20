@@ -44,6 +44,8 @@ func refresh(force=false) -> void:
 	target.visible=dm
 	var roster=str(app.campaign.get("participants",{})) if dm else ""
 	if dm and roster_key!=roster:
+		if not app.campaign.get("participants",{}).has(selected):
+			selected="dm-local"
 		roster_key=roster;target.clear();target.add_item("My personal notes");target.set_item_metadata(0,"dm-local")
 		for id in app.campaign.get("participants",{}):
 			target.add_item(str(app.campaign.participants[id].get("display_name","Player"))+" · saved notes");target.set_item_metadata(target.item_count-1,id)

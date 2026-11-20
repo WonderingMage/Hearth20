@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[sub_resource type="Shader" id="Sky"]
+code = "shader_type spatial;
+render_mode unshaded,cull_disabled;
+void fragment(){
+ float cloud=sin(UV.x*9.+UV.y*7.)*sin(UV.x*4.-UV.y*12.);
+ vec3 sky=mix(vec3(.66,.76,.87),vec3(.93,.82,.61),smoothstep(.05,.95,UV.y));
+ ALBEDO=sky*(.78+cloud*.035);EMISSION=sky*.18;ROUGHNESS=1.;
+}"
+
+[resource]
+shader = SubResource("Sky")

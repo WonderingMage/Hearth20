@@ -35,6 +35,7 @@ func scan(campaign: Dictionary,priority="") -> void:
 		else:queue.append(item)
 	latest=live
 	# Foreground PNGs are independent files so shared scenery is downloaded once.
+	foreground_keys.clear()
 	for actor in campaign.get("actors",[]):
 		var asset_id=str(actor.get("png_asset_id",""))
 		if not actor.get("decorative",false) or asset_id.is_empty():continue
@@ -91,9 +92,14 @@ static func descriptor(record: Dictionary) -> Dictionary:
 	var result={}
 	for key in ["id","cipher_sha256","size","key","iv","plain_size","map_sha256"]:result[key]=record[key]
 	return result
-func offers() -> Array:
+func offers(previously_offered: Dictionary = {}) -> Array:
 	var result=[];var ids={}
-	for record in records.values():
+	var current_keys=latest.values()+foreground_keys.values()
+	for key in records:
+		var record: Dictionary=records[key]
+		# Existing peers may still be receiving an old revision. A new peer
+		# only needs the latest revision of each loaded scene.
+		if key not in current_keys and not previously_offered.has(record.id):continue
 		if ids.has(record.id):continue
 		ids[record.id]=true;result.append({"id":record.id,"size":record.size,"sha256":record.cipher_sha256,"kind":record.kind})
 	return result

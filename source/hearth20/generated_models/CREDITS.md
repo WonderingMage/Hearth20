@@ -8,12 +8,28 @@ The replacement D20 pendant was supplied as `ComfyUI_00080.glb` on November 15, 
 
 These additional kits were supplied in the same folder:
 
-- "Stylized Low-poly Wooden beam" by Rocco Giandomenico: https://sketchfab.com/3d-models/stylized-low-poly-wooden-beam-01b16abea26646c8ba334c905374f83e — author: https://sketchfab.com/Rocco.Giandomenico
-- "Stylized Modular Stonewalls" by @blue.blender.print: https://sketchfab.com/3d-models/stylized-modular-stonewalls-4477c00b74574ab9a413dfd76e2362ce — author: https://sketchfab.com/arobaco
-- "Tileable Stylized Wooden Floor Texture" by JennyB: https://sketchfab.com/3d-models/tileable-stylized-wooden-floor-texture-167a3fd14d65456dacfacd9eee793e6f — author: https://sketchfab.com/jenny77
+- "Stylized Low-poly Wooden beam" by Rocco Giandomenico: https://sketchfab.com/3d-models/stylized-low-poly-wooden-beam-01b16abea26646c8ba334c905374f83e â€” author: https://sketchfab.com/Rocco.Giandomenico
+- "Stylized Modular Stonewalls" by @blue.blender.print: https://sketchfab.com/3d-models/stylized-modular-stonewalls-4477c00b74574ab9a413dfd76e2362ce â€” author: https://sketchfab.com/arobaco
+- "Tileable Stylized Wooden Floor Texture" by JennyB: https://sketchfab.com/3d-models/tileable-stylized-wooden-floor-texture-167a3fd14d65456dacfacd9eee793e6f â€” author: https://sketchfab.com/jenny77
 
 All three kits are licensed under Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/
 
 Modifications: Godot conversion, stripped unused static vertex channels, resized and block-compressed textures with mipmaps, material finish adjustments, fitted/rotated/instanced meshes, selected atlas regions and projection backfill for the reconstructed room. The authors do not endorse Hearth20.
 
 The room uses a reduced image-grid mesh with its original photo and UV mapping; the main table uses a simplified mesh preserving its UVs. Detached fragments were removed from selected generated props. Animated rulebook, live map/sheet surfaces, special dice and the supplied animated lizard remain separate from the static replacements.
+
+
+## Unreleased room craft update — November 18, 2026
+
+The active room now uses modeled masonry, beveled floor planks, timber structure,
+recessed windows, and rigidly oriented, uniformly scaled furniture. The historical
+image-depth room and three modular texture/geometry kits remain archived in the
+catalog but are no longer preloaded for the active room. The main interactive
+table and its existing props remain in use.
+
+The floor/timber material comes from the owner's supplied 40 Free Wood Textures
+pack. Original limestone albedo, boss tapestries (Vecna, Tiamat, Strahd, Tarrasque),
+and the 16-frame flame atlas were generated with the built-in image generation
+tool for this project. Exact prompts are retained under hearth20/room_craft.
+Auxiliary limestone normal/height/roughness maps are approximate derived detail;
+block relief, bevels and board height variation are actual geometry.

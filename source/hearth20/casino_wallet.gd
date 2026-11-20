@@ -110,6 +110,6 @@ static func valid(campaign: Dictionary) -> bool:
 		for key in ["id","game_id","actor_id","player_id"]:
 			if not r.get(key) is String or r[key].length()>256 or r[key].is_empty():return false
 		if ids.has(r.id) or not r.get("acknowledged") is bool or not r.get("name") is String or r.name.length()>64 or r.get("kind") not in ["payout","refund"]:return false
-		if not Hearth20CasinoGames.integer(r.get("before_cp")) or not Hearth20CasinoGames.integer(r.get("after_cp")) or not Hearth20Contracts._integer_number(r.get("delta_cp")) or r.delta_cp!=r.after_cp-r.before_cp:return false
+		if not Hearth20CasinoGames.integer(r.get("before_cp")) or not Hearth20CasinoGames.integer(r.get("after_cp"),0,Hearth20TavernGames.MAX_SETTLED_CP) or not Hearth20Contracts._integer_number(r.get("delta_cp")) or r.delta_cp!=r.after_cp-r.before_cp:return false
 		ids[r.id]=true
 	return true

@@ -7,6 +7,9 @@ const SPECIAL={"Bahamut":13,"Dracolich":10,"Tiamat":13,"Archmage":9,"Dragonslaye
 const TINTS=["#6b6265","#4477a8","#be984b","#7f8c68","#ad724b","#cfad55","#4d7947","#b74b35","#a1adbc","#b6c5c8"]
 const POWER={"Black":"Take 3 from the stakes.","Blue":"Choose tribute or a larger pot.","Brass":"Right neighbor: stronger good card or 5 coins.","Bronze":"Take two lowest ante cards.","Copper":"Replace with a triggered draw.","Gold":"Draw for your good dragons.","Green":"Left neighbor: weaker evil card or 5 coins.","Red":"Strongest opponent: 1 coin and a random card.","Silver":"Good flights draw a card.","White":"Weakest opponent pays 2.","Bahamut":"Mixed opponents pay 10; avoid evil allies.","Dracolich":"Triggered: +2 per evil dragon at scoring.","Tiamat":"Five evil colors; avoid good allies.","Archmage":"Later plays always trigger.","Dragonslayer":"Remove a dragon below 8.","Druid":"Lowest flight wins this gambit.","Fool":"Draw for stronger opposing flights.","Priest":"Winner shares stakes with left neighbor.","Princess":"Retrigger your good dragons in chosen order.","Thief":"Take 7 from the stakes."}
 const MAX_CP=100000000000
+# A legal buy-in can return more than the largest initial declaration.
+# The validated live table can settle up to MAX_CP in addition to that declaration.
+const MAX_SETTLED_CP=2*MAX_CP
 static var catalog: Dictionary={}
 static func cards() -> Dictionary:
 	if not catalog.is_empty():return catalog
@@ -24,9 +27,9 @@ static func purse(actor: Dictionary) -> int:
 	if not coins is Dictionary:return -1
 	for spec in [["cp",1],["sp",10],["ep",50],["gp",100],["pp",1000]]:
 		var value=coins.get(spec[0],0)
-		if not Hearth20Contracts._integer_number(value) or value<0 or value>MAX_CP:return -1
+		if not Hearth20Contracts._integer_number(value) or value<0 or value>MAX_SETTLED_CP:return -1
 		total+=int(value)*int(spec[1])
-	return total if total<=MAX_CP else -1
+	return total if total<=MAX_SETTLED_CP else -1
 static func set_purse(actor: Dictionary, cp: int) -> void:
 	actor.coins={"pp":0,"gp":cp/100,"ep":0,"sp":(cp%100)/10,"cp":cp%10}
 static func locked(g: Dictionary) -> bool:return not g.is_empty() and g.get("escrow_cp",0)>0
@@ -354,7 +357,7 @@ static func _apply_game(campaign: Dictionary, principal: String, command: Dictio
 	if not valid(g):return _fail("The card state is invalid. The previous state was preserved.")
 	for delta in deltas:
 		var actor=Hearth20Contracts.find_actor(campaign,str(delta.id));var balance=purse(actor)
-		if actor.is_empty() or balance<0 or balance+int(delta.cp)<0 or balance+int(delta.cp)>MAX_CP:return _fail("The character purse changed or is unavailable. No transaction was committed.")
+		if actor.is_empty() or balance<0 or balance+int(delta.cp)<0 or balance+int(delta.cp)>MAX_SETTLED_CP:return _fail("The character purse changed or is unavailable. No transaction was committed.")
 	for delta in deltas:
 		var actor=Hearth20Contracts.find_actor(campaign,str(delta.id));var balance=purse(actor);set_purse(actor,balance+int(delta.cp))
 		if not campaign.get("tavern_ledger") is Array:campaign.tavern_ledger=[]

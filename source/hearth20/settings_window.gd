@@ -66,8 +66,9 @@ func _build() -> void:
 	for index in maxi(1,DisplayServer.get_screen_count()):monitors.append(["Display "+str(index+1),index])
 	choice(display,"Monitor","monitor",monitors);choice(display,"Frame-rate limit","fps",[["30 FPS",30],["45 FPS",45],["60 FPS",60],["90 FPS",90],["120 FPS",120],["144 FPS",144],["Uncapped",0]])
 	choice(display,"When in background","background_fps",[["30 FPS",30],["45 FPS",45],["60 FPS",60]])
-	choice(display,"3D edge smoothing","quality",[["Performance · no MSAA",0],["Balanced · original detail",1],["Cinematic · 4× MSAA",2]])
+	choice(display,"3D detail & lighting","quality",[["Performance · light shafts off",0],["Balanced · soft light shafts",1],["Cinematic · detailed light shafts",2]]).tooltip_text="Controls edge smoothing and volumetric sunlight. Performance removes atmospheric light shafts; Balanced and Cinematic retain them."
 	toggle(display,"Synchronize frames with the display (VSync)","vsync")
+	toggle(display,"Reduce flashes in table alerts","reduce_flashes")
 	var audio=page("Audio");note(audio,"Volumes belong to this device. Adjust party sounds, the creature videos and the wake-up voice independently.")
 	var devices=[]
 	for device in AudioServer.get_output_device_list():devices.append(["System default" if device=="Default" else device,device])
@@ -76,6 +77,7 @@ func _build() -> void:
 		var line=row(audio,entry[0]);var slider=HSlider.new();slider.min_value=0;slider.max_value=100;slider.step=1;slider.value=float(pending[entry[1]])*100.;slider.size_flags_horizontal=Control.SIZE_EXPAND_FILL;line.add_child(slider);var percent=Label.new();percent.custom_minimum_size.x=48;percent.text=str(roundi(slider.value))+"%";line.add_child(percent)
 		var key=entry[1];slider.value_changed.connect(func(value):pending[key]=value/100.;percent.text=str(roundi(value))+"%";Hearth20Preferences.apply_audio(pending))
 	toggle(audio,"Mute while Hearth20 is in the background","mute_unfocused");button(audio,"♪ Play a sound preview",_sound_preview)
+	toggle(audio,"Allow the table’s Jax alert (Esc dismisses it)","table_alerts")
 	var updates=page("Updates");note(updates,"HEARTH20 BETA · "+Hearth20Identity.VERSION+"\nOfficial updates: WonderingMage/Hearth20 on GitHub. Campaigns, player identities, settings and website sign-in remain in your local profile.")
 	toggle(updates,"Check for updates when Hearth20 opens","startup_updates")
 	update_channel=choice(updates,"Update channel","update_channel",[["Beta releases","beta"],["Beta + Steam test builds","steam-test"]])

@@ -63,6 +63,8 @@ func setup(textures: Dictionary) -> void:
 	var key=DirectionalLight3D.new();key.rotation_degrees=Vector3(-58,-24,0);key.light_color=Color("#ffd298");key.light_energy=.75;key.shadow_enabled=true;key.directional_shadow_max_distance=15;world.add_child(key)
 	bronze=_surface(2,.72,.38);wood=_surface(0,.04,.83);felt=_surface(1,0,.97)
 	room=Hearth20TavernRoom.new();world.add_child(room);room.setup(self)
+	if room.get_meta("crafted_room",false):
+		key.light_energy=.24;key.shadow_enabled=false;env.ambient_light_color=Color("#aebed0");env.ambient_light_energy=.40
 	var crafted_table=Hearth20GeneratedModels.make("table",Vector3(6.4,.84,4.4))
 	if crafted_table!=null:world.add_child(crafted_table)
 	else:
@@ -79,6 +81,7 @@ func setup(textures: Dictionary) -> void:
 		_coin(at,.052,center_props)
 	for i in 8:
 		var deck=_bevel(Vector3(.47,.012,.71),.013,_card_material("",true));deck.position=Vector3(-.74,.86+i*.012,-.15);deck.rotation.y=-.15;stock_deck.add_child(deck)
+	room.finish_lighting()
 	_card_layer();game_view=Hearth20CasinoGameView.new();add_child(game_view);game_view.setup(self);_dust();material=_post();gui_input.connect(_input_table);mouse_exited.connect(func():hovered="";card_hovered.emit(""));resized.connect(_resolution);_resolution()
 func _card_layer() -> void:
 	# The presentation world has no table, props or environment depth buffer.
@@ -127,7 +130,7 @@ func _coin(at: Vector3, radius: float, parent: Node3D=null) -> void:
 	var crafted=Hearth20GeneratedModels.make("dragon_coin",Vector3(radius*2,.014,radius*2))
 	if crafted!=null:crafted.position=at;owner_node.add_child(crafted);return
 	_lathe(owner_node,at,[[0.,0],[radius,0],[radius,.009],[radius*.94,.014],[0.,.014]],1,1,bronze,16)
-	var text=_letters("✧",.07,.001,Color("#d7b45c"));text.position=at+Vector3(0,.016,0);text.rotation.x=-PI/2;owner_node.add_child(text)
+	var text=_letters("Ã¢Å“Â§",.07,.001,Color("#d7b45c"));text.position=at+Vector3(0,.016,0);text.rotation.x=-PI/2;owner_node.add_child(text)
 func _letters(text: String, height: float, depth: float, color: Color) -> MeshInstance3D:
 	var mesh=TextMesh.new();mesh.font=Hearth20Design.font(true);mesh.font_size=40;mesh.pixel_size=height/40.;mesh.depth=depth;mesh.text=text
 	var node=MeshInstance3D.new();node.mesh=mesh;var mat=StandardMaterial3D.new();mat.albedo_color=color;mat.roughness=.64;mat.metallic=.24;node.material_override=mat;return node
@@ -138,9 +141,8 @@ func _candle(at: Vector3) -> void:
 		_lathe(world,at,[[0.,0],[.16,0],[.17,.025],[.11,.05],[.055,.10],[.035,.22],[.065,.26],[.10,.28],[.10,.3],[0.,.3]],1,1,bronze,24)
 		var wax=StandardMaterial3D.new();wax.albedo_color=Color("#ccaf7b");wax.roughness=.94
 		_lathe(world,at,[[.055,.3],[.06,.32],[.052,.5],[.048,.53],[.04,.52],[0.,.52]],1,1,wax,16)
-	var flame=MeshInstance3D.new();var mesh=QuadMesh.new();mesh.size=Vector2(.10,.20);flame.mesh=mesh;flame.position=at+Vector3(0,.62,0)
-	var shader=Shader.new();shader.code="""shader_type spatial;render_mode unshaded,cull_disabled,depth_draw_never;void vertex(){VERTEX.x+=sin(TIME*9.+UV.y*7.)*.01*UV.y;}void fragment(){vec2 p=(UV-.5)*vec2(2.,1.3);float a=pow(max(0.,1.-length(p*vec2(1.+UV.y,1.))),2.);ALBEDO=mix(vec3(1.,.20,.01),vec3(1.,.9,.50),a);EMISSION=ALBEDO*2.;ALPHA=a;}"""
-	var mat=ShaderMaterial.new();mat.shader=shader;flame.material_override=mat;flame.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;world.add_child(flame)
+	var flame=MeshInstance3D.new();flame.name="UprightCandleFlame";var mesh=QuadMesh.new();mesh.size=Vector2(.10,.20);flame.mesh=mesh;flame.position=at+Vector3(0,.53+Hearth20RoomFlame.center_above_wick(.20),0)
+	flame.material_override=Hearth20RoomFlame.material(at.x*17.);flame.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;flame.set_meta("wick_y",at.y+.53);flame.set_meta("flame_height",.20);world.add_child(flame)
 	var light=OmniLight3D.new();light.position=at+Vector3(0,.65,0);light.light_color=Color("#ffc277");light.light_energy=2.;light.omni_range=4.5;light.shadow_enabled=true;world.add_child(light);candles.append(light)
 func _goblet(at: Vector3) -> void:
 	var crafted=Hearth20GeneratedModels.make("goblet",Vector3(.32,.40,.32))

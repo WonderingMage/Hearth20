@@ -1,0 +1,1 @@
+AI-generated albedo using the built-in image_gen tool; exact prompt in prompt.txt. Normal/height/roughness are approximate derived micro-detail, not measured scan channels. Masonry thickness, bevels and block depth are modeled geometry.

@@ -23,3 +23,6 @@ window/size/viewport_height=800
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+
+[gdgs]
+rendering/backend="Raster"
