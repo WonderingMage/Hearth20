@@ -951,7 +951,7 @@ func set_scene_lighting(enabled: bool, ambient: String = "dark") -> Dictionary:
 	_broadcast_snapshots()
 	return {"ok": true}
 
-func load_sample_map(map_id: String, move_party: bool = true) -> Dictionary:
+func load_sample_map(map_id: String, move_party: bool = false) -> Dictionary:
 	if local_role!="dm": return {"ok":false,"error":"Only the DM loads campaign maps."}
 	var result:=Hearth20MapLibrary.add_to_campaign(campaign,map_id,move_party)
 	if bool(result.get("ok",false)):
@@ -980,7 +980,7 @@ func set_grid_style(opacity: float, thickness: float, color: String) -> Dictiona
 	_broadcast_snapshots()
 	return {"ok":true}
 
-func switch_library_scene(scene_id: String, move_party: bool = true, include_stored: bool=false) -> Dictionary:
+func switch_library_scene(scene_id: String, move_party: bool = false, include_stored: bool=false) -> Dictionary:
 	if local_role!="dm": return {"ok":false,"error":"Only the DM switches campaign scenes."}
 	var scene:=Hearth20Contracts.find_scene(campaign,scene_id)
 	if scene.is_empty(): return {"ok":false,"error":"The selected campaign scene no longer exists."}
@@ -1004,6 +1004,58 @@ func switch_library_scene(scene_id: String, move_party: bool = true, include_sto
 	_broadcast_snapshots()
 	return {"ok":true,"id":scene_id,"title":str(scene.get("title","Scene"))}
 
+func delete_library_scene(scene_id: String) -> Dictionary:
+	if local_role!="dm": return {"ok":false,"error":"Only the DM deletes campaign maps."}
+	var scene:=Hearth20Contracts.find_scene(campaign,scene_id)
+	if scene.is_empty(): return {"ok":false,"error":"The selected campaign scene no longer exists."}
+	var proposed:=campaign.duplicate(true)
+	var removed_index: int=campaign.scenes.find(scene)
+	proposed.scenes.remove_at(removed_index)
+	if proposed.scenes.is_empty():
+		var starter: Dictionary=Hearth20Identity.new_campaign().scenes[0]
+		starter.blackout=bool(proposed.get("map_covered",false))
+		proposed.scenes.append(starter)
+	if proposed.active_scene==scene_id:
+		proposed.active_scene=proposed.scenes[mini(removed_index,proposed.scenes.size()-1)].id
+	var removed_art: Dictionary={}
+	removed_art[str(scene.get("map_asset",""))]=true
+	var kept_actors: Array=[]
+	for actor in proposed.actors:
+		if actor.scene_id==scene_id:
+			if actor.get("decorative",false):
+				removed_art[str(actor.get("png_asset_id",""))]=true
+				continue
+			# Stored tokens still need a valid scene for existing saves.
+			actor.scene_id=proposed.active_scene
+			actor.position=Vector2(0.5,0.5)
+			actor.in_inventory=true
+		kept_actors.append(actor)
+	proposed.actors=kept_actors
+	for item in proposed.get("custom_items",[]):
+		if item.scene_id==scene_id:
+			item.scene_id=""
+			if item.holder.is_empty():item.holder="dm-local"
+		removed_art.erase(item.png_asset_id)
+	for retained in kept_actors:removed_art.erase(str(retained.get("png_asset_id","")))
+	for remaining in proposed.scenes:removed_art.erase(str(remaining.get("map_asset","")))
+	for asset_id in removed_art:proposed.assets.erase(asset_id)
+	proposed.revision=int(proposed.get("revision",0))+1
+	var checked:=Hearth20Contracts.validate_campaign(proposed)
+	if not checked.ok:return {"ok":false,"error":"; ".join(checked.errors)}
+	campaign.merge(proposed,true)
+	template_undo=template_undo.filter(func(entry):return entry.scene_id!=scene_id)
+	for player in board_undo:
+		board_undo[player]=board_undo[player].filter(func(entry):return entry.scene!=scene_id)
+	# Offered files remain encrypted, but deleted scenes no longer generate new work.
+	map_stream.queue=map_stream.queue.filter(func(work):return work.scene!=scene_id)
+	if map_stream.work_scene==scene_id:
+		map_stream.work_key=""
+		map_stream.work_scene=""
+	projection_cache.clear()
+	sight_cache.clear()
+	_broadcast_snapshots()
+	return {"ok":true,"id":scene_id,"title":str(scene.get("title","Scene")),"active_scene":str(campaign.active_scene)}
+
 func set_blackout(enabled: bool) -> Dictionary:
 	if local_role != "dm":
 		return {"ok": false, "error": "Only the DM covers the table."}
@@ -1021,9 +1073,20 @@ func _sync_map_cover() -> void:
 
 func import_map_package(path: String) -> Dictionary:
 	if local_role!="dm":return {"ok":false,"error":"Only the DM imports campaign maps."}
-	var result:=Hearth20MapPackage.import_into(campaign,path)
+	return _finish_map_import(Hearth20MapPackage.import_into(campaign,path))
+
+func import_map_image(inspected: Dictionary, title: String, columns: int) -> Dictionary:
+	if local_role!="dm":return {"ok":false,"error":"Only the DM imports campaign maps."}
+	return _finish_map_import(Hearth20MapLibrary.add_image_scene(campaign,inspected,title,columns))
+
+func _finish_map_import(result: Dictionary) -> Dictionary:
 	if result.ok:
-		_sync_map_cover();sight_cache.clear();template_undo.clear();board_undo.clear();_broadcast_snapshots()
+		_sync_map_cover()
+		projection_cache.clear()
+		sight_cache.clear()
+		template_undo.clear()
+		board_undo.clear()
+		_broadcast_snapshots()
 	return result
 
 func set_actor_vision(actor_id: String, enabled: bool, darkvision_feet: float = 0.0, bright_light_feet: float = 0.0, dim_light_feet: float = 0.0) -> Dictionary:

@@ -330,7 +330,7 @@ func _build_ui() -> void:
 	files.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	files.add_filter("*.hearth20map, *.png, *.jpg, *.jpeg", "Hearth20 maps and images")
 	files.file_selected.connect(_on_map_selected)
-	files.title="Choose a battlemap · Cancel returns to your table"
+	files.title="Add a new map · Choose a package or image"
 	files.use_native_dialog=OS.get_name()=="Windows"
 	files.canceled.connect(_cancel_map_dialog);files.close_requested.connect(_cancel_map_dialog)
 	(seated_shell if seated_shell!=null else self).add_child(files)
@@ -975,10 +975,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _build_scene_section(parent: VBoxContainer) -> void:
 	_add_header(parent, "MAP SETUP")
 	var intro := Label.new()
-	intro.text = "Bring in your own battle map, then align its 5-foot grid. The artwork stays separate from walls, doors, fog and tokens."
+	intro.text = "Add a new battlemap or adjust the grid on the map you have open."
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(intro)
-	map_import_button = _add_button(parent, "Import map package / image…", _open_map_dialog)
+	map_import_button = _add_button(parent, "Add map from file…", _open_map_dialog)
 	_accent_button(map_import_button)
 	var library_button:=_add_button(parent,"Browse 15 sample maps…",_open_map_library)
 	library_button.icon=Hearth20Design.icon("map",18)
@@ -1004,6 +1004,8 @@ func _build_scene_section(parent: VBoxContainer) -> void:
 	grid_scale_edit.value = 100
 	grid_scale_edit.suffix = "% scale"
 	parent.add_child(grid_scale_edit)
+	Hearth20Design.track_number(grid_cells_edit)
+	Hearth20Design.track_number(grid_scale_edit)
 	_add_button(parent, "Apply grid scale", _apply_grid_calibration)
 	var calibration_note := Label.new()
 	calibration_note.text = "Width calibration assumes the grid begins at the image's top-left. Border and offset anchor calibration is pending."
@@ -1147,25 +1149,19 @@ func _build_token_section(parent: VBoxContainer) -> void:
 	_add_button(parent, "Apply movement policy", _apply_movement)
 
 func _apply_grid_calibration() -> void:
-	var previous_revision := int(campaign.get("revision", 0))
-	var outcome: Dictionary = board.calibrate_map_width(int(grid_cells_edit.value))
-	if not outcome.get("ok", false):
-		_on_status(str(outcome.get("error", "Grid calibration failed.")))
+	var inputs:=Hearth20Design.commit_numbers([grid_cells_edit,grid_scale_edit])
+	if not inputs.ok:
+		_on_status(str(inputs.error))
 		return
-	var scene: Dictionary = board.current_scene()
-	var factor := float(grid_scale_edit.value) / 100.0
-	scene.cell_pixels = float(scene.cell_pixels) * factor
-	scene.width_cells = maxi(1, ceili(float(scene.get("map_width", 0)) / float(scene.cell_pixels)))
-	scene.height_cells = maxi(1, ceili(float(scene.get("map_height", 0)) / float(scene.cell_pixels)))
-	campaign.revision = int(campaign.get("revision", 0)) + 1
+	var previous_revision:=int(campaign.get("revision",0))
+	var outcome: Dictionary=board.calibrate_map_width(int(grid_cells_edit.value),float(grid_scale_edit.value)/100.0)
+	if not outcome.ok:
+		_on_status(str(outcome.error))
+		return
 	_mark_scene_recovery_revision(previous_revision)
-	board.fit_map()
-	board.queue_redraw()
-	if session and session.local_role == "dm":
-		session._broadcast_snapshots()
-	grid_scale_edit.value = 100.0
+	grid_scale_edit.value=100.0
 	_update_grid_state()
-	_on_status("Grid scale applied. Fine tune between 80% and 120%, then apply again.")
+	_on_status("Grid set to %d × %d squares."%[outcome.width_cells,outcome.height_cells])
 
 func _capture_scene_recovery() -> void:
 	var scene: Dictionary = board.current_scene()
@@ -1409,12 +1405,12 @@ func _open_map_library() -> Hearth20MapLibraryWindow:
 	Hearth20Design.popup_window(window)
 	return window
 
-func _load_sample_map(map_id: String, move_party: bool=true) -> Dictionary:
+func _load_sample_map(map_id: String, move_party: bool=false) -> Dictionary:
 	var result: Dictionary=session.load_sample_map(map_id,move_party)
 	if result.get("ok",false): _finish_library_scene_change(str(result.get("title","Sample map")))
 	return result
 
-func _switch_library_scene(scene_id: String, move_party: bool=true, include_stored: bool=false) -> Dictionary:
+func _switch_library_scene(scene_id: String, move_party: bool=false, include_stored: bool=false) -> Dictionary:
 	var result: Dictionary=session.switch_library_scene(scene_id,move_party,include_stored)
 	if result.get("ok",false): _finish_library_scene_change(str(result.get("title","Scene")))
 	return result
@@ -1429,6 +1425,8 @@ func _finish_library_scene_change(title_value: String) -> void:
 	board.activate_tool("select",true)
 	board.fit_map()
 	scene_recovery.clear()
+	grid_cells_edit.remove_meta("number_draft")
+	grid_scale_edit.remove_meta("number_draft")
 	grid_cells_edit.value=int(board.current_scene().get("width_cells",24))
 	grid_scale_edit.value=100
 	_update_grid_state()
@@ -1437,102 +1435,189 @@ func _finish_library_scene_change(title_value: String) -> void:
 
 func _on_map_selected(path: String) -> void:
 	Hearth20Design.dismiss_file_picker(map_dialog)
+	if session.local_role!="dm":return
 	if path.get_extension().to_lower()=="hearth20map":
 		var imported: Dictionary=session.import_map_package(path)
 		if imported.ok:
 			_finish_library_scene_change(str(imported.title))
-			_on_status("%s · Imported %d × %d cells, %d walls/doors/lights and %d foreground objects. Previous maps are kept in the map tabs."%[imported.title,imported.width_cells,imported.height_cells,imported.annotation_count,imported.foreground_count])
-		else:_on_status(str(imported.get("error","Could not import map package.")))
+			_on_status("Added %s · %d × %d squares, %d walls/doors/lights and %d foreground objects."%[imported.title,imported.width_cells,imported.height_cells,imported.annotation_count,imported.foreground_count])
+		else:
+			_map_import_error(str(imported.get("error","The map package could not be opened.")))
 		return
-	var previous_revision := int(campaign.get("revision", 0))
-	_capture_scene_recovery()
-	var result: Dictionary = board.import_map(path)
-	if not result.get("ok", false):
-		scene_recovery.clear()
-		restore_scene_button.disabled = true
-		_on_status("Map import failed: %s" % result.get("error", "unknown error"))
+	var inspected:=Hearth20Assets.inspect_map_file(path)
+	if not inspected.ok:
+		_map_import_error(str(inspected.error))
 		return
-	_mark_scene_recovery_revision(previous_revision)
-	if result.get("auto_calibrated",false):
-		grid_cells_edit.value=int(result.calibration_width_cells)
-		_on_status("Map ready · %d × %d cells · %s ft per cell. Grid scale read from the image."%[int(result.calibration_width_cells),int(result.height_cells),str(result.feet_per_cell)])
-		_update_grid_state()
+	if not inspected.grid.is_empty():
+		var title:=path.get_file().get_basename().trim_suffix(".hearth20")
+		var imported:=_add_map_image(inspected,title,int(inspected.grid.width_cells))
+		if not imported.ok:_map_import_error(str(imported.error))
 		return
-	_on_status("Map imported (%d × %d px). Set its grid scale to finish setup." % [int(result.width), int(result.height)])
-	_update_grid_state()
-	_calibrate_prompt()
+	_calibrate_prompt(inspected)
 
-func _calibrate_prompt() -> AcceptDialog:
-	var dialog_owner: Node = seated_shell if is_instance_valid(seated_shell) else self
-	var existing := dialog_owner.get_node_or_null("GridCalibration") as AcceptDialog
+func _add_map_image(inspected: Dictionary, title: String, columns: int) -> Dictionary:
+	var imported: Dictionary=session.import_map_image(inspected,title,columns)
+	if imported.ok:
+		_finish_library_scene_change(str(imported.title))
+		_on_status("Added %s · %d × %d squares at %s ft per square."%[imported.title,imported.width_cells,imported.height_cells,str(imported.feet_per_cell).trim_suffix(".0")])
+	return imported
+
+func _map_import_error(message: String) -> void:
+	_on_status(message)
+	var dialog:=AcceptDialog.new()
+	dialog.title="Could not add map"
+	dialog.dialog_text=message
+	dialog.dialog_autowrap=true
+	dialog.theme=Hearth20Design.theme()
+	dialog.size=Vector2i(460,160)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.close_requested.connect(dialog.queue_free)
+	(seated_shell if is_instance_valid(seated_shell) else self).add_child(dialog)
+	Hearth20Design.popup_window(dialog)
+
+func _calibrate_prompt(inspected: Dictionary={}) -> AcceptDialog:
+	var dialog_owner: Node=seated_shell if is_instance_valid(seated_shell) else self
+	var existing:=dialog_owner.get_node_or_null("GridCalibration") as AcceptDialog
 	if is_instance_valid(existing) and not existing.is_queued_for_deletion():
 		Hearth20Design.popup_window(existing)
 		return existing
-	var dialog := ConfirmationDialog.new()
-	dialog.name = "GridCalibration"
-	dialog.title = "Grid calibration"
-	dialog.theme = Hearth20Design.theme()
-	dialog.dialog_hide_on_ok = false
-	dialog.ok_button_text = "Apply grid"
-	dialog.cancel_button_text = "Keep current grid"
-	# A wrapped label with no initial width can report one word per line and
-	# expand an AcceptDialog beyond the screen before its first layout pass.
-	# Bound the content with a scroll region; the native action footer stays out.
-	var available := get_tree().root.size - Vector2i(48, 96)
-	var content_width := clampi(available.x - 40, 240, 440)
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size = Vector2(content_width, mini(172, maxi(80, available.y - 100)))
+	var adding:=not inspected.is_empty()
+	var target_campaign: Dictionary=campaign
+	var target_scene:=str(campaign.active_scene)
+	var dialog:=ConfirmationDialog.new()
+	dialog.name="GridCalibration"
+	dialog.title="Add new map" if adding else "Calibrate current map"
+	dialog.theme=Hearth20Design.theme()
+	dialog.dialog_hide_on_ok=false
+	dialog.ok_button_text="Add map" if adding else "Apply grid"
+	dialog.cancel_button_text="Cancel import" if adding else "Keep current grid"
+	# Keep the native action footer outside the scrolling form on short displays.
+	var available:=get_tree().root.size-Vector2i(48,96)
+	var content_width:=clampi(available.x-40,240,440)
+	var scroll:=ScrollContainer.new()
+	scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size=Vector2(content_width,mini(212,maxi(80,available.y-100)))
 	dialog.add_child(scroll)
-	var form := VBoxContainer.new()
-	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	form.custom_minimum_size.x = content_width
-	form.add_theme_constant_override("separation", 12)
+	var form:=VBoxContainer.new()
+	form.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	form.custom_minimum_size.x=content_width
+	form.add_theme_constant_override("separation",9)
 	scroll.add_child(form)
-	var description := Label.new()
-	description.text = "Set how many 5-foot cells span the imported map's width. Height follows the image aspect ratio."
-	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var description:=Label.new()
+	description.text="Choose a name and how many squares span the image width. Hearth20 calculates the height." if adding else "Set the number of squares across this map to align its grid."
+	description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	form.add_child(description)
-	var cells := SpinBox.new()
-	cells.name = "WidthCells"
-	cells.min_value = 1
-	cells.max_value = 256
-	cells.step = 1
-	cells.value = int(board.current_scene().get("calibration_width_cells", board.current_scene().get("width_cells", 24)))
-	grid_cells_edit.value = cells.value
+	var map_name: LineEdit
+	if adding:
+		map_name=LineEdit.new()
+		map_name.name="MapName"
+		map_name.placeholder_text="Map name"
+		map_name.max_length=96
+		map_name.text=str(inspected.get("original_name","map.png")).get_basename().trim_suffix(".hearth20").left(96)
+		form.add_child(map_name)
+	var cells:=SpinBox.new()
+	cells.name="WidthCells"
+	cells.min_value=1
+	cells.max_value=256
+	cells.step=1
+	cells.suffix=" squares across"
+	cells.value=Hearth20MapLibrary.default_image_columns(inspected) if adding else int(board.current_scene().get("calibration_width_cells",board.current_scene().get("width_cells",24)))
 	form.add_child(cells)
 	Hearth20Design.track_number(cells)
-	var error_label := Label.new()
-	error_label.name = "ValidationError"
-	error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	error_label.add_theme_color_override("font_color", Color("#ffb896"))
+	if adding:
+		var dimensions:=Label.new()
+		dimensions.add_theme_color_override("font_color",Hearth20Regal.resolve(Hearth20Design.MUTED))
+		var update_dimensions:=func(value: float):
+			dimensions.text="%d × %d squares · 5 ft per square · %d × %d px"%[int(value),ceili(value*float(inspected.height)/float(inspected.width)),inspected.width,inspected.height]
+		cells.value_changed.connect(update_dimensions)
+		update_dimensions.call(cells.value)
+		form.add_child(dimensions)
+	var error_label:=Label.new()
+	error_label.name="ValidationError"
+	error_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	error_label.add_theme_color_override("font_color",Color("#ffb896"))
 	form.add_child(error_label)
 	dialog.confirmed.connect(func():
-		var valid := Hearth20Design.commit_numbers([cells])
+		if not is_same(target_campaign,campaign):
+			error_label.text="The campaign changed. Close this dialog and try again on the new table."
+			return
+		var valid:=Hearth20Design.commit_numbers([cells])
 		if not valid.ok:
-			error_label.text = str(valid.error)
+			error_label.text=str(valid.error)
 			cells.get_line_edit().grab_focus()
 			return
-		var previous_revision := int(campaign.get("revision", 0))
-		var outcome: Dictionary = board.calibrate_map_width(int(cells.value))
-		_on_status(outcome.get("error", "Map calibration saved at %.2f px per cell." % float(outcome.get("cell_pixels", 0.0))))
-		if outcome.get("ok", false):
+		var previous_revision:=int(campaign.get("revision",0))
+		var outcome: Dictionary
+		if adding:
+			if map_name.text.strip_edges().is_empty():
+				error_label.text="Enter a name for the map."
+				map_name.grab_focus()
+				return
+			outcome=_add_map_image(inspected,map_name.text,int(cells.value))
+		elif str(campaign.active_scene)!=target_scene:
+			outcome={"ok":false,"error":"The active map changed. Reopen grid calibration for the map you want to edit."}
+		else:
+			outcome=board.calibrate_map_width(int(cells.value))
+		if not outcome.ok:
+			error_label.text=str(outcome.error)
+			_on_status(str(outcome.error))
+			return
+		if not adding:
+			grid_cells_edit.value=cells.value
+			grid_scale_edit.value=100
 			_mark_scene_recovery_revision(previous_revision)
 			_update_grid_state()
-			dialog.queue_free()
-		else:
-			error_label.text = str(outcome.get("error", "Could not calibrate this map."))
-	)
-	var keep_current := func():
-		_on_status("Map imported with its current grid. You can adjust the grid from the map toolbar.")
+			_on_status("Grid set to %d × %d squares."%[outcome.width_cells,outcome.height_cells])
+		dialog.queue_free())
+	var cancel:=func():
+		_on_status("Map import cancelled." if adding else "Grid calibration cancelled.")
 		dialog.queue_free()
-	dialog.canceled.connect(keep_current)
-	dialog.close_requested.connect(keep_current)
+	dialog.canceled.connect(cancel)
+	dialog.close_requested.connect(cancel)
 	dialog_owner.add_child(dialog)
-	dialog.size = Vector2i(content_width + 40, mini(280, maxi(180, available.y)))
+	dialog.size=Vector2i(content_width+40,mini(290,maxi(180,available.y)))
 	Hearth20Design.popup_window(dialog)
 	cells.get_line_edit().grab_focus.call_deferred()
 	return dialog
+
+func _confirm_map_deletion(scene_id: String) -> void:
+	if session.local_role!="dm":return
+	var scene:=Hearth20Contracts.find_scene(campaign,scene_id)
+	if scene.is_empty():return
+	var dialog_owner: Node=seated_shell if is_instance_valid(seated_shell) else self
+	var open_confirmation:=dialog_owner.get_node_or_null("DeleteCampaignMap") as ConfirmationDialog
+	if is_instance_valid(open_confirmation) and not open_confirmation.is_queued_for_deletion():
+		Hearth20Design.popup_window(open_confirmation)
+		return
+	var target_campaign: Dictionary=campaign
+	var dialog:=ConfirmationDialog.new()
+	dialog.name="DeleteCampaignMap"
+	dialog.title="Delete map"
+	dialog.theme=Hearth20Design.theme()
+	dialog.dialog_autowrap=true
+	dialog.dialog_text="Delete “%s” from this campaign? Its layers and map scenery will be removed. Placed tokens and custom items will return to their vaults."%str(scene.get("title","Map"))
+	dialog.ok_button_text="Delete map"
+	dialog.cancel_button_text="Keep map"
+	dialog.size=Vector2i(460,190)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.close_requested.connect(dialog.queue_free)
+	dialog.confirmed.connect(func():
+		dialog.queue_free()
+		if not is_same(target_campaign,campaign):
+			_on_status("The campaign changed before deletion. Open the map menu to try again.")
+			return
+		var was_active: bool=campaign.active_scene==scene_id
+		var deleted: Dictionary=session.delete_library_scene(scene_id)
+		if deleted.ok:
+			if was_active:_finish_library_scene_change(str(board.current_scene().get("title","New scene")))
+			map_tabs.refresh()
+			_on_status("Deleted %s. Its tokens and items are in their vaults."%str(deleted.title))
+		else:
+			_on_status(str(deleted.error)))
+	dialog_owner.add_child(dialog)
+	Hearth20Design.popup_window(dialog)
+	dialog.get_cancel_button().grab_focus.call_deferred()
 
 func _toggle_grid_snap() -> void:
 	var enabled: bool = board.toggle_snap_to_grid()

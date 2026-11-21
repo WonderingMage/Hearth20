@@ -154,14 +154,13 @@ static func prepare(m: Variant, data: PackedByteArray, entries: Dictionary) -> D
 	if not Hearth20Contracts.valid_scene(scene):return _fail("Walls, lights or environment failed scene validation.")
 	return {"ok":true,"scene":scene,"background":background,"foreground":foreground,"entry_points":positions}
 
-static func import_into(campaign: Dictionary, path: String, move_party: bool=true) -> Dictionary:
-	if campaign.get("scenes",[]).size()>=Hearth20Contracts.MAX_SCENES:return _fail("This campaign has reached its scene limit.")
+static func import_into(campaign: Dictionary, path: String) -> Dictionary:
 	var prepared:=read(path)
 	if not prepared.ok:return prepared
 	var proposed: Dictionary=campaign.duplicate(true)
-	var old_scene: String=str(proposed.active_scene)
 	var scene: Dictionary=prepared.scene
-	scene.id="import-%d-%d"%[Time.get_ticks_usec(),randi()%100000]
+	scene.id=Hearth20MapLibrary.new_scene_id(campaign)
+	scene.title=Hearth20MapLibrary.unique_scene_title(campaign,scene.title)
 	scene.map_asset=Hearth20Assets.store_asset(proposed,prepared.background,"map")
 	scene.blackout=bool(proposed.get("map_covered",false))
 	proposed.scenes.append(scene);proposed.active_scene=scene.id
@@ -170,18 +169,6 @@ static func import_into(campaign: Dictionary, path: String, move_party: bool=tru
 		actor.id=scene.id+"-fg-"+Hearth20Assets.sha256(str(actor.id).to_utf8_buffer()).left(16);actor.scene_id=scene.id
 		actor.png_asset_id=Hearth20Assets.store_asset(proposed,entry.image,"token")
 		proposed.actors.append(actor)
-	if move_party:
-		var heroes: Array=proposed.actors.filter(func(actor):return actor.get("is_hero",false) and not actor.get("in_inventory",false) and actor.get("scene_id","")==old_scene)
-		var places:=Hearth20TokenInventory.party_positions(scene,prepared.entry_points,heroes.size())
-		if places.size()<heroes.size():return _fail("This map has insufficient clear entry squares for the party.")
-		var index:=0
-		for actor in proposed.actors:
-			if actor.get("is_hero",false) and not actor.get("in_inventory",false) and actor.get("scene_id","")==old_scene:
-				actor.scene_id=scene.id;actor.position=places[index];index+=1
-	proposed.revision=int(proposed.get("revision",0))+1
-	Hearth20MapLibrary.discard_empty_starter(proposed,scene.id)
-	var checked:=Hearth20Contracts.validate_campaign(proposed)
-	if not checked.ok:return _fail("Import rejected: "+"; ".join(checked.errors))
-	if JSON.stringify(Hearth20Identity._encode_variant(proposed)).to_utf8_buffer().size()>Hearth20Identity.MAX_SAVE_BYTES:return _fail("Adding this map would exceed the 64 MiB campaign save budget.")
-	campaign.merge(proposed,true)
+	var result:=Hearth20MapLibrary.commit_new_scene(campaign,proposed,scene.id)
+	if not result.ok:return result
 	return {"ok":true,"id":scene.id,"title":scene.title,"width_cells":scene.width_cells,"height_cells":scene.height_cells,"foreground_count":prepared.foreground.size(),"annotation_count":scene.annotations.size()}

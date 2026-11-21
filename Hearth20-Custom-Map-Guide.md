@@ -245,11 +245,11 @@ Several placements may reuse the same asset path/hash. They still need unique ob
 
 ## 9. Party entry and map tabs
 
-Give `entry_points` as 1–16 distinct **square centers**, on genuinely clear walkable floor. Prefer enough positions for the expected party, separated from closed walls and hazards. Four points in a 2 × 2 floor area are a reasonable default. The importer may search nearby clear square centers for additional heroes; do not rely on that to rescue an inaccessible start.
+Give `entry_points` as 1–16 distinct **square centers**, on genuinely clear walkable floor. Prefer enough positions for the expected party, separated from closed walls and hazards. Four points in a 2 × 2 floor area are a reasonable default. When the host brings the party to the map, Hearth20 can search nearby clear square centers for additional heroes.
 
-Importing the package adds a map to the current campaign and moves the currently deployed heroes from the prior active map to clear entry positions, preserving their identity and control grants. Stored heroes remain stored during ordinary import. Existing NPCs remain with their existing map. Do not define new player accounts, ownership policies, imported character sheets or financial balances in the map manifest; those belong to the campaign.
+Importing the package adds a separate map tab and opens it for the host. Players continue to see the maps where their tokens are placed. Deployed tokens keep their positions and control grants, and stored tokens stay in the vault. Keep player accounts, ownership policies, imported character sheets and financial balances in the campaign.
 
-The host sees loaded maps as horizontal tabs. Left-click opens a map. Right-click a particular tab and choose **Bring all heroes here** to gather heroes, including stored heroes, onto that specific map. This action is host-only. Map names and editor controls are not shown to players while the map is covered.
+The host sees loaded maps as horizontal tabs. Left-click opens a map for the host. Right-click a tab and choose **Bring all heroes here** to gather heroes, including stored heroes, at that map’s entry points. Choose **Delete map…** on the same menu to remove the map after confirming. Its placed tokens and loose custom items return to their vaults. While the campaign is covered, players see the cover screen.
 
 From Beta 0.3.14, a successful import removes the unused default **New scene** tab. Stored tokens survive that cleanup. A starter board containing tokens, drawings or a custom name is retained as authored campaign content. The map context menu closes before changing scenes, and Escape or a click outside dismisses it.
 

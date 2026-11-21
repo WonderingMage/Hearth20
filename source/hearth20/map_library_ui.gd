@@ -125,7 +125,7 @@ func setup(owner_app: Node) -> void:
 		campaign_list.add_child(button)
 	move_party=CheckButton.new()
 	move_party.text="Bring party heroes to the selected scene"
-	move_party.button_pressed=true
+	move_party.button_pressed=false
 	root.add_child(move_party)
 	var footer:=HBoxContainer.new()
 	footer.add_theme_constant_override("separation",12)

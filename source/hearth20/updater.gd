@@ -6,6 +6,7 @@ const RELEASES_PAGE="https://github.com/"+REPOSITORY+"/releases"
 const API="https://api.github.com/repos/"+REPOSITORY+"/releases?per_page=100"
 const ASSET="Hearth20_Beta_Portable.exe"
 const MANIFEST="Hearth20-Beta-Manifest.json"
+const STABLE_MANIFEST="Hearth20-Manifest.json"
 const TEST_MANIFEST="Hearth20-Steam-Test-Manifest.json"
 const LIMIT=1500*1024*1024
 const DOWNLOAD_IDLE_MSEC=45000
@@ -102,22 +103,44 @@ static func valid_asset(asset: Dictionary,tag: String,name_value: String) -> boo
 	return asset.get("name","")==name_value and asset.get("state","")=="uploaded" and Hearth20Contracts._integer_number(size_value) and size_value>0 and size_value<=LIMIT and digest.begins_with("sha256:") and digest.length()==71 and digest.substr(7).is_valid_hex_number(false) and asset.get("browser_download_url","")=="https://github.com/"+REPOSITORY+"/releases/download/"+tag+"/"+name_value
 static func select_release(records: Variant,current: String,update_channel="beta") -> Dictionary:
 	if not records is Array:return {}
+	var current_parts=version_parts(current)
+	if current_parts.is_empty():return {}
 	var best={}
 	for item in records:
 		if not item is Dictionary or item.get("draft",true):continue
-		var tag=str(item.get("tag_name",""));var prefix="hearth20-steam-test-v" if tag.begins_with("hearth20-steam-test-v") else "hearth20-beta-v"
-		var test_channel=prefix=="hearth20-steam-test-v"
-		if not tag.begins_with(prefix) or (test_channel and update_channel!="steam-test"):continue
-		var version=tag.trim_prefix(prefix)
-		if not newer(version,current):continue
-		var executable={};var metadata={}
+		var tag=str(item.get("tag_name",""))
+		var version: String
+		var channel_id: String
+		var manifest_name: String
+		if tag.begins_with("v"):
+			version=tag.trim_prefix("v")
+			channel_id="stable"
+			manifest_name=STABLE_MANIFEST
+		elif tag.begins_with("hearth20-beta-v"):
+			version=tag.trim_prefix("hearth20-beta-v")
+			channel_id="beta"
+			manifest_name=MANIFEST
+		elif tag.begins_with("hearth20-steam-test-v") and update_channel=="steam-test":
+			version=tag.trim_prefix("hearth20-steam-test-v")
+			channel_id="steam-test"
+			manifest_name=TEST_MANIFEST
+		else:continue
+		var parts=version_parts(version)
+		if parts.is_empty() or not newer(version,current):continue
+		var prerelease: bool=bool(item.get("prerelease",true)) or not str(parts[3]).is_empty()
+		if prerelease and (channel_id=="stable" or (channel_id=="beta" and str(current_parts[3]).is_empty())):continue
+		var executable={}
+		var metadata={}
 		if not item.get("assets",[]) is Array:continue
 		for asset in item.get("assets",[]):
 			if not asset is Dictionary:continue
 			if valid_asset(asset,tag,ASSET):executable=asset
-			if valid_asset(asset,tag,TEST_MANIFEST if test_channel else MANIFEST) and int(asset.size)<=65536:metadata=asset
+			if valid_asset(asset,tag,manifest_name) and int(asset.size)<=65536:metadata=asset
 		if executable.is_empty() or metadata.is_empty():continue
-		if best.is_empty() or newer(version,best.version):best={"tag":tag,"version":version,"channel":"steam-test" if test_channel else "beta","exe":executable.duplicate(true),"metadata":metadata.duplicate(true)}
+		# The standard tag wins over a same-version compatibility listing.
+		var preferred: bool=not best.is_empty() and version==best.version and channel_id=="stable" and best.channel!="stable"
+		if best.is_empty() or preferred or newer(version,best.version):
+			best={"tag":tag,"version":version,"channel":channel_id,"exe":executable.duplicate(true),"metadata":metadata.duplicate(true)}
 	return best
 static func valid_manifest(value: Variant,selected: Dictionary) -> bool:
 	if not value is Dictionary or not selected.get("exe",{}) is Dictionary:return false
@@ -129,9 +152,9 @@ static func valid_manifest(value: Variant,selected: Dictionary) -> bool:
 	for field in ["version","tag"]:
 		if not selected.get(field) is String:return false
 	var selected_channel=selected.get("channel","beta")
-	if not selected_channel is String or selected_channel not in ["beta","steam-test"]:return false
+	if not selected_channel is String or selected_channel not in ["beta","steam-test","stable"]:return false
 	if value.has("channel") and (not value.channel is String or value.channel!=selected_channel):return false
-	if selected_channel=="steam-test" and value.get("channel","")!="steam-test":return false
+	if selected_channel in ["steam-test","stable"] and value.get("channel","")!=selected_channel:return false
 	return value is Dictionary and value.get("edition","")==Hearth20Identity.EDITION and value.get("product","")==Hearth20Identity.PRODUCT_ID and value.get("version","")==selected.get("version","") and value.get("tag","")==selected.get("tag","") and value.get("asset","")==ASSET and value.get("bytes",0)==selected.get("exe",{}).get("size",-1) and value.get("sha256","")==str(selected.get("exe",{}).get("digest","")).trim_prefix("sha256:") and value.get("schema",-1)==Hearth20Identity.SCHEMA_VERSION and value.get("protocol",-1)==Hearth20Identity.NETWORK_PROTOCOL
 func set_channel(value: String) -> void:
 	if busy or install_requested or value not in ["beta","steam-test"]:return

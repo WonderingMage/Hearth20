@@ -724,60 +724,48 @@ func _map_texture() -> Texture2D:
 	return map_texture_cache
 
 func import_map(path: String) -> Dictionary:
-	if role != "dm":
-		return {"ok": false, "error": "Only the DM imports a map."}
-	var inspected := Hearth20Assets.inspect_map_file(path)
-	if not inspected.ok:
-		return inspected
-	var scene := current_scene()
-	if scene.is_empty():
-		return {"ok": false, "error": "Create a scene first."}
-	var grid: Dictionary=inspected.get("grid",{})
-	var target_cells := int(grid.get("width_cells",maxi(1,int(scene.get("calibration_width_cells",scene.get("width_cells",24))))))
-	if grid.is_empty():target_cells=mini(target_cells,maxi(1,floori(256.0*float(inspected.width)/float(inspected.height))))
-	var target_height := ceili(float(inspected.height)/(float(inspected.width)/float(target_cells)))
-	if target_height>256:return {"ok":false,"error":"Map is too tall for square cells. Crop or pad the image so it fits within 256 cells."}
-	var asset_id := Hearth20Assets.store_asset(campaign, inspected, "map")
-	if asset_id.is_empty():
-		return {"ok": false, "error": "Map image could not be stored."}
-	# The DM calibrates by setting the number of cells spanning the image width.
-	scene.cell_pixels = float(inspected.width) / float(target_cells)
-	scene.width_cells = target_cells
-	scene.height_cells = maxi(1, ceili(float(inspected.height) / float(scene.cell_pixels)))
-	scene.map_asset = asset_id
-	if scene.get("title","")=="New scene":scene.title=path.get_file().get_basename().strip_edges().left(96)
-	scene.map_width = int(inspected.width)
-	scene.map_height = int(inspected.height)
-	scene.calibration_width_cells = target_cells
-	if not grid.is_empty():scene.feet_per_cell=float(grid.feet_per_cell)
-	Hearth20MapLibrary.discard_empty_starter(campaign,str(scene.id))
-	campaign.revision = int(campaign.get("revision", 0)) + 1
-	actor_image_cache.clear()
-	map_texture_cache = null
-	map_texture_cache_key = ""
-	fit_pending = true
-	queue_redraw()
-	if session and session.local_role == "dm":
-		session._broadcast_snapshots()
-	return {"ok": true, "sha256": inspected.sha256, "width": inspected.width, "height": inspected.height, "calibration_width_cells": target_cells,"auto_calibrated":not grid.is_empty(),"height_cells":target_height,"feet_per_cell":scene.feet_per_cell}
+	if role!="dm":return {"ok":false,"error":"Only the DM imports a map."}
+	var inspected:=Hearth20Assets.inspect_map_file(path)
+	if not inspected.ok:return inspected
+	var title:=path.get_file().get_basename().trim_suffix(".hearth20")
+	var columns:=Hearth20MapLibrary.default_image_columns(inspected)
+	var result: Dictionary=session.import_map_image(inspected,title,columns) if session!=null else Hearth20MapLibrary.add_image_scene(campaign,inspected,title,columns)
+	if result.ok:
+		map_texture_cache=null
+		map_texture_cache_key=""
+		fit_map()
+	return result
 
-func calibrate_map_width(cells: int) -> Dictionary:
-	if role != "dm" or cells < 1 or cells > 256:
-		return {"ok": false, "error": "Map width calibration must be 1 to 256 cells."}
-	var scene := current_scene()
-	var image := _map_image()
-	if scene.is_empty() or image == null:
-		return {"ok": false, "error": "Import a map before calibrating it."}
-	if ceili(float(image.get_height())/(float(image.get_width())/float(cells)))>256:
-		return {"ok":false,"error":"This scale makes the map taller than 256 cells. Choose fewer width cells."}
-	scene.calibration_width_cells = cells
-	scene.cell_pixels = float(image.get_width()) / float(cells)
-	scene.width_cells = cells
-	scene.height_cells = maxi(1, ceili(float(image.get_height()) / float(scene.cell_pixels)))
-	campaign.revision = int(campaign.get("revision", 0)) + 1
-	fit_pending = true
-	queue_redraw()
-	return {"ok": true, "cell_pixels": scene.cell_pixels, "height_cells": scene.height_cells}
+func calibrate_map_width(cells: int, scale_factor: float=1.0) -> Dictionary:
+	if role!="dm" or cells<1 or cells>256 or not is_finite(scale_factor) or scale_factor<0.8 or scale_factor>1.2:
+		return {"ok":false,"error":"Choose 1–256 grid squares across and a scale between 80% and 120%."}
+	var scene:=current_scene()
+	var image:=_map_image()
+	if scene.is_empty() or image==null:
+		return {"ok":false,"error":"Add a map image before calibrating its grid."}
+	var revised:=scene.duplicate(false)
+	revised.calibration_width_cells=cells
+	revised.cell_pixels=float(image.get_width())*scale_factor/cells
+	revised.width_cells=ceili(float(cells)/scale_factor)
+	revised.height_cells=ceili(float(image.get_height())*cells/(float(image.get_width())*scale_factor))
+	if revised.width_cells>256 or revised.height_cells>256:
+		return {"ok":false,"error":"This scale exceeds 256 squares on one side. Choose fewer squares across or increase the scale."}
+	if not Hearth20Contracts.valid_scene(revised):
+		return {"ok":false,"error":"That grid would leave map content outside the board. Increase the number of squares or reposition the content first."}
+	for actor in campaign.actors:
+		if actor.get("scene_id","")==scene.id and not Hearth20Contracts._inside_scene(actor.position,revised):
+			return {"ok":false,"error":"That grid would leave a token outside the board. Move the token or choose a larger grid."}
+	for item in campaign.get("custom_items",[]):
+		if item.scene_id==scene.id and item.holder.is_empty() and not Hearth20BoardTools.point_ok(item.position,revised):
+			return {"ok":false,"error":"That grid would leave an item outside the board. Move the item or choose a larger grid."}
+	scene.merge(revised,true)
+	campaign.revision=int(campaign.get("revision",0))+1
+	fit_map()
+	if session!=null:
+		session.projection_cache.clear()
+		session.sight_cache.clear()
+		session._broadcast_snapshots()
+	return {"ok":true,"cell_pixels":scene.cell_pixels,"width_cells":scene.width_cells,"height_cells":scene.height_cells}
 
 func add_token(name: String, hero: bool = false, position: Vector2 = Vector2(4, 4)) -> String:
 	if role != "dm":

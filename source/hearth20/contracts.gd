@@ -180,15 +180,18 @@ static func validate_campaign(campaign: Variant,use_asset_cache=true) -> Diction
 			return {"ok": false, "errors": ["Campaign contains an invalid asset record."]}
 		encoded_asset_bytes += str(asset.base64).length()
 		if encoded_asset_bytes > Hearth20Identity.MAX_SAVE_BYTES:
-			return {"ok": false, "errors": ["Campaign assets exceed the supported aggregate transfer size."]}
+			return {"ok": false, "errors": ["Campaign images exceed the 64 MiB save limit. Delete a map or use smaller images."]}
 	for asset_id in checked.assets:
 		var bytes=Hearth20Assets.read_asset(checked,str(asset_id)) if use_asset_cache else Hearth20Assets.read_asset_uncached(checked,str(asset_id))
 		if not bytes.size() > 0:
 			return {"ok": false, "errors": ["Campaign contains an invalid or corrupt image asset."]}
 	var scene_ids := {}
 	for scene in checked.scenes:
-		if not valid_scene(scene) or scene_ids.has(scene.id):
-			return {"ok": false, "errors": ["Campaign has an invalid or duplicate scene."]}
+		var title:=str(scene.get("title",scene.get("id","Untitled map"))).left(96) if scene is Dictionary else "Untitled map"
+		if not valid_scene(scene):
+			return {"ok":false,"errors":["Map “%s” has invalid grid settings or content outside its grid."%title]}
+		if scene_ids.has(scene.id):
+			return {"ok":false,"errors":["Map “%s” shares a map ID with another scene."%title]}
 		var map_asset_id := str(scene.get("map_asset", ""))
 		if not map_asset_id.is_empty() and (not checked.assets.has(map_asset_id) or checked.assets[map_asset_id].get("kind", "") != "map"):
 			return {"ok": false, "errors": ["Campaign scene references a missing or non-map image asset."]}
