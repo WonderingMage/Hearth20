@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode unshaded, fog_disabled, depth_draw_never, depth_test_disabled, cull_disabled;
+#include "res://hearth20/room_craft/window_shape.gdshaderinc"
 uniform sampler2D scene_depth : hint_depth_texture, repeat_disable, filter_nearest;
 uniform sampler2D sun_depth : repeat_disable, filter_nearest;
 uniform mat4 sun_view;
@@ -8,11 +9,15 @@ uniform vec3 sun_direction;
 uniform int portal_count=0;
 uniform vec4 portal_centers[5];
 uniform vec2 portal_dimensions[5];
+uniform vec2 portal_profiles[5];
 uniform vec3 portal_normals[5];
 uniform vec3 beam_lower[5];
 uniform vec3 beam_upper[5];
 uniform int steps=32;
 uniform float environment_strength=1.;
+uniform vec4 light_tint : source_color = vec4(1.,.78,.47,1.);
+uniform vec3 room_lower=vec3(-8.,.01,-8.);
+uniform vec3 room_upper=vec3(8.,6.05,8.);
 uniform bool debug_no_shadow=false;
 uniform bool debug_field=false;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
@@ -38,14 +43,14 @@ float aperture(vec3 p){
   if(distance_to_window<0.||distance_to_window>23.)continue;
   vec3 entry=p-sun_direction*distance_to_window-center;
   float x=abs(n.x)>.5?entry.z:entry.x;
-  float y=entry.y;float w=portal_dimensions[i].x;float h=portal_dimensions[i].y;
-  float cap=h*.5-w*.5;
-  float edge=min(w*.5-abs(x),y+h*.5);
-  if(y>cap)edge=min(edge,w*.5-length(vec2(x,y-cap)));
+  float y=entry.y;float h=portal_dimensions[i].y;
+  float edge=h20_window_edge(vec2(x,y),portal_dimensions[i],portal_profiles[i].x);
   float frame=smoothstep(.008,.055,edge);
-  float mullion=smoothstep(.019,.037,abs(x));
-  float crossbar=min(abs(y+h*(.5-.36)),abs(y+h*(.5-.69)));
-  mullion*=smoothstep(.019,.037,crossbar);
+  float mullion=1.;
+  if(portal_profiles[i].y>.5){
+   float crossbar=min(abs(y+h*(.5-.36)),abs(y+h*(.5-.69)));
+   mullion=smoothstep(.019,.037,abs(x))*smoothstep(.019,.037,crossbar);
+  }
   coverage=max(coverage,frame*mullion*exp(-distance_to_window*.032));
  }
  return coverage;
@@ -80,7 +85,7 @@ void fragment(){
  for(int i=0;i<56;i++){
   if(i>=steps||step_size<.0001||environment_strength<.001)break;
   vec3 p=eye+ray*(begin+(float(i)+jitter)*step_size);
-  if(abs(p.x)>8.||abs(p.z)>8.||p.y<.01||p.y>6.05)continue;
+  if(any(lessThan(p,room_lower))||any(greaterThan(p,room_upper)))continue;
   float beam=aperture(p);
   if(beam<.001)continue;
   float dust=.90+.10*sin(p.x*1.4+p.y*2.3+TIME*.045)*sin(p.z*2.5-p.y*.9);
@@ -90,7 +95,7 @@ void fragment(){
   transmittance*=transmission;
  }
  float phase=.78+.32*pow(max(0.,dot(ray,sun_direction)),3.);
- ALBEDO=vec3(1.,.78,.47)*phase*1.8;
+ ALBEDO=light_tint.rgb*phase*1.8;
  ALPHA=clamp(scattering,0.,.35);
  if(debug_field){ALBEDO=vec3(float(portal_count)/5.,reach/25.,scattering*8.);ALPHA=1.;}
 }

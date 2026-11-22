@@ -52,6 +52,8 @@ uniform int h20_window_count = 0;
 uniform vec3 h20_window_centers[5];
 uniform vec3 h20_window_normals[5];
 uniform vec2 h20_window_dimensions[5];
+uniform vec2 h20_window_profiles[5];
+#include "res://hearth20/room_craft/window_shape.gdshaderinc"
 
 bool h20_through_window(vec3 eye, vec3 ray) {
  for (int i = 0; i < 5; i++) {
@@ -64,15 +66,14 @@ bool h20_through_window(vec3 eye, vec3 ray) {
   vec3 point = eye + ray * distance_to_plane - h20_window_centers[i];
   float x = abs(normal.x) > 0.5 ? point.z : point.x;
   float y = point.y;
-  float width = h20_window_dimensions[i].x;
   float height = h20_window_dimensions[i].y;
-  float cap = height * 0.5 - width * 0.5;
-  float edge = min(width * 0.5 - abs(x), y + height * 0.5);
-  if (y > cap) edge = min(edge, width * 0.5 - length(vec2(x, y - cap)));
+  float edge = h20_window_edge(vec2(x, y), h20_window_dimensions[i], h20_window_profiles[i].x);
   if (edge <= 0.008) continue;
-  // The same 42 mm physical mullions and crossbars used by the room geometry.
-  if (abs(x) < 0.021) continue;
-  if (min(abs(y + height * (0.5 - 0.36)), abs(y + height * (0.5 - 0.69))) < 0.021) continue;
+  // New panes use their opaque modeled trim; the original room retains its 42 mm inset.
+  if (h20_window_profiles[i].y > 0.5) {
+   if (abs(x) < 0.021) continue;
+   if (min(abs(y + height * (0.5 - 0.36)), abs(y + height * (0.5 - 0.69))) < 0.021) continue;
+  }
   return true;
  }
  return false;

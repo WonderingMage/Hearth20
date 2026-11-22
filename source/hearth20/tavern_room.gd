@@ -6,15 +6,21 @@ const FRONT=-7.
 const REAR=8.
 const CEILING=4.84
 const BOUNDARY_LAYER=1<<19
+const STORYBOOK_SCENE="res://hearth20/storybook_room/LivingRoom.glb"
 var table: Hearth20CasinoTable
 var materials={}
 var batches={}
 var batch_materials={}
 var effects: Array=[]
 var ceiling_height=CEILING
-func setup(owner_table: Hearth20CasinoTable) -> void:
+func setup(owner_table: Hearth20CasinoTable, storybook: PackedScene=null) -> void:
 	table=owner_table;name="EnclosedTavern"
 	materials={"wood":table.wood,"brass":table.bronze,"velvet":table.felt,"stone":_stone(),"mortar":_solid(Color("#302b25")),"iron":_solid(Color("#242326"),.72,.47),"green":_solid(Color("#26483b"),.06,.3),"amber":_solid(Color("#5b3422"),.08,.28),"wine":_solid(Color("#4a2630"),.05,.35),"paper":_solid(Color("#a28c66")),"glass":_window_glass(),"crest":_crest()}
+	if storybook==null and ResourceLoader.exists(STORYBOOK_SCENE,"PackedScene"):
+		storybook=load(STORYBOOK_SCENE) as PackedScene
+	if storybook!=null:
+		load("res://hearth20/storybook_room/setup.gd").build(self,storybook)
+		return
 	if Hearth20GeneratedModels.available("bar"):
 		_generated_room();return
 	# All six room boundaries and the front fireplace/bar are modeled geometry.
@@ -111,6 +117,8 @@ func _lathe(at: Vector3,profile: Array,rx: float,rz: float,key: String,segments=
 	var node=table._lathe(self,at,profile,rx,rz,materials[key],segments);_merge(node.mesh,node.position,node.basis,key);node.free()
 func _boundary(label: String,at: Vector3,size_value: Vector3,key: String) -> void:
 	_box(at,size_value,key)
+	_collision_boundary(label,at,size_value)
+func _collision_boundary(label: String,at: Vector3,size_value: Vector3) -> void:
 	var body=StaticBody3D.new();body.name=label;body.position=at;body.collision_layer=BOUNDARY_LAYER;body.collision_mask=0;add_child(body)
 	var collision=CollisionShape3D.new();var shape=BoxShape3D.new();shape.size=size_value;collision.shape=shape;body.add_child(collision)
 func _floor() -> void:

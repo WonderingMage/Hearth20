@@ -62,8 +62,13 @@ func setup(textures: Dictionary) -> void:
 	var env_node=WorldEnvironment.new();var env=Environment.new();env.background_mode=Environment.BG_COLOR;env.background_color=Color("#100c09");env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;env.ambient_light_color=Color("#b69b75");env.ambient_light_energy=.28;env.tonemap_mode=Environment.TONE_MAPPER_FILMIC;env_node.environment=env;world.add_child(env_node)
 	var key=DirectionalLight3D.new();key.rotation_degrees=Vector3(-58,-24,0);key.light_color=Color("#ffd298");key.light_energy=.75;key.shadow_enabled=true;key.directional_shadow_max_distance=15;world.add_child(key)
 	bronze=_surface(2,.72,.38);wood=_surface(0,.04,.83);felt=_surface(1,0,.97)
-	room=Hearth20TavernRoom.new();world.add_child(room);room.setup(self)
-	if room.get_meta("crafted_room",false):
+	room=Hearth20TavernRoom.new();world.add_child(room);room.setup(self,textures.get("room") as PackedScene)
+	if room.get_meta("storybook_room",false):
+		key.hide()
+		env.ambient_light_color=Color("#b1a594")
+		env.ambient_light_energy=.31
+		env.tonemap_exposure=.88
+	elif room.get_meta("crafted_room",false):
 		key.light_energy=.24;key.shadow_enabled=false;env.ambient_light_color=Color("#aebed0");env.ambient_light_energy=.40
 	var table_scene := load("res://hearth20/storybook_table/walnut-table.glb") as PackedScene
 	var crafted_table := table_scene.instantiate()

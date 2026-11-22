@@ -73,11 +73,15 @@ func _ready() -> void:
 	app.shell.board_controls.hide()
 	focus_surface.hide();_build_hud();_loading();_prepare_table()
 func _prepare_table() -> void:
-	var assets={};var paths=app.casino_portal.paths
+	var assets={}
+	var paths=app.casino_portal.paths.duplicate()
+	paths["room"]=Hearth20TavernRoom.STORYBOOK_SCENE
 	var deadline=Time.get_ticks_msec()+AssetRequests.TIMEOUT_MSEC
-	for path in paths.values():
-		if not ResourceLoader.exists(path,"Texture2D") or ResourceLoader.load_threaded_request(path,"Texture2D")!=OK:
-			_table_load_failed("The table’s artwork could not load.")
+	for key in paths:
+		var path: String=paths[key]
+		var resource_type := "PackedScene" if key=="room" else "Texture2D"
+		if not ResourceLoader.exists(path,resource_type) or ResourceLoader.load_threaded_request(path,resource_type)!=OK:
+			_table_load_failed("The tavern and table could not load.")
 			return
 		loading_assets.append(path)
 	while assets.size()<paths.size():
@@ -86,14 +90,14 @@ func _prepare_table() -> void:
 			var path=paths[key];var state=ResourceLoader.load_threaded_get_status(path)
 			if state==ResourceLoader.THREAD_LOAD_IN_PROGRESS:continue
 			loading_assets.erase(path)
-			var texture=ResourceLoader.load_threaded_get(path) if state!=ResourceLoader.THREAD_LOAD_INVALID_RESOURCE else null
-			if not texture is Texture2D:
-				_table_load_failed("The table’s artwork could not load.")
+			var resource: Resource=ResourceLoader.load_threaded_get(path) if state==ResourceLoader.THREAD_LOAD_LOADED else null
+			if not (resource is PackedScene if key=="room" else resource is Texture2D):
+				_table_load_failed("The tavern and table could not load.")
 				return
-			assets[key]=texture
+			assets[key]=resource
 		if assets.size()==paths.size():break
 		if Time.get_ticks_msec()>=deadline:
-			_table_load_failed("The table’s artwork took too long to load.")
+			_table_load_failed("The tavern and table took too long to load.")
 			return
 		await get_tree().process_frame
 		if loading_cancelled:return
