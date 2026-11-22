@@ -5,12 +5,16 @@ class_name Hearth20BoardCanvas
 signal selection_changed(actor_id: String)
 signal hint_changed(text: String)
 signal object_selected(object: Dictionary)
+signal owned_token_context_requested(actor_id: String, point: Vector2)
 
 var session: Node
 var role := "dm"
 var campaign: Dictionary = {}
 var snapshot: Dictionary = {}
 var selected_actor_id := ""
+var masked_names_visible := false
+var masked_name_frame := 0
+const MASKED_NAME_GLYPHS := "AxyzQJvRΞΔΩΨΦΠΛΓΣΘλЖЯЧФГБЮЅѦѬѢѪ"
 var dragging_actor := false
 var panning := false
 var space_pan := false
@@ -26,6 +30,10 @@ var fx_target_mode := false
 var tool_start := Vector2.ZERO
 var seen_fx: Dictionary = {}
 var actor_image_cache: Dictionary = {}
+var actor_gif_cache: Dictionary = {}
+var drawn_gifs: Dictionary = {}
+var gif_cache_bytes := 0
+const GIF_CACHE_BUDGET := 96 * 1024 * 1024
 var map_texture_cache: Texture2D
 var map_texture_cache_key := ""
 var selected_map_image: Image
@@ -117,6 +125,7 @@ func set_player_snapshot(value: Dictionary) -> void:
 		selected_object_id = ""
 		tool_drag = false
 		actor_image_cache.clear()
+		_clear_token_animations()
 		seen_fx.clear()
 		pings.clear()
 		selected_actor_id = ""
@@ -134,6 +143,8 @@ func set_player_snapshot(value: Dictionary) -> void:
 		map_texture_cache = null
 		map_texture_cache_key = ""
 	snapshot = value
+	for asset_id in actor_gif_cache.keys():
+		if not current_assets().has(asset_id):_discard_token_animation(asset_id)
 	var current_fx_ids := {}
 	for fx in snapshot.get("fx", []):
 		var event_id := str(fx.get("id", ""))
@@ -171,6 +182,7 @@ func set_role(active_role: String) -> void:
 	if active_role == "player":
 		snapshot.clear()
 		actor_image_cache.clear()
+		_clear_token_animations()
 		seen_fx.clear()
 		pings.clear()
 		selected_actor_id = ""
@@ -191,9 +203,19 @@ func current_assets() -> Dictionary:
 	return snapshot.get("assets", {}) if role == "player" else campaign.get("assets", {})
 
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT and event.pressed and not read_only_preview and not dragging_actor and not tool_drag and not selecting_drawings and tool_name=="select":
-		var item=item_at(event.position)
-		if not item.is_empty():Hearth20ItemsWindow.board_context(self,item,event.position);accept_event();return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and not read_only_preview and tool_name == "select":
+		if not (dragging_actor or tool_drag or selecting_drawings or panning or space_pan or measuring or measure_tool or not template_shape.is_empty() or (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0):
+			if role == "player":
+				var owned := _actor_at(event.position, true)
+				if not owned.is_empty():
+					owned_token_context_requested.emit(str(owned.id), get_global_transform() * event.position)
+					accept_event()
+					return
+			var item := item_at(event.position)
+			if not item.is_empty():
+				Hearth20ItemsWindow.board_context(self, item, event.position)
+				accept_event()
+				return
 	if _tool_input(event):
 		queue_redraw()
 		accept_event()
@@ -401,6 +423,8 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 
 func _draw() -> void:
+	masked_names_visible = false
+	drawn_gifs.clear()
 	Hearth20Design.panel(Color("#0d1420"),14,0,Hearth20Design.BORDER).draw(get_canvas_item(),Rect2(Vector2.ZERO,get_rect().size))
 	var scene := current_scene()
 	if role == "player" and (scene.is_empty() or scene.get("id", "") == "disconnected"):
@@ -605,8 +629,10 @@ func _draw_actors(_scene: Dictionary, cell_px: float, layer: String = "tokens") 
 		if actor.get("decorative",false)==true:
 			for other in current_actors():
 				if other.get("layer","tokens")=="tokens" and other.get("position",Vector2(-999,-999)).distance_to(actor.position)<float(actor.get("token_size",1))*0.5: token_tint.a=0.42
-		var texture := _actor_texture(str(actor.get("png_asset_id", actor.get("asset_id", ""))))
+		var asset_id := str(actor.get("png_asset_id", actor.get("asset_id", "")))
+		var texture := _actor_texture(asset_id)
 		if texture:
+			if actor_gif_cache.has(asset_id):drawn_gifs[asset_id]=true
 			if actor.get("decorative",false) and actor.has("display_width_cells"):
 				var extent:=Vector2(float(actor.display_width_cells),float(actor.display_height_cells))*cell_px*camera_zoom
 				draw_set_transform(center,deg_to_rad(float(actor.get("rotation_degrees",0))))
@@ -623,7 +649,7 @@ func _draw_actors(_scene: Dictionary, cell_px: float, layer: String = "tokens") 
 			draw_arc(center, diameter * 0.58, 0.0, TAU, 48, Color("#62e4d1"), 3.0)
 		if actor.get("decorative",false)==true: continue
 		var label := str(actor.get("name", "Hero" if bool(actor.get("is_hero", false)) else "Token"))
-		if role == "player" and str(actor.get("kind", "")) == "hero":
+		if role == "player" and not actor.has("name") and str(actor.get("kind", "")) == "hero":
 			for sheet in snapshot.get("sheets", []):
 				if str(sheet.get("id", "")) == str(actor.get("id", "")):
 					label = str(sheet.get("name", "My hero"))
@@ -631,7 +657,17 @@ func _draw_actors(_scene: Dictionary, cell_px: float, layer: String = "tokens") 
 		if hidden_for_players:
 			label = "Hidden · " + label
 		var caption := label.left(24) + ("…" if label.length() > 24 else "")
-		var label_width := clampf(ThemeDB.fallback_font.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 12.0, 70.0, 220.0)
+		var masked: bool = role == "player" and actor.has("masked_name_length")
+		if masked:
+			masked_names_visible = true
+			caption = masked_token_name(str(actor.id), int(actor.masked_name_length), masked_name_frame)
+		var font_size := 13
+		var max_width := minf(size.x - 8.0, 600.0 if masked else 220.0)
+		var text_width := ThemeDB.fallback_font.get_string_size(caption,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
+		if masked and text_width > max_width - 12.0:
+			font_size = maxi(1, floori(font_size * (max_width - 12.0) / text_width))
+			text_width = ThemeDB.fallback_font.get_string_size(caption,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
+		var label_width := clampf(text_width + 12.0, minf(70.0,max_width), max_width)
 		var caption_height := 36.0 if role == "player" and actor.has("movement") else 21.0
 		var caption_rect := Rect2(center + Vector2(-label_width * 0.5, diameter * 0.5 + 3), Vector2(label_width, caption_height))
 		var original_y := caption_rect.position.y
@@ -650,12 +686,20 @@ func _draw_actors(_scene: Dictionary, cell_px: float, layer: String = "tokens") 
 		if absf(caption_rect.position.y - original_y) > 3.0:
 			draw_line(center + Vector2(0.0, diameter * 0.5), Vector2(caption_rect.get_center().x, caption_rect.position.y), Color(0.7, 0.84, 0.82, 0.55), 1.0)
 		draw_rect(caption_rect, Color(0.04, 0.06, 0.07, 0.86))
-		draw_string(ThemeDB.fallback_font, caption_rect.position + Vector2(4, 15), caption, HORIZONTAL_ALIGNMENT_CENTER, label_width - 8.0, 13, Color("#d2ae79") if hidden_for_players else Color.WHITE)
+		draw_string(ThemeDB.fallback_font, caption_rect.position + Vector2(4, 15), caption, HORIZONTAL_ALIGNMENT_CENTER, label_width - 8.0, font_size, Color("#d2ae79") if hidden_for_players or masked else Color.WHITE)
 		if role == "player" and actor.has("movement"):
 			var movement: Dictionary = actor.movement
 			var mode := str(movement.get("mode", "blocked")).replace("_", " ")
 			var permission := "Free" if mode == "free until revoked" else "Blocked" if mode == "blocked" else "%.0f ft left" % float(movement.get("remaining_feet", 0.0))
 			draw_string(ThemeDB.fallback_font, caption_rect.position + Vector2(0.0, 30.0), permission, HORIZONTAL_ALIGNMENT_CENTER, caption_rect.size.x, 11, Color("#9ee5d8"))
+
+static func masked_token_name(id: String, length: int, frame: int) -> String:
+	var result := ""
+	var count := MASKED_NAME_GLYPHS.length()
+	for index in clampi(length,0,64):
+		var offset := hash("%s:%d" % [id,index])
+		result += MASKED_NAME_GLYPHS[posmod(offset + frame * (1 + index % 5), count)]
+	return result
 
 func _actor_texture(asset_id: String) -> Texture2D:
 	if asset_id.is_empty():
@@ -668,12 +712,45 @@ func _actor_texture(asset_id: String) -> Texture2D:
 	var bytes := Marshalls.base64_to_raw(str(record.get("base64", "")))
 	if bytes.size() != int(record.get("byte_length", -1)) or Hearth20Assets.sha256(bytes) != str(record.get("sha256", "")):
 		return null
-	var checked := Hearth20Assets.inspect_token_png_bytes(bytes)
-	if not checked.ok:
+	var checked := Hearth20Assets.inspect_token_art_bytes(bytes,asset_id,true)
+	if not checked.ok or checked.mime_type!=str(record.get("mime_type","")):
 		return null
 	var texture := ImageTexture.create_from_image(checked.image)
+	var frames: Array=checked.get("frames",[])
+	if frames.size()>1:
+		var memory: int=frames.size()*checked.width*checked.height*4
+		for id in actor_gif_cache.keys():
+			if gif_cache_bytes+memory<=GIF_CACHE_BUDGET:break
+			if not drawn_gifs.has(id):_discard_token_animation(id)
+		if gif_cache_bytes+memory<=GIF_CACHE_BUDGET:
+			var ends:=PackedInt32Array()
+			var duration:=0
+			for delay in checked.delays:
+				duration+=delay
+				ends.append(duration)
+			actor_gif_cache[asset_id]={"frames":frames,"ends":ends,"duration":duration,"last":0,"bytes":memory}
+			gif_cache_bytes+=memory
 	actor_image_cache[asset_id] = texture
 	return texture
+
+func _clear_token_animations() -> void:
+	actor_gif_cache.clear()
+	drawn_gifs.clear()
+	gif_cache_bytes=0
+
+func _discard_token_animation(asset_id: String) -> void:
+	gif_cache_bytes-=int(actor_gif_cache[asset_id].bytes)
+	actor_gif_cache.erase(asset_id)
+	actor_image_cache.erase(asset_id)
+
+func _advance_token_animations(now: int) -> void:
+	for asset_id in drawn_gifs:
+		var clip: Dictionary=actor_gif_cache.get(asset_id,{})
+		if clip.is_empty():continue
+		var index: int=clip.ends.bsearch(now%int(clip.duration),false)
+		if index!=int(clip.last):
+			clip.last=index
+			actor_image_cache[asset_id].update(clip.frames[index])
 
 func current_items() -> Array:
 	return snapshot.get("board_items",[]) if role=="player" else campaign.get("custom_items",[]).filter(func(item):return item.holder.is_empty() and item.scene_id==campaign.get("active_scene",""))
@@ -789,12 +866,12 @@ func attach_token_png(path: String, target_id: String="") -> Dictionary:
 	var actor_id=target_id if not target_id.is_empty() else selected_actor_id
 	if actor_id.is_empty():
 		return {"ok": false, "error": "Select a token first."}
-	var result := Hearth20Assets.inspect_token_png(path)
-	if not result.ok:
-		return result
-	var attached := Hearth20Assets.attach_token_override(campaign, actor_id, result.bytes, result.name)
+	if not FileAccess.file_exists(path):return {"ok":false,"error":"Token image does not exist."}
+	var bytes := Hearth20Assets._read_image_file(path,Hearth20Assets.TOKEN_MAX_BYTES)
+	var attached := Hearth20Assets.attach_token_override(campaign, actor_id, bytes, path.get_file())
 	if attached.ok:
 		actor_image_cache.clear()
+		_clear_token_animations()
 		queue_redraw()
 		if session and session.local_role == "dm":
 			session._broadcast_snapshots()
@@ -925,17 +1002,20 @@ func _drop_data(at_position: Vector2, data: Variant) -> void:
 	else:selected_actor_id=id;selection_changed.emit(id)
 	dragging_actor=false;queue_redraw()
 
-func _actor_at(screen: Vector2) -> Dictionary:
+func _actor_at(screen: Vector2, own_only: bool = false) -> Dictionary:
 	var scene := current_scene()
 	var cell_px := float(scene.get("cell_pixels", 64.0))
 	for actor in current_actors().duplicate():
 		if not actor is Dictionary:
 			continue
+		if own_only and not actor.get("self_editable", false):
+			continue
 		if role == "dm" and actor.get("layer", "tokens") != active_layer: continue
 		var position: Variant = actor.get("position", null)
 		if not position is Vector2:
 			continue
-		var radius := maxf(12.0, cell_px * camera_zoom * float(actor.get("token_size", 0.82)) * 0.6)
+		var token_size := float(actor.get("token_size", actor.get("size", 0.82)))
+		var radius := maxf(12.0, cell_px * camera_zoom * token_size * 0.6)
 		if _world_to_screen(position, cell_px).distance_to(screen) <= radius:
 			if role == "player" and str(actor.get("kind", "")) != "hero":
 				continue
@@ -1058,6 +1138,13 @@ func _process(_delta: float) -> void:
 	var animated_pings=not pings.is_empty();var rulers_before=remote_rulers.size()
 	pings = pings.filter(func(event: Dictionary) -> bool: return Time.get_ticks_msec() - int(event.started) < 1800)
 	var now := Time.get_ticks_msec()
+	_advance_token_animations(now)
+	if masked_names_visible:
+		@warning_ignore("integer_division")
+		var frame := now / 95
+		if frame != masked_name_frame:
+			masked_name_frame = frame
+			queue_redraw()
 	for key in remote_rulers.keys():
 		if now - int(remote_rulers[key].received) > 1600: remote_rulers.erase(key)
 	if not local_ruler.is_empty() and now - last_preview_msec > 100 and session and not read_only_preview:

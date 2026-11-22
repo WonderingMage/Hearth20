@@ -14,6 +14,7 @@ var kind: OptionButton
 var store_button: Button
 var place_button: Button
 var duplicate_button: Button
+var delete_button: Button
 var selected_id:=""
 var revision:=-1
 var theme_revision:=-1
@@ -55,6 +56,7 @@ func setup(owner_app: Hearth20App) -> void:
 	duplicate_button=_button(inspector,"Duplicate into inventory",func():
 		var result: Dictionary=app.session.duplicate_inventory_token(selected_id); _result(result)
 		if result.ok: select_token(str(result.id)))
+	delete_button=_button(inspector,"Delete token…",func():app._confirm_token_deletion(self))
 	var detail_scroll:=ScrollContainer.new(); detail_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED; detail_scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL; inspector.add_child(detail_scroll)
 	editor=Hearth20TokenPanel.new(); editor.inventory_context=true; editor.size_flags_horizontal=Control.SIZE_EXPAND_FILL; detail_scroll.add_child(editor); editor.setup(app)
 	status=_label("Stored tokens keep their image and player assignment. Save the campaign to retain the inventory.",12); status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; column.add_child(status)
@@ -86,6 +88,7 @@ func refresh() -> void:
 	page_note.text="%d matches  ·  Page %d / %d"%[visible_entries.size(),page+1,maxi(1,ceili(visible_entries.size()/24.0))]
 	var actor:=Hearth20Contracts.find_actor(app.campaign,selected_id)
 	place_button.disabled=actor.is_empty(); duplicate_button.disabled=actor.is_empty(); store_button.disabled=actor.is_empty() or actor.get("in_inventory",false)
+	delete_button.disabled=actor.is_empty()
 	selected_note.text=(str(actor.get("name",""))+"\n"+_location(actor)) if not actor.is_empty() else "Choose a token to inspect."
 func _location(actor: Dictionary) -> String:
 	if actor.get("in_inventory",false): return "Stored in inventory"

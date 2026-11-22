@@ -11,11 +11,14 @@ class ContextMenu extends Control:
 	signal id_pressed(id: int)
 	var panel: PanelContainer
 	var items: Array[Button]=[]
+	var actions: Array
+	func _init(menu_actions: Array = [["Open this map","map"],["Bring all heroes here","tokens"],["Delete map…","close"]]) -> void:
+		actions=menu_actions
 	func _ready() -> void:
-		name="MapContextMenu";set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP;z_index=1100
+		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP;z_index=1100
 		panel=PanelContainer.new();panel.add_theme_stylebox_override("panel",Hearth20Design.panel(Hearth20Design.SURFACE,8,8,Hearth20Design.GOLD));add_child(panel)
 		var column=VBoxContainer.new();column.add_theme_constant_override("separation",4);panel.add_child(column)
-		for record in [["Open this map","map"],["Bring all heroes here","tokens"],["Delete map…","close"]]:
+		for record in actions:
 			var index=items.size();var button=Button.new();button.text=record[0];button.icon=Hearth20Design.icon(record[1],18);button.alignment=HORIZONTAL_ALIGNMENT_LEFT;button.custom_minimum_size=Vector2(248,36)
 			button.pressed.connect(func():hide();id_pressed.emit(index));column.add_child(button);items.append(button)
 		hide()
@@ -66,7 +69,7 @@ func setup(owner_app: Hearth20App) -> void:
 	# A popup Window inside the map SubViewport can retain an exclusive input
 	# grab while its originating tab is rebuilt. Keep this menu on the same
 	# ordinary canvas as the map; it never captures the native window.
-	menu=ContextMenu.new();menu.id_pressed.connect(_context_action);app.add_child(menu)
+	menu=ContextMenu.new();menu.name="MapContextMenu";menu.id_pressed.connect(_context_action);app.add_child(menu)
 	var scrollbar:=scroll.get_h_scroll_bar()
 	scrollbar.changed.connect(_update_scroll_buttons)
 	scrollbar.value_changed.connect(func(_value):_update_scroll_buttons())

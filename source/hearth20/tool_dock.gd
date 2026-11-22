@@ -92,6 +92,8 @@ func choose_tool(tool: String) -> void:
 func refresh_role() -> void:
 	for control in dm_controls: control.visible = session.local_role == "dm"
 	if session.local_role == "player" and current in ["tokens","casino","beacon","mask","lighting","layers"]: open("draw",false)
+	if current == "dice" and fields.has("preset_face") != (session.local_role == "dm"):
+		open("dice", false)
 	if session.local_role == "player": board.active_layer = "tokens"
 
 func clear_content() -> void:
@@ -372,7 +374,7 @@ func _dice_ui() -> void:
 		for child in app.get_children():
 			if child is Hearth20DiceSetsWindow and not child.is_queued_for_deletion():Hearth20Design.popup_window(child);return
 		var picker:=Hearth20DiceSetsWindow.new(); app.add_child(picker); picker.setup(session))
-	choices([["self","Only me"],["public","Everyone"],["secret","GM only"]],dice_visibility,func(v): dice_visibility=v)
+	choices([["self","Only me"],["public","Everyone"],["secret","GM only"]],dice_visibility,_set_dice_visibility)
 	section("CHOOSE YOUR DICE")
 	choices([["4","d4"],["6","d6"],["8","d8"],["10","d10"],["12","d12"],["20","d20"],["100","d100"]],str(dice_sides),func(v): dice_sides=int(v); fields.sides.remove_meta("number_draft");fields.sides.value=dice_sides; _formula(),4)
 	var basic:=HBoxContainer.new()
@@ -406,6 +408,26 @@ func _dice_ui() -> void:
 	formula_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	formula_label.add_theme_font_override("font",Hearth20Design.font(true))
 	action_area.add_child(formula_label)
+	if session.local_role == "dm":
+		var preset_row := HBoxContainer.new()
+		preset_row.add_theme_constant_override("separation", 8)
+		action_area.add_child(preset_row)
+		var preset_label := label("Preset die face · DM", 13)
+		preset_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		preset_row.add_child(preset_label)
+		var preset := LineEdit.new()
+		preset.name = "PresetDieFace"
+		preset.custom_minimum_size = Vector2(94, 34)
+		preset.placeholder_text = "Random"
+		preset.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		preset.tooltip_text = "Sets the die face on the next Everyone roll made with Roll dice."
+		preset.text_submitted.connect(func(_text): _roll())
+		preset_row.add_child(preset)
+		fields.preset_face = preset
+		var help := label("", 11, Hearth20Design.MUTED)
+		help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		action_area.add_child(help)
+		fields.preset_help = help
 	_formula()
 	dice_roll_button=button("Roll dice",_roll,true,action_area)
 	dice_roll_button.disabled=not pending_dice_request.is_empty()
@@ -418,6 +440,19 @@ func _dice_ui() -> void:
 	_target().add_child(roll_history)
 	_refresh_rolls()
 	_sync_dice_mode()
+
+func _set_dice_visibility(value: String) -> void:
+	dice_visibility = value
+	_sync_dice_preset()
+
+func _sync_dice_preset() -> void:
+	if not fields.has("preset_face"):
+		return
+	fields.preset_face.editable = dice_visibility == "public"
+	var rule := "first die" if dice_mode == "normal" and dice_count > 1 else "die face" if dice_mode == "normal" else "kept d20"
+	var help_text := "Next Everyone roll sets the %s. Blank rolls randomly." % rule if dice_visibility == "public" else "Choose Everyone to set the next die face."
+	fields.preset_help.text = help_text
+	fields.preset_help.tooltip_text = help_text
 
 func _set_dice_mode(value: String) -> void:
 	dice_mode=value
@@ -441,6 +476,7 @@ func _formula() -> void:
 	if not is_instance_valid(formula_label): return
 	formula_label.text="%dd%d" % [dice_count,dice_sides]+("%+d" % dice_bonus if dice_bonus else "")+(" + proficiency" if use_proficiency else "")
 	if dice_mode!="normal":formula_label.text="2d20 · keep "+("highest" if dice_mode=="advantage" else "lowest")+("%+d"%dice_bonus if dice_bonus else "")
+	_sync_dice_preset()
 
 func _roll() -> void:
 	if not pending_dice_request.is_empty():return
@@ -451,7 +487,20 @@ func _roll() -> void:
 		dice_status_text="Advantage/disadvantage use two d20s. Choose d20 with quantity 1, or Normal for this die.";roll_result.text=dice_status_text;return
 	var actor: Dictionary=app._selected_sheet_actor()
 	var expression:="%dd%d" % [dice_count,dice_sides]+("%+d" % dice_bonus if dice_bonus else "")
-	var result: Dictionary=session.submit_dice(str(actor.get("id","")) if use_proficiency else "",expression,dice_visibility,use_proficiency,dice_mode)
+	var preset: LineEdit = fields.get("preset_face")
+	var preset_text := preset.text.strip_edges() if session.local_role == "dm" and dice_visibility == "public" and is_instance_valid(preset) else ""
+	var result: Dictionary
+	if preset_text.is_empty():
+		result = session.submit_dice(str(actor.get("id","")) if use_proficiency else "",expression,dice_visibility,use_proficiency,dice_mode)
+	elif not preset_text.is_valid_int() or preset_text.to_int() < 1 or preset_text.to_int() > dice_sides:
+		dice_status_text = "Preset die face must be a whole number from 1 to %d." % dice_sides
+		roll_result.text = dice_status_text
+		preset.grab_focus()
+		return
+	else:
+		result = session.submit_public_preset_dice(expression, dice_mode, preset_text.to_int())
+		if result.get("ok", false) and is_instance_valid(preset):
+			preset.clear()
 	if not result.get("ok",false):dice_status_text=str(result.get("error","The roll could not be sent."))
 	elif result.get("pending",false):
 		pending_dice_request=str(result.get("request_id",""));dice_status_text="Waiting for the GM to confirm the roll…";dice_roll_button.disabled=true

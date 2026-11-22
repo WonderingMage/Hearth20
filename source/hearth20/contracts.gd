@@ -480,6 +480,12 @@ static func project_for_player(campaign: Dictionary, player_id: String, map_asse
 			clean.decorative=true
 			for field in ["display_width_cells","display_height_cells","rotation_degrees"]:
 				if actor.has(field):clean[field]=actor[field]
+		else:
+			var token_name := str(actor.get("name","Token")).left(64)
+			var public_name := Hearth20TokenInventory.name_is_public(actor)
+			clean.name = token_name if public_name else "Token"
+			if not public_name:clean.masked_name_length=token_name.length()
+			if owned and Hearth20TokenInventory.can_edit_character(actor,player_id):clean.self_editable=true
 		if owned:
 			var movement_value: Variant = actor.get("movement_policy", {})
 			var movement: Dictionary = movement_value if movement_value is Dictionary else {}
@@ -626,14 +632,14 @@ static func _visible_assets(campaign: Dictionary, actors: Array[Dictionary]) -> 
 		var bytes := Hearth20Assets.read_asset(campaign, asset_id, "token")
 		if bytes.is_empty():
 			continue
-		# read_asset already checked this exact record, digest, dimensions and PNG.
+		# read_asset already checked this exact record, digest, dimensions and format.
 		var verified: Dictionary=campaign.assets[asset_id]
 		var base64: String=verified.base64
 		encoded_bytes += base64.to_utf8_buffer().size()
 		if encoded_bytes > MAX_PROJECTION_BYTES:
 			return {"_h20_overflow": true}
 		allowed[asset_id] = {
-			"kind": "token", "mime_type": "image/png", "width": int(verified.width),
+			"kind": "token", "mime_type": str(verified.mime_type), "width": int(verified.width),
 			"height": int(verified.height), "sha256": str(verified.sha256),
 			"base64": base64, "byte_length": bytes.size(),
 		}

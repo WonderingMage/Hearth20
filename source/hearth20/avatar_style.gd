@@ -1,7 +1,43 @@
 extends RefCounted
 class_name Hearth20AvatarStyle
 ## Cosmetic choices only. The authenticated session decides who is the DM.
-const ROBES={"amethyst":"#7356b5","crimson":"#b33c47","emerald":"#36966a","sapphire":"#367dad","ivory":"#ddd0ad","onyx":"#45444e"}
+const ROBES={
+	"amethyst":"#7356b5",
+	"crimson":"#b33c47",
+	"emerald":"#36966a",
+	"sapphire":"#367dad",
+	"ivory":"#ddd0ad",
+	"onyx":"#45444e",
+	"burgundy":"#722f47",
+	"dusty_rose":"#bf728d",
+	"coral":"#db7661",
+	"terracotta":"#a55239",
+	"copper":"#ae6e43",
+	"amber":"#c48c37",
+	"saffron":"#dfb753",
+	"ochre":"#987437",
+	"olive":"#7a803b",
+	"moss":"#53683c",
+	"forest":"#2a5941",
+	"sage":"#879e72",
+	"jade":"#4fb486",
+	"seafoam":"#7dbdaf",
+	"teal":"#287c83",
+	"turquoise":"#46aabc",
+	"midnight":"#2c3b68",
+	"storm_blue":"#65768a",
+	"cerulean":"#5c9fca",
+	"cobalt":"#4c58ad",
+	"periwinkle":"#818bd2",
+	"lilac":"#ae92c1",
+	"plum":"#624369",
+	"orchid":"#a25e9c",
+	"sand":"#bd9e71",
+	"taupe":"#89786c",
+	"slate":"#696a7c",
+	"charcoal":"#292b35",
+}
+const CLASSIC_ROBES=["amethyst","crimson","emerald","sapphire","ivory","onyx"]
 const METALS=["gold","silver"]
 const CHAINS=["none","cuban","rope","layered"]
 const HOST_PENDANT="d20"
@@ -28,6 +64,21 @@ static func clean(value: Variant,host: bool) -> Dictionary:
 	if value.get("eye_color") in EYE_COLORS:result.eye_color=value.eye_color
 	if value.get("eye_treatment") in EYE_TREATMENTS:result.eye_treatment=value.eye_treatment
 	result.pendant=HOST_PENDANT if host and value.get("pendant")==HOST_PENDANT else "none"
+	return result
+static func wire_style(style: Dictionary,extended_palette: bool) -> Dictionary:
+	if extended_palette or style.robe in CLASSIC_ROBES:return style
+	var dye:=Color(ROBES[style.robe])
+	var fallback: String=CLASSIC_ROBES[0]
+	var nearest_distance:=INF
+	for id in CLASSIC_ROBES:
+		var classic:=Color(ROBES[id])
+		var delta:=Vector3(dye.r-classic.r,dye.g-classic.g,dye.b-classic.b)
+		var distance:=delta.length_squared()
+		if distance<nearest_distance:
+			nearest_distance=distance
+			fallback=id
+	var result:=style.duplicate()
+	result.robe=fallback
 	return result
 static func remembered(host: bool) -> Dictionary:
 	var config=ConfigFile.new();config.load(Hearth20PlayerProfile.SETTINGS_PATH)

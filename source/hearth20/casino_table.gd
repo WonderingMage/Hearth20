@@ -65,12 +65,10 @@ func setup(textures: Dictionary) -> void:
 	room=Hearth20TavernRoom.new();world.add_child(room);room.setup(self)
 	if room.get_meta("crafted_room",false):
 		key.light_energy=.24;key.shadow_enabled=false;env.ambient_light_color=Color("#aebed0");env.ambient_light_energy=.40
-	var crafted_table=Hearth20GeneratedModels.make("table",Vector3(6.4,.84,4.4))
-	if crafted_table!=null:world.add_child(crafted_table)
-	else:
-		_lathe(world,Vector3.ZERO,[[.0,.65],[1.0,.65],[1.0,.75],[.98,.8],[.94,.83],[0.,.83]],3.2,2.2,wood,64)
-		_lathe(world,Vector3.ZERO,[[1.,.838],[.0,.838]],2.95,1.96,felt,64)
-		for band in [[3.16,2.16,.77],[2.98,1.99,.835]]:_ring(Vector3(0,band[2],0),band[0],band[1],.012,bronze)
+	var table_scene := load("res://hearth20/storybook_table/walnut-table.glb") as PackedScene
+	var crafted_table := table_scene.instantiate()
+	crafted_table.name="Generated_table"
+	world.add_child(crafted_table)
 	for x in [-1.87,1.87]:_candle(Vector3(x,.84,-.1))
 	_goblet(Vector3(-1.65,.84,.78));_pouch(Vector3(1.7,.84,.62))
 	book=Hearth20CasinoBook.new();world.add_child(book);book.setup(self,textures);book.opened_changed.connect(_book_state)

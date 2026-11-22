@@ -6,6 +6,7 @@ const TITLE_SCENE="res://hearth20_boot.tscn"
 var app: Hearth20App
 var console: Hearth20SkirtConsole
 var console_button: Button
+var casino_console_button: Button
 var jax_alert: Hearth20JaxAlert
 var table: Hearth20CasinoTable
 var map_viewport: SubViewport
@@ -35,6 +36,7 @@ var changing_focus=false
 var looking=false
 var look_up=false
 var viewing_table_controls=false
+var console_view_blend := 0.0
 var look=Vector2.ZERO
 var look_blend=Vector2.ZERO
 var held_pull=""
@@ -62,6 +64,7 @@ func _ready() -> void:
 	map_viewport=SubViewport.new();map_viewport.name="TableUi";map_viewport.size=Vector2i(1440,900);map_viewport.handle_input_locally=true;map_viewport.gui_embed_subwindows=true;focus_surface.add_child(map_viewport)
 	app=Hearth20App.new();app.name="TableApplication";app.seated_shell=self;app.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);map_viewport.add_child(app)
 	jax_alert=Hearth20JaxAlert.new();add_child(jax_alert);app.session.jax_alert_received.connect(jax_alert.trigger);app.session.jax_alert_cancelled.connect(jax_alert.dismiss)
+	app.session.table_alert_received.connect(jax_alert.trigger_named)
 	# Canvas notifications/rolls belong to this player's screen, not the map texture.
 	app.casino_portal.balance_notice.reparent(self)
 	# The focused map is at 700; rolls must composite above it on the player's screen.
@@ -233,6 +236,13 @@ func _build_hud() -> void:
 	_button(home_row,"Open campaign",func():focus_map();app._load_campaign())
 	back=Button.new();back.icon=Hearth20Design.icon("back",18);back.add_theme_constant_override("icon_max_width",18);back.tooltip_text="Back to the table";back.custom_minimum_size=Vector2(40,36);back.size_flags_vertical=Control.SIZE_SHRINK_CENTER;back.pressed.connect(leave_focus);app.shell.toolbar.add_child(back);app.shell.toolbar.move_child(back,0);back.hide()
 	look_button=Button.new();look_button.anchor_left=.5;look_button.anchor_right=.5;look_button.offset_left=-78;look_button.offset_right=78;look_button.offset_top=18;look_button.offset_bottom=54;look_button.z_index=950;look_button.pressed.connect(_use_camera_button);add_child(look_button)
+	casino_console_button=_button(self,"Table controls",_show_table_controls)
+	casino_console_button.anchor_left=.5;casino_console_button.anchor_right=.5
+	casino_console_button.offset_left=87;casino_console_button.offset_right=239
+	casino_console_button.offset_top=18;casino_console_button.offset_bottom=54
+	casino_console_button.z_index=950
+	casino_console_button.icon=Hearth20Design.icon("panel",16)
+	casino_console_button.hide()
 	_update_camera_button()
 func _update_camera_button() -> void:
 	look_button.text="Back to the table" if viewing_table_controls else "↑ Ceiling pulls"
@@ -241,7 +251,7 @@ func _use_camera_button() -> void:
 	if viewing_table_controls:_leave_table_controls()
 	else:toggle_pulls()
 func _show_table_controls() -> void:
-	if not ready_to_show or switching or focus_state!="table" or app.session.local_role!="dm" or app.session.is_spectating():return
+	if not ready_to_show or switching or focus_state!="table" or app.session.local_role!="dm" or app.session.is_spectating() or table.book.opened:return
 	viewing_table_controls=true
 	looking=false;look_up=false;look=Vector2(0,-1.1);held_pull=""
 	_update_camera_button()
@@ -328,6 +338,7 @@ func focus_map(page: Control=null) -> void:
 	app.shell.board_controls.show()
 	focus_state="map";focus_surface.show();back.show();hud.hide();table.hide();table.viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;table.card_viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;table.soul_viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;map_viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
 	table.room.set_active(false)
+	console.hide()
 	table.process_mode=Node.PROCESS_MODE_DISABLED
 	app.board.soft_light.refresh_hz=60.
 	if page!=null:app._show_sidebar_page(page)
@@ -340,6 +351,8 @@ func focus_sheet() -> void:
 	changing_focus=false;back.hide()
 func leave_focus() -> void:
 	if not is_instance_valid(table):return
+	var context_menu := app.active_context_menu()
+	if context_menu != null:context_menu.hide()
 	_leave_table_controls()
 	if focus_state=="sheet" and app.beyond_sheet.browser_ready:app.beyond_sheet.capture_sheet_preview()
 	changing_focus=true
@@ -358,6 +371,11 @@ func _camera(delta: float) -> void:
 	table.camera.position=Vector3(0,1.96,2.45).lerp(Vector3(0,2.10,2.20),peek).lerp(Vector3(0,2.52,1.62),reading);var pitch=look_blend.y
 	var room_gaze=smoothstep(.45,1.15,absf(wrapf(look_blend.x,-PI,PI)))*1.265 if not look_up else 0.
 	var target_point=Vector3(sin(look_blend.x)*2.7,.85+pitch*3.1+room_gaze,2.45-cos(look_blend.x)*2.7).lerp(Vector3(0,.87,0),peek).lerp(Vector3(0,1.25,.65),reading)
+	console_view_blend=lerpf(console_view_blend,1.0 if viewing_table_controls else 0.0,minf(1.0,delta*8.0))
+	if console_view_blend>.001 and is_instance_valid(console):
+		table.camera.position=table.camera.position.lerp(Vector3(0,1.82,2.87),console_view_blend)
+		var console_center: Vector3=console.to_global(Vector3(0,-Hearth20SkirtConsole.ROW_GAP*.5,.07))
+		target_point=target_point.lerp(console_center,console_view_blend)
 	table.camera.look_at(target_point,Vector3.UP)
 	table.card_camera.global_transform=table.camera.global_transform;table.card_camera.fov=table.camera.fov
 func _process(delta: float) -> void:
@@ -367,6 +385,7 @@ func _process(delta: float) -> void:
 	if exterior!=null:exterior.request(app.session.room_environment())
 	var can_use_console=app.session.local_role=="dm" and not app.session.is_spectating()
 	console_button.visible=can_use_console
+	casino_console_button.visible=can_use_console and current_mode=="casino" and focus_state=="table" and not switching and not viewing_table_controls and not table.book.opened
 	if not can_use_console:_leave_table_controls()
 	look_button.visible=focus_state=="table" and not switching and not app.session.is_spectating() and not table.book.opened
 	if desired_mode()!=requested_mode and not switching:
@@ -375,8 +394,8 @@ func _process(delta: float) -> void:
 	if focus_state=="table":
 		_camera(delta)
 		hud.visible=current_mode=="map" and not viewing_table_controls and not looking and look_blend.y>-.55
-		if current_mode=="casino" and is_instance_valid(app.casino_portal.hud):app.casino_portal.hud.visible=not look_up and not looking and look_blend.y>-.55 and not switching and not table.book.opened and not app.session.is_spectating()
-		if is_instance_valid(app.casino_portal.book_nav):app.casino_portal.book_nav.visible=not look_up and not looking and look_blend.y>-.55
+		if current_mode=="casino" and is_instance_valid(app.casino_portal.hud):app.casino_portal.hud.visible=not viewing_table_controls and not look_up and not looking and look_blend.y>-.55 and not switching and not table.book.opened and not app.session.is_spectating()
+		if is_instance_valid(app.casino_portal.book_nav):app.casino_portal.book_nav.visible=not viewing_table_controls and not look_up and not looking and look_blend.y>-.55
 		var online=not (app.session.multiplayer.multiplayer_peer is OfflineMultiplayerPeer)
 		home_row.visible=not online and current_mode=="map"
 		var player_view: bool=app.session.local_role=="player"
@@ -389,7 +408,8 @@ func _process(delta: float) -> void:
 			var rect=app.board.get_global_rect();var dimensions=Vector2(map_viewport.size);map_plate.material_override.set_shader_parameter("crop",Vector4(rect.position.x/dimensions.x,rect.position.y/dimensions.y,rect.size.x/dimensions.x,rect.size.y/dimensions.y))
 			if rect.size.x>0:map_plate.mesh.size=Vector2(2.62,2.62*rect.size.y/rect.size.x)
 			var revision=int(app.campaign.get("revision",0)) if app.session.local_role=="dm" else int(app.session.client_snapshot.get("revision",0))
-			var live_fx=not app.board.active_fx.events.is_empty();var refresh=1./30. if live_fx else .1
+			var live_fx=not app.board.active_fx.events.is_empty()
+			var refresh=1./30. if live_fx or not app.board.drawn_gifs.is_empty() else .1
 			app.board.soft_light.refresh_hz=30. if live_fx else 10.
 			app.board.active_fx.cinematic.refresh_hz=30.
 			if revision!=last_revision or viewport_tick>refresh:map_viewport.render_target_update_mode=SubViewport.UPDATE_ONCE;last_revision=revision;viewport_tick=0.
@@ -417,7 +437,7 @@ func _input(event: InputEvent) -> void:
 	if has_modal():return
 	# HUD actions have priority over the scene beneath their buttons.
 	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and held_pull.is_empty():
-		var buttons=action_row.get_children()+home_row.get_children()+[look_button,invite_button]
+		var buttons=action_row.get_children()+home_row.get_children()+[look_button,invite_button,casino_console_button]
 		for button in buttons:
 			if button.is_visible_in_tree() and button.get_global_rect().has_point(event.position):
 				if is_instance_valid(console):console.held=""
@@ -461,8 +481,9 @@ func _input(event: InputEvent) -> void:
 				if absf(crossing.x)<.46 and crossing.z>.73 and crossing.z<1.4:focus_sheet();get_viewport().set_input_as_handled()
 				elif absf(crossing.x)<1.36 and absf(crossing.z+.13)<.95:focus_map();get_viewport().set_input_as_handled()
 func _unhandled_key_input(event: InputEvent) -> void:
-	if is_instance_valid(app.map_tabs) and app.map_tabs.menu.visible:
-		app.map_tabs.menu.handle_key(event)
+	var context_menu := app.active_context_menu()
+	if context_menu != null:
+		context_menu.handle_key(event)
 		get_viewport().set_input_as_handled();return
 	if has_modal():return
 	if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:

@@ -1,10 +1,13 @@
 extends Node3D
 class_name Hearth20WizardAvatar
 ## Shared static body/hood meshes with emissive cartoon eyes. No mouth or tracking.
+# The visor mesh faces 16.6 degrees left of the avatar's forward axis.
+const VISOR_YAW_CORRECTION := deg_to_rad(16.5)
 var hood: Node3D
 var eyes: MeshInstance3D
 var style={}
 var host=false
+static var cloth_shader: Shader
 static var cloth_cache={}
 static var metal_cache={}
 func setup(value: Dictionary,is_host: bool) -> void:
@@ -13,8 +16,13 @@ func setup(value: Dictionary,is_host: bool) -> void:
 	if body!=null:add_child(body);_cloth(body)
 	hood=Node3D.new();hood.name="IndependentHood";hood.position=Vector3(-.025,.70,-.16);add_child(hood)
 	var hat=Hearth20GeneratedModels.make("wizard_hat",Vector3(.83,.76,.72))
-	if hat!=null:hood.add_child(hat);_cloth(hat)
-	if hat!=null:eyes=Hearth20WizardEyes.make(hat,style);hood.add_child(eyes)
+	if hat!=null:
+		hood.add_child(hat)
+		_cloth(hat)
+		eyes=Hearth20WizardEyes.make(hat,style)
+		hood.add_child(eyes)
+		hat.rotation.y=VISOR_YAW_CORRECTION
+		eyes.rotation.y=VISOR_YAW_CORRECTION
 	_jewelry()
 func _cloth(node: Node) -> void:
 	for mesh in node.find_children("*","MeshInstance3D",true,false):
@@ -23,7 +31,9 @@ func _cloth(node: Node) -> void:
 			if not original is StandardMaterial3D:continue
 			var key=str(original.get_instance_id())+style.robe
 			if not cloth_cache.has(key):
-				var shader=Shader.new();shader.code="""
+				if cloth_shader==null:
+					cloth_shader=Shader.new()
+					cloth_shader.code="""
 shader_type spatial;
 uniform sampler2D cloth:source_color,filter_linear_mipmap_anisotropic;
 uniform sampler2D relief:hint_normal,filter_linear_mipmap_anisotropic;
@@ -38,7 +48,7 @@ void fragment(){
  ROUGHNESS=mix(.88,.44,1.-neutral);METALLIC=(1.-neutral)*.55;
 }
 """
-				var material_value=ShaderMaterial.new();material_value.shader=shader;material_value.set_shader_parameter("cloth",original.albedo_texture);material_value.set_shader_parameter("relief",original.normal_texture);material_value.set_shader_parameter("dye",Color(Hearth20AvatarStyle.ROBES[style.robe]));cloth_cache[key]=material_value
+				var material_value=ShaderMaterial.new();material_value.shader=cloth_shader;material_value.set_shader_parameter("cloth",original.albedo_texture);material_value.set_shader_parameter("relief",original.normal_texture);material_value.set_shader_parameter("dye",Color(Hearth20AvatarStyle.ROBES[style.robe]));cloth_cache[key]=material_value
 			mesh.set_surface_override_material(surface,cloth_cache[key])
 func set_eyes(id: String,color: String,treatment="") -> void:
 	if treatment.is_empty():treatment=style.eye_treatment

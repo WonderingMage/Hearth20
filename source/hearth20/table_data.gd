@@ -48,7 +48,7 @@ static func owned_sheets(campaign: Dictionary, player_id: String) -> Array:
 	var out=[]
 	for actor in campaign.get("actors",[]):
 		if actor.get("owner_player_id","")!=player_id or not actor.get("is_hero",false):continue
-		out.append({"id":str(actor.id),"name":str(actor.get("name","Character")),"in_inventory":bool(actor.get("in_inventory",false)),"sheet_external":true})
+		out.append({"id":str(actor.id),"name":str(actor.get("name","Character")) if Hearth20TokenInventory.name_is_public(actor) else "Token","in_inventory":bool(actor.get("in_inventory",false)),"sheet_external":true})
 	return out
 
 static func ability_index(key: String) -> int:
@@ -106,7 +106,7 @@ static func modifier(actor: Dictionary, kind: String, key: String) -> Dictionary
 		bonus = int(actor.get("initiative_bonus", bonus))
 	return {"ok": true, "bonus": clampi(bonus, -1000, 1000), "label": label}
 
-static func roll(actor: Dictionary, kind: String, key: String, mode: String, expression: String, rng: RandomNumberGenerator) -> Dictionary:
+static func roll(actor: Dictionary, kind: String, key: String, mode: String, expression: String, rng: RandomNumberGenerator, preset_face: int = 0) -> Dictionary:
 	if mode not in ["normal", "advantage", "disadvantage"]:
 		return {"ok": false, "error": "Choose normal, advantage, or disadvantage."}
 	var count := 1
@@ -132,10 +132,15 @@ static func roll(actor: Dictionary, kind: String, key: String, mode: String, exp
 			return checked
 		bonus = int(checked.bonus)
 		label = str(checked.label)
+	if preset_face < 0 or preset_face > sides:
+		return {"ok": false, "error": "Preset die face must be a whole number from 1 to %d." % sides}
+	# An advantage or disadvantage roll must still keep the correct die.
+	var lowest := preset_face if preset_face > 0 and mode == "disadvantage" else 1
+	var highest := preset_face if preset_face > 0 and mode == "advantage" else sides
 	var dice: Array = []
 	var total := 0
 	for index in (2 if mode != "normal" else count):
-		var value := rng.randi_range(1, sides)
+		var value := preset_face if index == 0 and preset_face > 0 else rng.randi_range(lowest, highest)
 		dice.append(value)
 		total += value
 	var kept := total

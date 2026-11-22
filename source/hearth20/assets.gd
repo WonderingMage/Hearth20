@@ -1,6 +1,6 @@
 extends RefCounted
 class_name Hearth20Assets
-## Bounded image import. Token overrides retain the original PNG bytes exactly.
+## Bounded image import. Token overrides retain the original art bytes exactly.
 
 const MAP_MAX_BYTES := 40 * 1024 * 1024
 const MAP_MAX_SIDE := 16384
@@ -45,6 +45,21 @@ static func inspect_token_png(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {"ok": false, "error": "Token PNG does not exist."}
 	return inspect_token_png_bytes(_read_image_file(path,TOKEN_MAX_BYTES), path.get_file())
+
+static func inspect_token_art(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):return {"ok":false,"error":"Token image does not exist."}
+	return inspect_token_art_bytes(_read_image_file(path,TOKEN_MAX_BYTES),path.get_file(),true)
+
+static func inspect_token_art_bytes(bytes: PackedByteArray,name: String="token",keep_frames:=false) -> Dictionary:
+	if not Hearth20TokenGif.is_gif(bytes):
+		if bytes.slice(0,8)!=PackedByteArray(PNG_SIGNATURE):return {"ok":false,"error":"Choose a valid PNG or GIF token image of at most 8 MiB."}
+		return inspect_token_png_bytes(bytes,name)
+	var checked:=Hearth20TokenGif.inspect(bytes,keep_frames)
+	if not checked.ok:return checked
+	var digest:=sha256(bytes)
+	checked.merge({"bytes":bytes,"sha256":digest,"mime_type":"image/gif","name":name.get_file().left(128),"asset_id":"sha256-"+digest})
+	if keep_frames:checked.image=checked.frames[0]
+	return checked
 
 static func _read_image_file(path: String,limit: int) -> PackedByteArray:
 	var file=FileAccess.open(path,FileAccess.READ)
@@ -107,14 +122,14 @@ static func _read_asset(campaign: Dictionary, asset_id: String, expected_kind: S
 	var byte_length := int(record.get("byte_length", -1))
 	var encoded := str(record.get("base64", ""))
 	var mime:=str(record.get("mime_type",""))
-	if (mime!="image/png" and (kind!="map" or mime!="image/webp")) or byte_length < 1 or byte_length > byte_limit or encoded.length() != ceili(float(byte_length) / 3.0) * 4:
+	if (mime!="image/png" and not (kind=="map" and mime=="image/webp") and not (kind=="token" and mime=="image/gif")) or byte_length < 1 or byte_length > byte_limit or encoded.length() != ceili(float(byte_length) / 3.0) * 4:
 		return PackedByteArray()
 	var bytes := Marshalls.base64_to_raw(encoded)
 	if bytes.size() != int(record.byte_length) or sha256(bytes) != str(record.get("sha256", "")) or "sha256-" + sha256(bytes) != asset_id:
 		return PackedByteArray()
 	if kind == "token":
-		var checked := inspect_token_png_bytes(bytes)
-		if not checked.ok or int(record.get("width", -1)) != int(checked.width) or int(record.get("height", -1)) != int(checked.height):
+		var checked := inspect_token_art_bytes(bytes)
+		if not checked.ok or checked.mime_type!=mime or int(record.get("width", -1)) != int(checked.width) or int(record.get("height", -1)) != int(checked.height):
 			return PackedByteArray()
 	else:
 		var dimensions := _webp_dimensions(bytes) if mime=="image/webp" else _png_dimensions(bytes)
@@ -169,9 +184,11 @@ static func attach_token_override(campaign: Dictionary, actor_id: String, bytes:
 	var actor := Hearth20Contracts.find_actor(campaign, actor_id)
 	if actor.is_empty():
 		return {"ok": false, "error": "Select a campaign token first."}
-	var checked := inspect_token_png_bytes(bytes, name)
+	var checked := inspect_token_art_bytes(bytes, name)
 	if not checked.ok:
 		return checked
+	if campaign.assets.has(checked.asset_id) and campaign.assets[checked.asset_id].get("kind","")!="token":
+		return {"ok":false,"error":"That image is already used as a map. Choose a separate token image."}
 	var asset_id := store_asset(campaign, checked, "token")
 	if asset_id.is_empty():
 		return {"ok": false, "error": "Could not store the token image."}

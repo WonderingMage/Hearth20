@@ -65,7 +65,12 @@ func open() -> void:
 	for child in app.get_children():
 		if child!=self and child!=app.session:
 			_capture_branch(child)
-	layer=Control.new();layer.name="CasinoExperience";layer.z_index=400;layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);layer.mouse_filter=Control.MOUSE_FILTER_STOP;layer.theme=Hearth20Design.theme();(app.seated_shell if app.seated_shell!=null else app).add_child(layer)
+	layer=Control.new();layer.name="CasinoExperience";layer.z_index=400;layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);layer.mouse_filter=Control.MOUSE_FILTER_STOP;layer.theme=Hearth20Design.theme()
+	if app.seated_shell!=null:
+		app.seated_shell.add_child(layer)
+		# GUI hit testing follows tree order, independently of the canvas z index.
+		app.seated_shell.move_child(layer,app.seated_shell.look_button.get_index())
+	else:app.add_child(layer)
 	loader=Control.new();loader.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);layer.add_child(loader)
 	var back=ColorRect.new();back.color=Color("#100d08");back.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);loader.add_child(back)
 	var center=CenterContainer.new();center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);loader.add_child(center)

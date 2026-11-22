@@ -17,6 +17,9 @@ func rebuild(roster: Array) -> void:
 	for i in others.size():
 		var entry=others[i];var wizard=Hearth20WizardAvatar.new();add_child(wizard);wizard.setup(entry.style,entry.host)
 		wizard.position=seat(i,others.size());wizard.rotation.y=atan2(-wizard.position.x,2.45-wizard.position.z);wizard.scale=Vector3.ONE*fitting;avatars[entry.id]=wizard
+		var head_position: Vector3=wizard.transform*wizard.hood.position
+		wizard.hood.rotation.y=atan2(-head_position.x,-head_position.z)-wizard.rotation.y
+		wizard.hood.rotation.x=deg_to_rad(8.0)
 		var nameplate=Label3D.new();nameplate.name="PublicDisplayName";nameplate.text=str(entry.name).left(40);nameplate.font_size=42;nameplate.pixel_size=.0017;nameplate.position=Vector3(0,1.55,0);nameplate.modulate=Color("#ead3a0");nameplate.outline_size=8;nameplate.billboard=BaseMaterial3D.BILLBOARD_ENABLED;wizard.add_child(nameplate)
 		var record=Node3D.new();record.name="GenericPublicSheet_"+str(i);record.position=wizard.position+wizard.basis.z*.65;record.position.y=.855;record.rotation.y=wizard.rotation.y+PI;record.scale=Vector3.ONE*.65;add_child(record)
 		var paper=MeshInstance3D.new();var plane=PlaneMesh.new();plane.size=Vector2(.58,.72);paper.mesh=plane;var parchment=StandardMaterial3D.new();parchment.albedo_color=Color("#cab98e");parchment.roughness=.98;paper.material_override=parchment;record.add_child(paper)

@@ -1,5 +1,15 @@
 extends RefCounted
 class_name Hearth20TokenInventory
+static func is_player_character(actor: Dictionary) -> bool:
+	# Player onboarding has always generated character- IDs for external sheets.
+	return bool(actor.get("is_hero",false)) and bool(actor.get("sheet_external",false)) and str(actor.get("id","")).begins_with("character-")
+
+static func name_is_public(actor: Dictionary) -> bool:
+	return is_player_character(actor) or actor.get("name_revealed",false)==true
+
+static func can_edit_character(actor: Dictionary, player: String) -> bool:
+	return not player.is_empty() and actor.get("owner_player_id","")==player and actor.get("is_hero",false)==true and not actor.get("in_inventory",false) and not actor.get("decorative",false) and actor.get("layer","tokens")=="tokens"
+
 static func visual_bounds(actor: Dictionary) -> Rect2:
 	var diameter:=float(actor.get("token_size",actor.get("size",1.0)))
 	var extent:=Vector2(float(actor.get("display_width_cells",diameter)),float(actor.get("display_height_cells",diameter)))
@@ -13,7 +23,7 @@ static func snap_position(scene: Dictionary, point: Vector2) -> Vector2:
 	if not scene.get("snap_to_grid",true): return point
 	return Vector2(clampf(floorf(point.x),0,float(scene.width_cells)-1)+.5,clampf(floorf(point.y),0,float(scene.height_cells)-1)+.5)
 static func new_actor(name_value: String, hero: bool, scene: Dictionary, point: Vector2) -> Dictionary:
-	return {"id":"actor-%d-%d"%[Time.get_ticks_usec(),randi()%100000],"name":name_value.strip_edges().left(64),"is_hero":hero,"scene_id":scene.id,"position":snap_position(scene,point),"in_inventory":false,"token_size":1.0,"owner_player_id":"","hidden":not hero,"png_asset_id":"","movement_policy":Hearth20Contracts.default_movement_policy("blocked",[]),"hp":1,"max_hp":1,"temp":0,"ac":10,"armor_class":10,"speed":30,"level":1,"abilities":[10,10,10,10,10,10],"save_profs":[],"save_bonuses":{},"skill_bonuses":{},"skills":{},"vision":{"enabled":true,"darkvision_feet":0.0,"bright_light_feet":0.0,"dim_light_feet":0.0,"darkvision_override":false}}
+	return {"id":"actor-%d-%d"%[Time.get_ticks_usec(),randi()%100000],"name":name_value.strip_edges().left(64),"is_hero":hero,"scene_id":scene.id,"position":snap_position(scene,point),"in_inventory":false,"token_size":1.0,"owner_player_id":"","name_revealed":false,"hidden":not hero,"png_asset_id":"","movement_policy":Hearth20Contracts.default_movement_policy("blocked",[]),"hp":1,"max_hp":1,"temp":0,"ac":10,"armor_class":10,"speed":30,"level":1,"abilities":[10,10,10,10,10,10],"save_profs":[],"save_bonuses":{},"skill_bonuses":{},"skills":{},"vision":{"enabled":true,"darkvision_feet":0.0,"bright_light_feet":0.0,"dim_light_feet":0.0,"darkvision_override":false}}
 
 static func party_positions(scene: Dictionary, entries: Array, count: int) -> Array:
 	var output: Array=[]

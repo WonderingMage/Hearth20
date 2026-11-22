@@ -13,6 +13,7 @@ signal table_request_finished(command: Dictionary, result: Dictionary)
 signal ping_received(event: Dictionary)
 signal tool_preview_received(event: Dictionary)
 signal character_submission_result(result: Dictionary)
+signal character_edit_result(result: Dictionary)
 signal casino_action_result(result: Dictionary)
 signal refreshment_event(event: Dictionary)
 signal refreshment_action_result(result: Dictionary)
@@ -20,6 +21,7 @@ signal table_presence_changed(roster: Array)
 signal avatar_result(result: Dictionary)
 signal belongings_result(result: Dictionary)
 signal jax_alert_received
+signal table_alert_received(id: String)
 signal jax_alert_cancelled
 
 const MAX_CLIENTS := 8
@@ -27,7 +29,7 @@ const MAX_PORT := 65535
 const MAX_SECRET_LENGTH := 128
 const MAP_IDLE_MSEC := 90000
 
-var jax_last_sent_msec=-10000
+var table_alert_sent := {}
 var jax_last_received_msec=-10000
 var campaign: Dictionary = {}
 var client_snapshot: Dictionary = {}
@@ -106,7 +108,7 @@ func cancel_direct_join() -> void:
 	if direct_join_deadline>0:_restore_direct_table(multiplayer.multiplayer_peer,"Direct connection cancelled.")
 
 func configure(campaign_data: Dictionary) -> void:
-	jax_alert_cancelled.emit();jax_last_sent_msec=-10000;jax_last_received_msec=-10000
+	jax_alert_cancelled.emit();table_alert_sent.clear();jax_last_received_msec=-10000
 	map_stream.clear(false);peer_map_downloads.clear();pending_map_snapshot.clear()
 	campaign = campaign_data
 	Hearth20MapLibrary.discard_empty_starter(campaign,str(campaign.get("active_scene","")))
@@ -197,7 +199,7 @@ func adopt_steam_peer(peer: MultiplayerPeer,hosting: bool,secret: String,nicknam
 	return {"ok":true}
 
 func stop_session() -> void:
-	jax_last_sent_msec=-10000
+	table_alert_sent.clear()
 	var was_steam=transport=="steam"
 	if multiplayer.multiplayer_peer!=null:multiplayer.multiplayer_peer.close()
 	transport="direct";steam_chunks.clear();steam_outgoing.clear();peer_steam_images.clear()
@@ -251,7 +253,7 @@ func send_handshake(identity: Dictionary, secret: String, nickname: String, publ
 	var nonce:=Crypto.new().generate_random_bytes(32)
 	var features: Array=identity.get("steam_features",[]) if identity.get("steam_features",[]) is Array else []
 	var image_version:=2 if "image-cache-v2" in features else 1 if transport=="steam" and "image-cache-v1" in features else 0
-	pending_proofs[peer_id]={"nonce":nonce,"public_key":public_pem,"nickname":nickname.strip_edges(),"expires":Time.get_ticks_msec()+15000,"image_cache":image_version,"background_maps":"background-maps-v1" in features,"avatar_presence":identity.get("avatar_presence",false)==true}
+	pending_proofs[peer_id]={"nonce":nonce,"public_key":public_pem,"nickname":nickname.strip_edges(),"expires":Time.get_ticks_msec()+15000,"image_cache":image_version,"background_maps":"background-maps-v1" in features,"avatar_presence":identity.get("avatar_presence",false)==true,"robe_palette_v2":identity.get("robe_palette_v2",false)==true}
 	player_challenge.rpc_id(peer_id,nonce)
 
 @rpc("authority", "call_remote", "reliable")
@@ -284,7 +286,7 @@ func prove_player(signature: PackedByteArray) -> void:
 	if int(pending.get("image_cache",0))>0:
 		peer_steam_images[peer_id]=Hearth20SteamImages.new();peer_steam_images[peer_id].protocol_version=int(pending.image_cache)
 	if pending.get("background_maps",false):peer_map_downloads[peer_id]={"active":"","offset":0,"acked":0,"queue":[],"done":{},"offered":{},"catalog":"","files":{}}
-	remote_players[player_id] = {"peer_id": peer_id, "nickname": nickname.strip_edges(), "joined_at": Time.get_unix_time_from_system(),"avatar_presence":pending.get("avatar_presence",false)}
+	remote_players[player_id] = {"peer_id": peer_id, "nickname": nickname.strip_edges(), "joined_at": Time.get_unix_time_from_system(),"avatar_presence":pending.get("avatar_presence",false),"robe_palette_v2":pending.get("robe_palette_v2",false)}
 	status_changed.emit("%s joined the table." % nickname.strip_edges())
 	connected_player.rpc_id(peer_id, player_id)
 	_send_peer_snapshot(peer_id, player_id)
@@ -325,6 +327,10 @@ func request_move(actor_id: String, from: Vector2, to: Vector2, expected_revisio
 @rpc("authority", "call_remote", "reliable")
 func receive_snapshot(snapshot: Dictionary) -> void:
 	if multiplayer.is_server():
+		return
+	if snapshot.has("_h20_table_alert"):
+		if Hearth20Identity.validate_network_identity(snapshot) and snapshot._h20_table_alert is String:
+			_receive_table_alert(snapshot._h20_table_alert)
 		return
 	var completed_transfer=""
 	if snapshot.has("_h20_cancel"):
@@ -371,7 +377,8 @@ func _resolve_background_view(snapshot: Dictionary) -> Dictionary:
 
 func _install_snapshot(snapshot: Dictionary,completed_transfer="") -> void:
 	if not avatar_submitted and snapshot.get("avatar_presence",false)==true and not local_player_id.is_empty():
-		avatar_submitted=true;request_avatar.rpc_id(1,Hearth20AvatarStyle.remembered(false))
+		avatar_submitted=true
+		request_avatar.rpc_id(1,Hearth20AvatarStyle.wire_style(Hearth20AvatarStyle.remembered(false),snapshot.get("robe_palette_v2",false)==true))
 	if int(snapshot.revision)<int(client_snapshot.get("revision",-1)):
 		if not completed_transfer.is_empty():_finish_map_download(completed_transfer)
 		return
@@ -442,6 +449,23 @@ func store_inventory_token(id: String) -> Dictionary:
 	if actor.is_empty() or actor.get("decorative",false): return {"ok":false,"error":"Choose a campaign token."}
 	actor.in_inventory=true; _inventory_changed(); return {"ok":true}
 
+func delete_campaign_token(id: String) -> Dictionary:
+	if local_role!="dm":return {"ok":false,"error":"Only the DM can delete a campaign token."}
+	var actor := Hearth20Contracts.find_actor(campaign,id)
+	if actor.is_empty() or actor.get("decorative",false):return {"ok":false,"error":"Choose an existing campaign token."}
+	campaign.actors.erase(actor)
+	for entry in campaign.get("participants",{}).values():
+		if entry.get("character_id","")==id:entry.erase("character_id")
+	var viewpoints: Dictionary=campaign.get("viewpoints",{})
+	for player in viewpoints.keys():
+		if viewpoints[player]==id:viewpoints.erase(player)
+	var remaining: Dictionary=campaign.get("turn_remaining_feet",{})
+	remaining.erase(id)
+	if campaign.get("active_turn_actor","")==id:campaign.erase("active_turn_actor")
+	token_owner.erase(id)
+	_inventory_changed()
+	return {"ok":true,"name":str(actor.get("name","Token"))}
+
 func place_inventory_token(id: String, point: Vector2) -> Dictionary:
 	if local_role!="dm": return {"ok":false,"error":"Only the DM places campaign tokens."}
 	var actor:=Hearth20Contracts.find_actor(campaign,id)
@@ -456,7 +480,7 @@ func duplicate_inventory_token(id: String) -> Dictionary:
 	if source.is_empty() or source.get("decorative",false): return {"ok":false,"error":"Choose a campaign token."}
 	var actor:=source.duplicate(true)
 	actor.id="actor-%d-%d"%[Time.get_ticks_usec(),randi()%100000]; actor.name=(str(actor.get("name","Token")).left(59)+" copy"); actor.in_inventory=true
-	actor.owner_player_id=""; actor.movement_policy=Hearth20Contracts.default_movement_policy("blocked",[]); actor.erase("turn_allowance_turn_id")
+	actor.owner_player_id=""; actor.name_revealed=false; actor.movement_policy=Hearth20Contracts.default_movement_policy("blocked",[]); actor.erase("turn_allowance_turn_id")
 	campaign.actors.append(actor); _inventory_changed(); return {"ok":true,"id":str(actor.id)}
 
 func center_scene_tokens() -> Dictionary:
@@ -651,6 +675,7 @@ func _project_for(player_id: String,map_override: Variant=null) -> Dictionary:
 		projected.table_mode=str(campaign.get("table_mode","map"))
 		projected.room_environment=Hearth20RoomWorlds.clean(campaign.get("room_environment","fey_forest"))
 		projected.avatar_presence=true
+		projected.robe_palette_v2=true
 		projected.belongings_supported=true
 		var personal=Hearth20Belongings.project(campaign,player_id)
 		projected.personal_notes=personal.notes;projected.item_inventory=personal.inventory;projected.board_items=personal.board
@@ -679,12 +704,15 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	_broadcast_presence()
 	_broadcast_dm_state()
 
-func presence_for(viewer: String) -> Array:
+func presence_for(viewer: String, extended_palette: bool=true) -> Array:
 	var result=[{"id":Hearth20Contracts._neutral_id(viewer,"dm-local"),"name":"Game Master","host":true,"mine":viewer=="dm-local","style":Hearth20AvatarStyle.clean(campaign.get("host_avatar",Hearth20AvatarStyle.remembered(true)),true)}]
 	# Join order stays stable; saved, disconnected participants never occupy seats.
 	for id in remote_players:
 		var participant=campaign.get("participants",{}).get(id,{})
 		result.append({"id":Hearth20Contracts._neutral_id(viewer,id),"name":str(remote_players[id].get("nickname","Player")).left(40),"host":false,"mine":viewer==id,"style":Hearth20AvatarStyle.clean(participant.get("avatar",{}),false)})
+	if not extended_palette:
+		for entry in result:
+			entry.style=Hearth20AvatarStyle.wire_style(entry.style,false)
 	return result
 
 func _broadcast_presence() -> void:
@@ -696,7 +724,9 @@ func _broadcast_presence() -> void:
 			var remote: ENetPacketPeer=multiplayer.multiplayer_peer.get_peer(int(peer))
 			if remote==null or remote.get_state()!=ENetPacketPeer.STATE_CONNECTED or remote.get_channels()==0:continue
 		var player=str(peer_to_player[peer])
-		if remote_players.get(player,{}).get("avatar_presence",false):receive_presence.rpc_id(int(peer),presence_for(player))
+		var capabilities: Dictionary=remote_players.get(player,{})
+		if capabilities.get("avatar_presence",false):
+			receive_presence.rpc_id(int(peer),presence_for(player,capabilities.get("robe_palette_v2",false)))
 
 @rpc("authority","call_remote","reliable")
 func receive_presence(roster: Array) -> void:
@@ -714,7 +744,8 @@ func set_avatar(value: Dictionary) -> Dictionary:
 	if local_role=="dm":return _apply_avatar_as("dm-local",value)
 	if multiplayer.multiplayer_peer is OfflineMultiplayerPeer or local_player_id.is_empty():return {"ok":false,"error":"Join a table before updating its avatar."}
 	if not client_snapshot.get("avatar_presence",false):return {"ok":false,"error":"The host needs an updated Hearth20 build to show wizard avatars."}
-	request_avatar.rpc_id(1,value);return {"ok":true,"pending":true}
+	request_avatar.rpc_id(1,Hearth20AvatarStyle.wire_style(value,client_snapshot.get("robe_palette_v2",false)==true))
+	return {"ok":true,"pending":true}
 
 func _apply_avatar_as(player: String,value: Dictionary) -> Dictionary:
 	if local_role!="dm" or (player!="dm-local" and (not remote_players.has(player) or not campaign.get("participants",{}).has(player))):return {"ok":false,"error":"Not admitted."}
@@ -774,6 +805,13 @@ func timeline_for_local() -> Array:
 
 func _timeline_for(player_id: String) -> Array:
 	var output: Array = []
+	var name_visibility := {}
+	var concealed_names := {}
+	if player_id != "dm-local":
+		for actor in campaign.get("actors",[]):
+			var public_name := Hearth20TokenInventory.name_is_public(actor)
+			name_visibility[str(actor.id)] = public_name
+			if not public_name:concealed_names[str(actor.get("name","")).left(96)] = true
 	for entry in campaign.get("table_timeline", []):
 		if not entry is Dictionary:
 			continue
@@ -788,6 +826,10 @@ func _timeline_for(player_id: String) -> Array:
 		for field in ["id", "type", "sender", "actor_name", "label", "visibility", "total", "formula", "dice", "kept", "modifier", "mode", "dice_set", "text", "time"]:
 			if entry.has(field):
 				clean[field] = Hearth20TableData.safe_value(entry[field])
+		if player_id != "dm-local" and clean.has("actor_name"):
+			var concealed: bool = not name_visibility.get(str(entry.actor_id),false) if entry.has("actor_id") else concealed_names.has(clean.actor_name)
+			if concealed:
+				clean.actor_name = "Token"
 		output.append(clean)
 	return output.slice(-200)
 
@@ -834,11 +876,11 @@ func send_chat(message: String, visibility: String = "public") -> Dictionary:
 		return _submit_table_request({"action": "chat", "text": clean.substr(6), "visibility": "gm"})
 	return _submit_table_request({"action": "chat", "text": message, "visibility": visibility})
 
-func _submit_table_request(command: Dictionary) -> Dictionary:
+func _submit_table_request(command: Dictionary, preset_face: int = 0) -> Dictionary:
 	if command.get("action","")=="roll": command.dice_set=Hearth20DiceSets.selected(local_role)
 	command.request_id = "command-%d-%d" % [Time.get_ticks_usec(), randi()]
 	if local_role == "dm":
-		return _apply_table_request(command, "dm-local")
+		return _apply_table_request(command, "dm-local", preset_face)
 	if local_player_id.is_empty() or multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return {"ok": false, "error": "Join a table before sending a roll or message."}
 	if pending_table_commands.size()>=32:return {"ok":false,"error":"Wait for the GM to confirm your pending requests."}
@@ -869,7 +911,7 @@ func table_action_result(ok: bool, message: String) -> void:
 			table_request_finished.emit(command,{"ok":ok,"message":message,"error":"" if ok else message})
 		status_changed.emit(message if not ok else "Recorded at the table.")
 
-func _apply_table_request(command: Dictionary, player_id: String) -> Dictionary:
+func _apply_table_request(command: Dictionary, player_id: String, preset_face: int = 0) -> Dictionary:
 	if is_spectating(player_id) and command.get("action","")!="chat":return {"ok":false,"error":"You are spectating during a blackout."}
 	if player_id != "dm-local" and not remote_players.has(player_id):
 		return {"ok": false, "error": "Only an admitted player may send table messages."}
@@ -887,6 +929,8 @@ func _apply_table_request(command: Dictionary, player_id: String) -> Dictionary:
 	if int(rate.count) > 12:
 		return {"ok": false, "error": "Please wait a moment before sending more messages."}
 	var visibility := str(command.get("visibility", "public"))
+	if preset_face != 0 and (player_id != "dm-local" or local_role != "dm" or not multiplayer.is_server() or visibility != "public"):
+		return {"ok": false, "error": "Only the DM can preset a public roll."}
 	if visibility not in ["public", "gm", "self", "secret"]:
 		return {"ok": false, "error": "Choose Public or Only me + DM."}
 	var entry := {"visibility": visibility}
@@ -924,12 +968,13 @@ func _apply_table_request(command: Dictionary, player_id: String) -> Dictionary:
 				var parsed := expression_parts.search(expression)
 				if parsed == null: return {"ok": false, "error": "Choose valid dice."}
 				expression = parsed.get_string(1) + "%+d" % (int(parsed.get_string(2)) + prof)
-			var rolled := Hearth20TableData.roll(actor, str(command.kind), str(command.get("key", "")), str(command.get("mode", "normal")), expression, dice_rng)
+			var rolled := Hearth20TableData.roll(actor, str(command.kind), str(command.get("key", "")), str(command.get("mode", "normal")), expression, dice_rng, preset_face)
 			if not rolled.ok:
 				return rolled
 			rolled.erase("ok")
 			entry.merge(rolled)
 			entry.actor_name = str(actor.get("name", "Dice")).left(96)
+			if not actor.is_empty():entry.actor_id = str(actor.id)
 		_:
 			return {"ok": false, "error": "Unknown table action."}
 	recent_requests[request_id] = true
@@ -1244,6 +1289,13 @@ func _new_invite_secret() -> String:
 func submit_dice(actor_id: String, expression: String, visibility: String, proficiency: bool, mode: String = "normal") -> Dictionary:
 	return _submit_table_request({"action":"roll", "actor_id":actor_id, "kind":"dice", "key":"", "mode":mode, "visibility":visibility, "expression":expression, "proficiency":proficiency})
 
+func submit_public_preset_dice(expression: String, mode: String, face: int) -> Dictionary:
+	if local_role != "dm" or not multiplayer.is_server():
+		return {"ok": false, "error": "Only the DM can preset a public roll."}
+	if face < 1:
+		return {"ok": false, "error": "Choose a positive whole-number die face."}
+	return _submit_table_request({"action":"roll", "actor_id":"", "kind":"dice", "key":"", "mode":mode, "visibility":"public", "expression":expression}, face)
+
 func board_action(command: Dictionary) -> Dictionary:
 	command = command.duplicate(true)
 	command.request_id = "board-%d-%d" % [Time.get_ticks_usec(), randi()]
@@ -1523,6 +1575,7 @@ func _on_connected_to_server() -> void:
 	if local_role == "player":
 		var identity=Hearth20Identity.network_identity()
 		identity.avatar_presence=true
+		identity.robe_palette_v2=true
 		identity.steam_features=["image-cache-v1","image-cache-v2","background-maps-v1"]
 		send_handshake.rpc_id(1, identity, invite_secret, pending_nickname,Hearth20PlayerProfile.public_key())
 
@@ -1576,8 +1629,15 @@ func request_view_actor(actor_id: String) -> void:
 	if not campaign.get("viewpoints") is Dictionary:campaign.viewpoints={}
 	campaign.viewpoints[player]=actor_id;_inventory_changed()
 
+func edit_owned_character(actor_id: String, display_name: String, png: PackedByteArray) -> Dictionary:
+	if not Hearth20Contracts.valid_identifier(actor_id):return {"ok":false,"error":"Choose your character token."}
+	return _send_character({"edit_token_id":actor_id,"name":display_name},png)
+
 func submit_join_character(sheet: Dictionary, png: PackedByteArray) -> Dictionary:
-	if local_role!="player" or local_player_id.is_empty() or multiplayer.multiplayer_peer.get_connection_status()!=MultiplayerPeer.CONNECTION_CONNECTED:return {"ok":false,"error":"Connect to the DM first."}
+	return _send_character(sheet,png)
+
+func _send_character(sheet: Dictionary, png: PackedByteArray) -> Dictionary:
+	if local_role!="player" or local_player_id.is_empty() or not multiplayer.has_multiplayer_peer() or multiplayer.multiplayer_peer.get_connection_status()!=MultiplayerPeer.CONNECTION_CONNECTED:return {"ok":false,"error":"Connect to the DM first."}
 	if png.size()>Hearth20Assets.TOKEN_MAX_BYTES or var_to_bytes(sheet).size()>Hearth20CharacterImport.MAX_BYTES:return {"ok":false,"error":"The character or PNG is too large."}
 	if transport=="steam":
 		if steam_outgoing.has(1):return {"ok":false,"error":"Your character image is still uploading."}
@@ -1599,19 +1659,26 @@ func request_join_character(sheet: Dictionary, png: PackedByteArray) -> void:
 		if not received.complete:return
 		if not received.value is Array or received.value.size()!=2 or not received.value[0] is Dictionary or not received.value[1] is PackedByteArray:_steam_transfer_failed(peer,"The character transfer was invalid.");return
 		sheet=received.value[0];png=received.value[1]
-	var rate_key = "join-character:"+player;var now = Time.get_ticks_msec()
+	var editing := sheet.has("edit_token_id")
+	var actor_id := str(sheet.get("edit_token_id","")).left(96)
+	var rate_key: String = ("edit-character:" if editing else "join-character:")+player
+	var now := Time.get_ticks_msec()
+	var result: Dictionary
 	if now-int(request_rates.get(rate_key,-10000))<1500:
-		receive_character_submission.rpc_id(peer,{"ok":false,"error":"Wait a moment before sending your character again."})
-		return
-	request_rates[rate_key]=now
-	var result = Hearth20JoinCharacter.submit(campaign,player,sheet,png)
-	if result.ok:
-		_inventory_changed()
-		status_changed.emit("%s's character is in the campaign token inventory."%str(remote_players.get(player,{}).get("nickname","Player")))
+		result={"ok":false,"error":"Wait a moment before sending your character again."}
+	else:
+		request_rates[rate_key]=now
+		result=Hearth20JoinCharacter.edit(campaign,player,actor_id,sheet,png) if editing else Hearth20JoinCharacter.submit(campaign,player,sheet,png)
+		if result.ok:
+			_inventory_changed()
+			if not editing:status_changed.emit("%s's character is in the campaign token inventory."%str(remote_players.get(player,{}).get("nickname","Player")))
+	if editing:result.merge({"edit":true,"id":actor_id})
 	receive_character_submission.rpc_id(peer,result)
 @rpc("authority","call_remote","reliable")
 func receive_character_submission(result: Dictionary) -> void:
-	if local_role=="player" and multiplayer.get_remote_sender_id()==1:character_submission_result.emit(result)
+	if local_role!="player" or multiplayer.get_remote_sender_id()!=1:return
+	if result.get("edit",false):character_edit_result.emit(result)
+	else:character_submission_result.emit(result)
 
 func casino_action(command: Dictionary) -> Dictionary:
 	if local_role=="dm":return _casino_action_as("dm-local",command)
@@ -1655,28 +1722,43 @@ func set_room_environment(id: String) -> Dictionary:
 	if campaign.get("room_environment","fey_forest")==id:return {"ok":true,"unchanged":true}
 	campaign.room_environment=id;campaign.revision=int(campaign.get("revision",0))+1;_broadcast_snapshots();return {"ok":true}
 func send_jax_alert() -> Dictionary:
-	if local_role!="dm" or is_spectating("dm-local"):return {"ok":false,"error":"Only the DM can use the Jax button."}
-	var peer=_jax_peer_id()
+	return send_table_alert("jax")
+func send_table_alert(id: String) -> Dictionary:
+	if local_role!="dm" or is_spectating("dm-local") or not Hearth20JaxAlert.TARGETS.has(id):return {"ok":false,"error":"Only the DM can use the table alert buttons."}
+	var target: int=Hearth20JaxAlert.TARGETS[id]
+	var peer := _jax_peer_id() if id=="jax" else _table_alert_peer_id(target)
 	if peer==0:return {"ok":true,"sent":false}
-	var now=Time.get_ticks_msec()
-	if now-jax_last_sent_msec<Hearth20JaxAlert.COOLDOWN_MSEC:return {"ok":true,"sent":false,"cooldown":true}
+	var now := Time.get_ticks_msec()
+	if now-int(table_alert_sent.get(target,-10000))<Hearth20JaxAlert.COOLDOWN_MSEC:return {"ok":true,"sent":false,"cooldown":true}
 	# A single tiny targeted RPC. No broadcast, campaign mutation or map transfer.
-	var error=rpc_id(peer,"receive_jax_alert")
+	var packet := Hearth20Identity.network_identity()
+	packet._h20_table_alert=id
+	var error := rpc_id(peer,"receive_jax_alert") if id=="jax" else rpc_id(peer,"receive_snapshot",packet)
 	if error!=OK:return {"ok":true,"sent":false}
-	jax_last_sent_msec=now;return {"ok":true,"sent":true}
+	table_alert_sent[target]=now;return {"ok":true,"sent":true}
 func _jax_peer_id() -> int:
+	return _table_alert_peer_id(Hearth20JaxAlert.STEAM_ID)
+func _table_alert_peer_id(target: int) -> int:
 	if transport!="steam" or not is_instance_valid(steam_link) or not steam_link.initialized or steam_link.lobby_id<=0:return 0
 	var peer=multiplayer.multiplayer_peer
 	if not peer.has_method("get_steam_id_for_peer_id"):return 0
-	return Hearth20JaxAlert.find_peer(multiplayer.get_peers(),peer_to_player,func(id):return peer.get_steam_id_for_peer_id(id),func(id):return steam_link.allows_peer(id))
+	return Hearth20JaxAlert.find_peer(multiplayer.get_peers(),peer_to_player,func(id):return peer.get_steam_id_for_peer_id(id),func(id):return steam_link.allows_peer(id),target)
 func _is_jax_local() -> bool:
-	return transport=="steam" and is_instance_valid(steam_link) and steam_link.initialized and steam_link.lobby_id>0 and steam_link.own_id==Hearth20JaxAlert.STEAM_ID
+	return _is_table_alert_local(Hearth20JaxAlert.STEAM_ID)
+func _is_table_alert_local(target: int) -> bool:
+	return transport=="steam" and is_instance_valid(steam_link) and steam_link.initialized and steam_link.lobby_id>0 and steam_link.own_id==target
 @rpc("authority","call_remote","reliable")
 func receive_jax_alert() -> void:
 	if local_role!="player" or multiplayer.get_remote_sender_id()!=1 or not _is_jax_local():return
 	var now=Time.get_ticks_msec()
 	if now-jax_last_received_msec<Hearth20JaxAlert.COOLDOWN_MSEC:return
 	jax_last_received_msec=now;jax_alert_received.emit()
+func _receive_table_alert(id: String) -> void:
+	if local_role!="player" or multiplayer.get_remote_sender_id()!=1 or id=="jax" or not Hearth20JaxAlert.TARGETS.has(id):return
+	if not _is_table_alert_local(Hearth20JaxAlert.TARGETS[id]):return
+	var now := Time.get_ticks_msec()
+	if now-jax_last_received_msec<Hearth20JaxAlert.COOLDOWN_MSEC:return
+	jax_last_received_msec=now;table_alert_received.emit(id)
 func room_environment() -> String:
 	return Hearth20RoomWorlds.clean(campaign.get("room_environment","fey_forest") if local_role=="dm" else client_snapshot.get("room_environment","fey_forest"))
 

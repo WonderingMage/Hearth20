@@ -39,6 +39,8 @@ var token_name_edit: LineEdit
 var token_size_edit: SpinBox
 var token_preview: TextureRect
 var token_visibility_button: Button
+var token_name_visibility_button: Button
+var delete_token_button: Button
 var grid_cells_edit: SpinBox
 var grid_anchor_edit: OptionButton
 var grid_scale_edit: SpinBox
@@ -122,6 +124,8 @@ var dice_stage: Hearth20DiceStage
 var connection_window: Window
 var connection_signature=""
 var map_tabs: Hearth20MapTabs
+var owned_token_menu: Hearth20MapTabs.ContextMenu
+var owned_token_target := ""
 var autosave: Hearth20Autosave
 var autosave_indicator: Hearth20AutosaveIndicator
 
@@ -247,6 +251,7 @@ func _build_ui() -> void:
 	board.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	board.selection_changed.connect(_on_selection)
 	board.hint_changed.connect(_on_status)
+	board.owned_token_context_requested.connect(_open_owned_token_context)
 	board_panel.add_child(board)
 	body.add_child(board_panel)
 	inspector_tabs = TabContainer.new()
@@ -338,7 +343,7 @@ func _build_ui() -> void:
 	var token_files := FileDialog.new()
 	token_files.access = FileDialog.ACCESS_FILESYSTEM
 	token_files.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	token_files.add_filter("*.png", "PNG token image")
+	token_files.add_filter("*.png, *.gif", "PNG and GIF token images")
 	token_files.title="Hearth20 · Choose token image"
 	token_files.use_native_dialog=OS.get_name()=="Windows"
 	token_files.file_selected.connect(_on_token_selected)
@@ -914,8 +919,9 @@ func _set_dynamic_lighting(enabled: bool) -> void:
 		_on_status(str(result.get("error", "Lighting could not be updated.")))
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if is_instance_valid(map_tabs) and map_tabs.menu.visible:
-		map_tabs.menu.handle_key(event);get_viewport().set_input_as_handled();return
+	var context_menu := active_context_menu()
+	if context_menu != null:
+		context_menu.handle_key(event);get_viewport().set_input_as_handled();return
 	if casino_portal!=null and casino_portal.phase!="closed":
 		if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
 			var table=casino_portal.scene
@@ -1098,6 +1104,8 @@ func _build_token_section(parent: VBoxContainer) -> void:
 	token_preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	parent.add_child(token_preview)
 	token_visibility_button = _add_button(parent, "Reveal to players", _toggle_selected_visibility)
+	token_name_visibility_button = _add_button(parent, "Reveal name", _toggle_selected_name_visibility)
+	token_name_visibility_button.hide()
 	token_name_edit = LineEdit.new()
 	token_name_edit.placeholder_text = "Choose a token on the map"
 	token_name_edit.text_submitted.connect(_rename_selected_token)
@@ -1125,10 +1133,12 @@ func _build_token_section(parent: VBoxContainer) -> void:
 	position_row.add_child(token_y_edit)
 	parent.add_child(position_row)
 	_add_button(parent, "Apply token position", _apply_token_position)
-	_add_button(parent, "Choose PNG appearance…", _open_token_dialog)
+	_add_button(parent, "Choose token appearance…", _open_token_dialog)
+	delete_token_button = _add_button(parent,"Delete token…",_confirm_token_deletion)
+	delete_token_button.hide()
 	_add_header(parent, "DM CONTROL")
 	var note := Label.new()
-	note.text = "PNG is cosmetic and stored in this campaign."
+	note.text = "Token images stay in this campaign. GIFs loop on the map."
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(note)
 	_add_header(parent, "ASSIGNMENT / MOVEMENT")
@@ -1287,7 +1297,7 @@ func _build_network_section(parent: VBoxContainer) -> void:
 	var join_button := _add_button(network_controls, "Join as player", _join_table)
 	_accent_button(join_button)
 	var session_note := Label.new()
-	session_note.text = "Players can select and move an assigned hero within the DM's current movement permission. The host checks each request. First-time players import a character sheet and optional token PNG; the DM receives the character in inventory."
+	session_note.text = "Players can move an assigned hero within the DM's current movement permission. First-time players choose a character name and token image. The DM receives the token in the vault."
 	session_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(session_note)
 
@@ -1619,6 +1629,41 @@ func _confirm_map_deletion(scene_id: String) -> void:
 	Hearth20Design.popup_window(dialog)
 	dialog.get_cancel_button().grab_focus.call_deferred()
 
+func _confirm_token_deletion(owner: Node=null) -> void:
+	if session.local_role!="dm" or board.role!="dm":return
+	var id := str(board.selected_actor_id)
+	var actor := Hearth20Contracts.find_actor(campaign,id)
+	if actor.is_empty() or actor.get("decorative",false):return
+	var dialog_owner: Node=owner if is_instance_valid(owner) else seated_shell if is_instance_valid(seated_shell) else self
+	if dialog_owner.has_node("DeleteCampaignToken"):return
+	var target_campaign: Dictionary=campaign
+	var dialog:=ConfirmationDialog.new()
+	dialog.name="DeleteCampaignToken"
+	dialog.title="Delete token"
+	dialog.theme=Hearth20Design.theme()
+	dialog.dialog_autowrap=true
+	dialog.dialog_text="Delete “%s” from the campaign? This removes it from the board and the token vault."%str(actor.get("name","Token"))
+	dialog.ok_button_text="Delete token"
+	dialog.cancel_button_text="Keep token"
+	dialog.size=Vector2i(435,170)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.close_requested.connect(dialog.queue_free)
+	dialog.confirmed.connect(func():
+		dialog.queue_free()
+		if not is_same(target_campaign,campaign):
+			_on_status("The campaign changed. Select the token again.")
+			return
+		var result: Dictionary=session.delete_campaign_token(id)
+		if result.ok:
+			if board.selected_actor_id==id:board.selected_actor_id=""
+			_refresh_token_inspector()
+			board.queue_redraw()
+			_on_status("Deleted "+str(result.name)+".")
+		else:_on_status(str(result.error)))
+	dialog_owner.add_child(dialog)
+	Hearth20Design.popup_window(dialog)
+	dialog.get_cancel_button().grab_focus.call_deferred()
+
 func _toggle_grid_snap() -> void:
 	var enabled: bool = board.toggle_snap_to_grid()
 	_update_grid_state()
@@ -1872,6 +1917,9 @@ func _refresh_token_inspector() -> void:
 			if str(visible_actor.get("id", "")) == board.selected_actor_id:
 				actor = visible_actor
 				break
+	token_name_visibility_button.visible = board.role == "dm" and not actor.is_empty() and not actor.get("decorative",false) and not Hearth20TokenInventory.is_player_character(actor)
+	delete_token_button.visible = board.role=="dm" and not actor.is_empty() and not actor.get("decorative",false)
+	token_name_visibility_button.text = "Conceal name" if Hearth20TokenInventory.name_is_public(actor) else "Reveal name"
 	if actor.is_empty():
 		token_visibility_button.visible = board.role == "dm"
 		token_visibility_button.disabled = true
@@ -1904,6 +1952,17 @@ func _refresh_token_inspector() -> void:
 	var asset_id := str(actor.get("png_asset_id", actor.get("asset_id", "")))
 	token_preview.texture = board._actor_texture(asset_id) if not asset_id.is_empty() else null
 
+func _toggle_selected_name_visibility() -> void:
+	if board == null or board.role != "dm":return
+	var actor := Hearth20Contracts.find_actor(campaign,board.selected_actor_id)
+	if actor.is_empty() or actor.get("decorative",false) or Hearth20TokenInventory.is_player_character(actor):return
+	actor.name_revealed = not Hearth20TokenInventory.name_is_public(actor)
+	if session and session.local_role == "dm":session._inventory_changed()
+	else:campaign.revision = int(campaign.get("revision",0))+1
+	_refresh_token_inspector()
+	board.queue_redraw()
+	_on_status("Token name revealed to players." if actor.name_revealed else "Token name concealed from players.")
+
 func _toggle_selected_visibility() -> void:
 	if board == null or board.role != "dm" or board.selected_actor_id.is_empty():
 		return
@@ -1920,6 +1979,8 @@ func _toggle_selected_visibility() -> void:
 
 func _on_snapshot(value: Dictionary) -> void:
 	board.set_player_snapshot(value)
+	if is_instance_valid(owned_token_menu) and owned_token_menu.visible and _editable_owned_token(owned_token_target).is_empty():
+		owned_token_menu.hide()
 	if session.local_role=="player" and not value.get("connection_closed",false):
 		if value.get("character_required",false) and not is_instance_valid(join_character_window) and not (multiplayer_lab!=null and multiplayer_lab.auto_character()):
 			open_join_character()
@@ -2074,6 +2135,46 @@ func open_join_character() -> Hearth20JoinPawnWindow:
 	(seated_shell if seated_shell!=null else self).add_child(join_character_window)
 	join_character_window.setup(self)
 	return join_character_window
+
+func active_context_menu() -> Hearth20MapTabs.ContextMenu:
+	if is_instance_valid(owned_token_menu) and owned_token_menu.visible:
+		return owned_token_menu
+	if is_instance_valid(map_tabs) and map_tabs.menu.visible:
+		return map_tabs.menu
+	return null
+
+func _editable_owned_token(actor_id: String) -> Dictionary:
+	if session.local_role != "player" or board.read_only_preview or session.is_spectating():
+		return {}
+	for actor in board.current_actors():
+		if actor.get("self_editable", false) and actor.get("id", "") == actor_id:
+			return actor
+	return {}
+
+func _open_owned_token_context(actor_id: String, point: Vector2) -> void:
+	var actor := _editable_owned_token(actor_id)
+	if actor.is_empty():
+		return
+	if not is_instance_valid(owned_token_menu):
+		owned_token_menu = Hearth20MapTabs.ContextMenu.new([["Edit name & appearance…", "tokens"]])
+		owned_token_menu.name = "OwnedTokenContextMenu"
+		owned_token_menu.id_pressed.connect(func(_action): _open_owned_token_editor.call_deferred(owned_token_target))
+		add_child(owned_token_menu)
+	owned_token_menu.items[0].text="Change appearance…" if actor.has("masked_name_length") else "Edit name & appearance…"
+	owned_token_target = actor_id
+	owned_token_menu.popup_at(point)
+
+func _open_owned_token_editor(actor_id: String) -> void:
+	var actor := _editable_owned_token(actor_id)
+	if actor.is_empty():
+		return
+	var parent: Node = seated_shell if seated_shell != null else self
+	if parent.has_node("OwnedTokenEditor"):
+		return
+	var editor := Hearth20OwnedTokenEditor.new()
+	editor.name = "OwnedTokenEditor"
+	parent.add_child(editor)
+	editor.setup(self, actor)
 func _on_steam_invite() -> void:
 	open_connections("join").accept_invitation()
 func _steam_connection_changed() -> void:
